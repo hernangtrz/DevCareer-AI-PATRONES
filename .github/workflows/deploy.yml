@@ -1,0 +1,328 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      clean_state:
+        description: 'Forzar borrado de estado (manual)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # FASE 1: Levantar Infraestructura Base y Obtener DNS del ALB
+  # ────────────────────────────────────────────────────────────────────────────
+  infra-base:
+    name: 🏗️ 1. Infraestructura Base
+    runs-on: ubuntu-latest
+    outputs:
+      alb_dns: ${{ steps.alb_dns.outputs.DNS }}
+      cognito_user_pool_id: ${{ steps.alb_dns.outputs.USER_POOL_ID }}
+      cognito_client_id: ${{ steps.alb_dns.outputs.CLIENT_ID }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      # Descargar el estado de la ejecución anterior
+      - name: Download Previous Terraform State
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Buscando estado previo de Terraform..."
+          gh run download --name terraform-state --dir terraform-aws || echo "No se encontró estado previo en GitHub."
+
+      # Automatización Autocurativa: Detectar si cambió el Lab de AWS
+      - name: Auto-Detect Lab Rotation (Self-Healing State)
+        run: |
+          STATE_FILE="terraform-aws/terraform.tfstate"
+          if [ -f "$STATE_FILE" ]; then
+            echo "Analizando coincidencia de cuenta de AWS en el estado previo..."
+            
+            # Extraer el primer ARN de AWS en el archivo de estado para obtener el Account ID anterior
+            FIRST_ARN=$(grep -oE 'arn:aws:[a-zA-Z0-9._-]+:[a-z0-9-]+:[0-9]{12}:[a-zA-Z0-9._/-]+' "$STATE_FILE" | head -n 1 || true)
+            
+            if [ -n "$FIRST_ARN" ]; then
+              STATE_ACCOUNT=$(echo "$FIRST_ARN" | cut -d':' -f5)
+              CURRENT_ACCOUNT=$(aws sts get-caller-identity --query "Account" --output text)
+              
+              echo "Cuenta en estado previo: $STATE_ACCOUNT"
+              echo "Cuenta activa del Lab:  $CURRENT_ACCOUNT"
+              
+              if [ "$STATE_ACCOUNT" != "$CURRENT_ACCOUNT" ] || [ "${{ github.event.inputs.clean_state }}" = "true" ]; then
+                echo "⚠️ Se detectó un cambio de cuenta de AWS Academy o limpieza forzada."
+                echo "Eliminando estado obsoleto para iniciar despliegue limpio en el nuevo laboratorio..."
+                rm -f terraform-aws/terraform.tfstate terraform-aws/terraform.tfstate.backup
+              else
+                echo "✅ Las cuentas coinciden. Continuando con despliegue incremental sobre el mismo laboratorio."
+              fi
+            else
+              echo "El archivo de estado no contiene recursos creados aún."
+            fi
+          else
+            echo "No hay archivo de estado previo. Se iniciará un despliegue limpio."
+          fi
+
+      - name: Generate Base terraform.tfvars
+        run: |
+          cat <<EOF > terraform-aws/terraform.tfvars
+          aws_region   = "us-east-1"
+          project_name = "devcareer"
+          environment  = "dev"
+          
+          vpc_cidr           = "10.0.0.0/16"
+          availability_zones = ["us-east-1a", "us-east-1b"]
+          public_subnets     = ["10.0.1.0/24", "10.0.2.0/24"]
+          private_subnets    = ["10.0.10.0/24", "10.0.11.0/24"]
+          database_subnets   = ["10.0.20.0/24", "10.0.21.0/24"]
+          
+          backend_image  = "hernang09/devcareer-backend:latest"
+          
+          frontend_cpu           = 256
+          frontend_memory        = 512
+          backend_cpu            = 256
+          backend_memory         = 512
+          frontend_desired_count = 2
+          backend_desired_count  = 2
+          
+          port     = "3001"
+          node_env = "production"
+          
+          dynamo_table_users      = "devcareer_users"
+          dynamo_table_interviews = "devcareer_interviews"
+          dynamo_table_feedback   = "devcareer_feedback"
+          EOF
+
+      - name: Terraform Init & Apply (Base)
+        env:
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          TF_VAR_google_generative_ai_api_key: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+          TF_VAR_next_public_vapi_web_token: ${{ secrets.VAPI_WEB_TOKEN }}
+          TF_VAR_next_public_vapi_workflow_id: ${{ secrets.VAPI_WORKFLOW_ID }}
+          TF_VAR_livekit_url: ${{ secrets.LIVEKIT_URL }}
+          TF_VAR_livekit_api_key: ${{ secrets.LIVEKIT_API_KEY }}
+          TF_VAR_livekit_api_secret: ${{ secrets.LIVEKIT_API_SECRET }}
+          TF_VAR_deepgram_api_key: ${{ secrets.DEEPGRAM_API_KEY }}
+          TF_VAR_cartesia_api_key: ${{ secrets.CARTESIA_API_KEY }}
+          TF_VAR_groq_api_key: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          cd terraform-aws
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Extract Frontend ALB DNS & Cognito Details
+        id: alb_dns
+        run: |
+          cd terraform-aws
+          DNS=$(terraform output -raw frontend_alb_dns)
+          echo "DNS=$DNS" >> $GITHUB_OUTPUT
+          USER_POOL_ID=$(terraform output -raw cognito_user_pool_id)
+          echo "USER_POOL_ID=$USER_POOL_ID" >> $GITHUB_OUTPUT
+          CLIENT_ID=$(terraform output -raw cognito_client_id)
+          echo "CLIENT_ID=$CLIENT_ID" >> $GITHUB_OUTPUT
+
+      # Guardar el estado actual para pasarlo al siguiente Job
+      - name: Upload Current State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state
+          path: |
+            terraform-aws/terraform.tfstate
+            terraform-aws/terraform.tfstate.backup
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # FASE 2: Build y Push de la Imagen Docker del Frontend
+  # ────────────────────────────────────────────────────────────────────────────
+  build-frontend:
+    name: 🐳 2. Compilar & Subir Frontend
+    runs-on: ubuntu-latest
+    needs: infra-base
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/devcareer-frontend:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://${{ needs.infra-base.outputs.alb_dns }}
+            NEXT_PUBLIC_COGNITO_USER_POOL_ID=${{ needs.infra-base.outputs.cognito_user_pool_id }}
+            NEXT_PUBLIC_COGNITO_CLIENT_ID=${{ needs.infra-base.outputs.cognito_client_id }}
+            NEXT_PUBLIC_AWS_REGION=us-east-1
+            NEXT_PUBLIC_VAPI_WEB_TOKEN=${{ secrets.VAPI_WEB_TOKEN }}
+            NEXT_PUBLIC_VAPI_WORKFLOW_ID=${{ secrets.VAPI_WORKFLOW_ID }}
+            NEXT_PUBLIC_VOICE_PROVIDER=livekit
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # FASE 2b: Build y Push de la Imagen Docker del Backend
+  # ────────────────────────────────────────────────────────────────────────────
+  build-backend:
+    name: 🐳 2b. Compilar & Subir Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./Backend
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/devcareer-backend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/devcareer-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/devcareer-backend:v3
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # FASE 2c: Build y Push de la Imagen Docker del LiveKit Agent
+  # ────────────────────────────────────────────────────────────────────────────
+  build-agent:
+    name: 🎤 2c. Compilar & Subir LiveKit Agent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push LiveKit Agent Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./livekit-agent
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/devcareer-agent:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/devcareer-agent:latest
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # FASE 3: Actualizar ECS Fargate con Frontend, Backend y LiveKit Agent
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-ecs:
+    name: 🚀 3. Redesplegar ECS Fargate
+    runs-on: ubuntu-latest
+    needs: [infra-base, build-frontend, build-backend, build-agent]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      # Descargar el estado transferido desde la Fase 1
+      - name: Download State from Phase 1
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-state
+          path: terraform-aws/
+
+      - name: Generate Base terraform.tfvars
+        run: |
+          cat <<EOF > terraform-aws/terraform.tfvars
+          aws_region   = "us-east-1"
+          project_name = "devcareer"
+          environment  = "dev"
+          
+          vpc_cidr           = "10.0.0.0/16"
+          availability_zones = ["us-east-1a", "us-east-1b"]
+          public_subnets     = ["10.0.1.0/24", "10.0.2.0/24"]
+          private_subnets    = ["10.0.10.0/24", "10.0.11.0/24"]
+          database_subnets   = ["10.0.20.0/24", "10.0.21.0/24"]
+          
+          backend_image  = "${{ secrets.DOCKERHUB_USERNAME }}/devcareer-backend:${{ github.sha }}"
+          
+          frontend_cpu           = 256
+          frontend_memory        = 512
+          backend_cpu            = 256
+          backend_memory         = 512
+          frontend_desired_count = 2
+          backend_desired_count  = 2
+          
+          port     = "3001"
+          node_env = "production"
+          
+          dynamo_table_users      = "devcareer_users"
+          dynamo_table_interviews = "devcareer_interviews"
+          dynamo_table_feedback   = "devcareer_feedback"
+          EOF
+
+      - name: Terraform Apply (Final Update)
+        env:
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          TF_VAR_google_generative_ai_api_key: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+          TF_VAR_next_public_vapi_web_token: ${{ secrets.VAPI_WEB_TOKEN }}
+          TF_VAR_next_public_vapi_workflow_id: ${{ secrets.VAPI_WORKFLOW_ID }}
+          TF_VAR_livekit_url: ${{ secrets.LIVEKIT_URL }}
+          TF_VAR_livekit_api_key: ${{ secrets.LIVEKIT_API_KEY }}
+          TF_VAR_livekit_api_secret: ${{ secrets.LIVEKIT_API_SECRET }}
+          TF_VAR_deepgram_api_key: ${{ secrets.DEEPGRAM_API_KEY }}
+          TF_VAR_cartesia_api_key: ${{ secrets.CARTESIA_API_KEY }}
+          TF_VAR_groq_api_key: ${{ secrets.GROQ_API_KEY }}
+          TF_VAR_frontend_image: ${{ secrets.DOCKERHUB_USERNAME }}/devcareer-frontend:${{ github.sha }}
+          TF_VAR_backend_image: ${{ secrets.DOCKERHUB_USERNAME }}/devcareer-backend:${{ github.sha }}
+          TF_VAR_livekit_agent_image: ${{ secrets.DOCKERHUB_USERNAME }}/devcareer-agent:${{ github.sha }}
+        run: |
+          cd terraform-aws
+          terraform init
+          terraform apply -auto-approve
+
+      # Subir el estado final definitivo
+      - name: Upload Final State for Next Runs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state
+          path: |
+            terraform-aws/terraform.tfstate
+            terraform-aws/terraform.tfstate.backup

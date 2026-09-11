@@ -1,0 +1,35 @@
+import type { Metadata } from "next";
+import { Mona_Sans } from "next/font/google";
+
+import "./globals.css";
+import { Toaster } from "sonner";
+import { LanguageProvider } from "@/contexts/LanguageContext";
+
+const monaSans = Mona_Sans({
+  variable: "--font-mona-sans",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "DevCareer AI",
+  description:
+    "Plataforma impulsada por IA para entrevistas, creación y análisis de CV profesional",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="es" className="dark">
+      <body className={`${monaSans.className} antialiased pattern`}>
+        <LanguageProvider>
+          {children}
+
+          <Toaster />
+        </LanguageProvider>
+      </body>
+    </html>
+  );
+}

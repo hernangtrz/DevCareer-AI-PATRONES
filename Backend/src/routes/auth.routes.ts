@@ -2,10 +2,23 @@ import { Router, Request, Response } from "express";
 import { cognitoIdVerifier } from "../config/cognito";
 import { supabase } from "../config/supabase";
 import { getUserById, createUser } from "../services/users.service";
-import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
+import {
+  requireAuth,
+  AuthRequest,
+  IAuthVerifier,
+  AuthUser,
+  SupabaseAuthVerifier,
+  CognitoAuthVerifier,
+} from "../middleware/auth.middleware";
 import { authLimiter } from "../middleware/rate-limit.middleware";
 
 const router = Router();
+
+// Lista de verificadores independientes según el Patrón Strategy (OCP / DIP)
+const authVerifiers: IAuthVerifier[] = [
+  new SupabaseAuthVerifier(supabase),
+  new CognitoAuthVerifier(cognitoIdVerifier),
+];
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /auth/signup
@@ -62,28 +75,21 @@ router.post("/signin", authLimiter, async (req: Request, res: Response): Promise
   }
 
   try {
-    let uid: string;
-    let email: string;
-    let name: string;
-
-    if (process.env.SUPABASE_URL) {
-      const { data: { user }, error } = await supabase.auth.getUser(idToken);
-      if (error || !user) {
-        throw new Error(error?.message || "Token de Supabase inválido");
-      }
-      uid = user.id;
-      email = user.email!;
-      name = user.user_metadata?.name || user.user_metadata?.full_name || email.split("@")[0];
-    } else {
-      if (!cognitoIdVerifier) {
-        throw new Error("AWS Cognito no está configurado (faltan variables de entorno).");
-      }
-      // Verificar que el token sea válido (firmado por nuestro Cognito User Pool)
-      const payload = await cognitoIdVerifier.verify(idToken);
-      uid   = payload.sub;
-      email = payload.email as string;
-      name  = (payload.name as string) || email.split("@")[0];
+    // Verificación polimórfica mediante la interfaz IAuthVerifier (Patrón Strategy)
+    let authUser: AuthUser | null = null;
+    for (const verifier of authVerifiers) {
+      authUser = await verifier.verifyToken(idToken);
+      if (authUser) break;
     }
+
+    if (!authUser) {
+      res.status(401).json({ success: false, message: "Token inválido o proveedor no reconocido." });
+      return;
+    }
+
+    const uid = authUser.id;
+    const email = authUser.email || "";
+    const name = authUser.name || email.split("@")[0] || "Usuario";
 
     // Auto-crear usuario en DB si no existe
     const existing = await getUserById(uid);
@@ -107,7 +113,7 @@ router.post("/signin", authLimiter, async (req: Request, res: Response): Promise
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /auth/me
-// Retorna el usuario actual a partir del Bearer token (ID Token de Cognito o Access Token de Supabase)
+// Retorna el usuario actual a partir del Bearer token
 // ──────────────────────────────────────────────────────────────────────────────
 router.get("/me", requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -144,27 +150,20 @@ router.post("/verify-session", async (req: Request, res: Response): Promise<void
   }
 
   try {
-    let uid: string;
-    let email: string;
-    let name: string;
-
-    if (process.env.SUPABASE_URL) {
-      const { data: { user }, error } = await supabase.auth.getUser(sessionCookie);
-      if (error || !user) {
-        throw new Error(error?.message || "Token de Supabase inválido");
-      }
-      uid = user.id;
-      email = user.email!;
-      name = user.user_metadata?.name || user.user_metadata?.full_name || email.split("@")[0];
-    } else {
-      if (!cognitoIdVerifier) {
-        throw new Error("AWS Cognito no está configurado (faltan variables de entorno).");
-      }
-      const payload = await cognitoIdVerifier.verify(sessionCookie);
-      uid   = payload.sub;
-      email = payload.email as string;
-      name  = (payload.name as string) || email.split("@")[0];
+    let authUser: AuthUser | null = null;
+    for (const verifier of authVerifiers) {
+      authUser = await verifier.verifyToken(sessionCookie);
+      if (authUser) break;
     }
+
+    if (!authUser) {
+      res.status(401).json({ success: false, message: "Sesión inválida o expirada" });
+      return;
+    }
+
+    const uid = authUser.id;
+    const email = authUser.email || "";
+    const name = authUser.name || email.split("@")[0] || "Usuario";
 
     let user = await getUserById(uid);
 
@@ -182,4 +181,3 @@ router.post("/verify-session", async (req: Request, res: Response): Promise<void
 });
 
 export default router;
-

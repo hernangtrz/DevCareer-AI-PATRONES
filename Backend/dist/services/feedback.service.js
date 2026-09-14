@@ -1,33 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.setFeedbackRepository = setFeedbackRepository;
 exports.createFeedbackRecord = createFeedbackRecord;
 exports.getFeedbackByInterviewId = getFeedbackByInterviewId;
-const lib_dynamodb_1 = require("@aws-sdk/lib-dynamodb");
-const dynamo_1 = require("../config/dynamo");
-const uuid_1 = require("uuid");
+const repository_factory_1 = require("../repositories/repository.factory");
+/**
+ * Servicio de Dominio para Feedback (DIP / LSP / SRP).
+ * Delega la persistencia al contrato IFeedbackRepository.
+ */
+let currentRepo = repository_factory_1.RepositoryFactory.getFeedbackRepository();
+function setFeedbackRepository(repo) {
+    currentRepo = repo;
+}
 async function createFeedbackRecord(feedback) {
-    const id = (0, uuid_1.v4)();
-    const item = { id, ...feedback };
-    await dynamo_1.dynamo.send(new lib_dynamodb_1.PutCommand({
-        TableName: dynamo_1.TABLES.FEEDBACK,
-        Item: item,
-    }));
-    return id;
+    return currentRepo.create(feedback);
 }
 async function getFeedbackByInterviewId(interviewId, userId) {
-    const result = await dynamo_1.dynamo.send(new lib_dynamodb_1.QueryCommand({
-        TableName: dynamo_1.TABLES.FEEDBACK,
-        IndexName: "interviewId-userId-index",
-        KeyConditionExpression: "interviewId = :interviewId AND userId = :userId",
-        ExpressionAttributeValues: {
-            ":interviewId": interviewId,
-            ":userId": userId,
-        },
-    }));
-    if (!result.Items || result.Items.length === 0)
-        return null;
-    const feedbacks = result.Items;
-    // Retornar el más reciente
-    return feedbacks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    return currentRepo.getByInterviewId(interviewId, userId);
 }
 //# sourceMappingURL=feedback.service.js.map

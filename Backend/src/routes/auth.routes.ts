@@ -75,7 +75,7 @@ router.post("/signin", authLimiter, async (req: Request, res: Response): Promise
   }
 
   try {
-    // Verificación polimórfica mediante la interfaz IAuthVerifier (Patrón Strategy)
+    // Verificación polimórfica mediante la interfaz IAuthVerifier
     let authUser: AuthUser | null = null;
     for (const verifier of authVerifiers) {
       authUser = await verifier.verifyToken(idToken);

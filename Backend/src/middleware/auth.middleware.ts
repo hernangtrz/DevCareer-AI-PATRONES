@@ -132,7 +132,7 @@ export function requireAuth(
     new CognitoAuthVerifier(cognitoIdVerifier),
   ];
 
-  // Caso 2: Express lo invoca directamente como middleware: router.use(requireAuth) o router.get("/me", requireAuth, ...)
+  // Caso 2: si Express lo invoca directamente como middleware: router.use(requireAuth) o router.get("/me", requireAuth), etc
   if (reqOrVerifiers && res && next) {
     return executeAuth(reqOrVerifiers as AuthRequest, res, next, defaultVerifiers);
   }

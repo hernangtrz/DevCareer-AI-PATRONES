@@ -1,2 +1,6 @@
 REDEPLOY.md
 /livekit-sandbox
+.env
+.env*
+*.env
+

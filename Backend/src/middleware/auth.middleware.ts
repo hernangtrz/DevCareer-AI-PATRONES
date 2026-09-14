@@ -11,7 +11,7 @@ export interface AuthUser {
 }
 
 /**
- * Patrón Strategy (OCP / DIP / ISP):
+ * Principio de Inversión de Dependencias y Abierto/Cerrado (DIP / OCP / ISP):
  * Interfaz común para verificadores de autenticación independientes.
  */
 export interface IAuthVerifier {

@@ -75,7 +75,7 @@ router.post("/signin", authLimiter, async (req: Request, res: Response): Promise
   }
 
   try {
-    // Verificación polimórfica mediante la interfaz IAuthVerifier (Patrón Strategy)
+    // Verificación polimórfica mediante la interfaz IAuthVerifier
     let authUser: AuthUser | null = null;
     for (const verifier of authVerifiers) {
       authUser = await verifier.verifyToken(idToken);
@@ -122,8 +122,8 @@ router.get("/me", requireAuth, async (req: AuthRequest, res: Response): Promise<
     if (!user) {
       // Auto-crear usuario si no existe
       user = {
-        id:    req.userId!,
-        name:  req.userName || req.userEmail?.split("@")[0] || "Usuario",
+        id: req.userId!,
+        name: req.userName || req.userEmail?.split("@")[0] || "Usuario",
         email: req.userEmail || "",
       };
       await createUser(user);

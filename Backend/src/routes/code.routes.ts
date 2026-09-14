@@ -1,8 +1,9 @@
 import { Router, Request, Response } from "express";
-import { evaluateCodeChallenge } from "../services/gemini.service";
+import { CodeChallengeService } from "../services/ai";
 import { aiRateLimiter } from "../middleware/rate-limit.middleware";
 
 const router = Router();
+const codeChallengeService = new CodeChallengeService();
 
 // Apply AI rate limiting
 router.use(aiRateLimiter);
@@ -14,7 +15,6 @@ router.post("/feedback", async (req: Request, res: Response): Promise<void> => {
       code,
       problemTitle,
       problemDescription,
-      testResults,
       passedCount,
       totalCount,
       isDesignPattern,
@@ -28,7 +28,7 @@ router.post("/feedback", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const feedback = await evaluateCodeChallenge({
+    const feedback = await codeChallengeService.evaluate({
       code,
       problemTitle,
       problemDescription: problemDescription || "",

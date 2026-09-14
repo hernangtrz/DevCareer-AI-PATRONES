@@ -153,9 +153,9 @@ export async function createFeedback(
     language?: string;
   },
   bearerToken: string,
-): Promise<{ success: boolean; feedbackId?: string }> {
+): Promise<{ success: boolean; feedbackId?: string; feedback?: any }> {
   try {
-    return await apiFetch(
+    const res = await apiFetch<{ success: boolean; feedbackId?: string; feedback?: { id: string } }>(
       "/feedback",
       {
         method: "POST",
@@ -163,7 +163,13 @@ export async function createFeedback(
       },
       bearerToken,
     );
-  } catch {
+    return {
+      success: res.success,
+      feedbackId: res.feedbackId || res.feedback?.id,
+      feedback: res.feedback,
+    };
+  } catch (err) {
+    console.error("[api.createFeedback] Error:", err);
     return { success: false };
   }
 }

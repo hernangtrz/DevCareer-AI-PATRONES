@@ -5,34 +5,12 @@ import * as openai from '@livekit/agents-plugin-openai';
 import * as silero from '@livekit/agents-plugin-silero';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
+import { VoiceAgentStrategyResolver } from './strategies/voice-agent.strategy.js';
 
 dotenv.config();
 
 // Cargar Voice Activity Detection (Silero VAD) una vez globalmente al iniciar el worker
 const vad = await silero.VAD.load();
-
-const VOICE_MAP: Record<string, { voice: string; language: string; name: string }> = {
-  'jeronimo-es': {
-    voice: '7c1ecd2d-1c83-4d5d-a25c-b3820a274a2e', // Jeronimo (Spanish)
-    language: 'es',
-    name: 'Alejandro',
-  },
-  'catalina-es': {
-    voice: '162e0f37-8504-474c-bb33-c606c01890dc', // Catalina (Spanish)
-    language: 'es',
-    name: 'Catalina',
-  },
-  'katie-en': {
-    voice: 'f786b574-daa5-4673-aa0c-cbe3e8534c02', // Katie (English US)
-    language: 'en',
-    name: 'Katie',
-  },
-  'daniel-en': {
-    voice: '47c38ca4-5f35-497b-b1a3-415245fb35e1', // Corey (English US)
-    language: 'en',
-    name: 'Daniel',
-  },
-};
 
 export default defineAgent({
   entry: async (ctx: JobContext) => {
@@ -43,18 +21,12 @@ export default defineAgent({
     const roomName = ctx.job.room?.name || '';
     const parts = roomName.split('_');
     const voiceKey = parts[2] || 'jeronimo-es';
-    const config = VOICE_MAP[voiceKey] || VOICE_MAP['jeronimo-es'];
-    const isEnglish = config.language === 'en';
-
-    let instructions = '';
-    let greeting = '';
     const interviewId = parts[1] || 'interview_unknown';
 
-    if (isEnglish) {
-      greeting = `Hello, welcome to your simulation interview at DevCareer AI. I am ${config.name} and I will be your interviewer today. Are you ready to begin with the first question?`;
-    } else {
-      greeting = `Hola, bienvenido a tu entrevista de simulación en DevCareer AI. Soy ${config.name} y hoy seré tu entrevistador. ¿Estás listo para comenzar con la primera pregunta?`;
-    }
+    // SRP y OCP: Delegar la configuración de voz, diálogos y prompts a la estrategia
+    const strategy = VoiceAgentStrategyResolver.getStrategy(voiceKey);
+    const config = strategy.getVoiceConfig(voiceKey);
+    const greeting = strategy.getGreeting(config.name);
 
     let role = 'Software Developer';
     let questionsList: string[] = [];
@@ -77,58 +49,13 @@ export default defineAgent({
       console.error(`[Agent] Excepción al buscar detalles en backend:`, err);
     }
 
-    // Si no se pudieron obtener preguntas del backend, fallback seguro
+    // Si no se obtuvieron preguntas del backend, obtener preguntas de respaldo de la estrategia
     if (questionsList.length === 0) {
-      if (isEnglish) {
-        questionsList = [
-          'Could you describe your experience in software development?',
-          'What are your favorite technologies and why?',
-          'How do you handle disagreements with your technical team?',
-        ];
-      } else {
-        questionsList = [
-          '¿Podrías describirme tu experiencia en el desarrollo de software?',
-          '¿Cuáles son tus tecnologías favoritas y por qué?',
-          '¿Cómo manejas situaciones de desacuerdo con tu equipo técnico?',
-        ];
-      }
+      questionsList = strategy.getFallbackQuestions();
     }
 
-    const formattedQuestions = questionsList
-      .map((q, idx) => (isEnglish ? `- Question ${idx + 1}: ${q}` : `- Pregunta ${idx + 1}: ${q}`))
-      .join('\n');
-
-    if (isEnglish) {
-      instructions =
-        `You are a professional interviewer and expert technical recruiter from DevCareer AI. You are conducting a real-time voice interview with a candidate.\n` +
-        `The position they are applying for is: "${role}".\n\n` +
-        `You must ask the following questions sequentially in the order established, waiting for the user to respond to each before moving to the next:\n` +
-        `${formattedQuestions}\n\n` +
-        `Important guidelines:\n` +
-        `- Greet the user cordially and ask if they are ready.\n` +
-        `- Ask one question at a time. Do not read them all together.\n` +
-        `- Listen to the user's response actively. Acknowledge it or make a very brief comment before asking the next question.\n` +
-        `- If their answer is too short or vague, you can ask a very brief follow-up question on the topic.\n` +
-        `- Keep your responses very short (maximum 2 sentences) to make it an active dialogue.\n` +
-        `- Be professional but polite and encouraging.\n` +
-        `- Speak ALWAYS in English. Do not use Spanish.\n` +
-        `- Upon completing all questions, formally thank the user for their time, tell them that the interview has concluded and the system will generate their report in the dashboard immediately. Say goodbye politely.`;
-    } else {
-      instructions =
-        `Eres un entrevistador profesional y reclutador técnico experto de DevCareer AI. Estás conduciendo una entrevista en tiempo real con un candidato.\n` +
-        `El puesto para el que está aplicando es: "${role}".\n\n` +
-        `Debes realizar las siguientes preguntas secuencialmente en el orden establecido, esperando a que el usuario responda a cada una antes de pasar a la siguiente:\n` +
-        `${formattedQuestions}\n\n` +
-        `Pautas importantes:\n` +
-        `- Saluda al usuario cordialmente y pregúntale si está listo.\n` +
-        `- Formula una pregunta a la vez. No las leas todas juntas.\n` +
-        `- Escucha la respuesta del usuario de forma activa. Reconócela o haz un comentario muy breve antes de pasar a la siguiente pregunta.\n` +
-        `- Si su respuesta es demasiado corta o vaga, puedes hacer una pregunta de seguimiento muy breve sobre el tema.\n` +
-        `- Mantén las respuestas de tu parte muy cortas (máximo 2 frases) para que sea un diálogo ágil.\n` +
-        `- Sé profesional pero amable y motivador.\n` +
-        `- Habla SIEMPRE en español. No uses inglés.\n` +
-        `- Al finalizar todas las preguntas, agradece formalmente al usuario por su tiempo, dile que su entrevista ha concluido y que el sistema generará su reporte en el dashboard de inmediato. Despídete amablemente.`;
-    }
+    // Generar instrucciones polimórficamente sin condicionales de idioma
+    const instructions = strategy.getInstructions(role, questionsList);
 
     // Groq como LLM (modelo conversacional de baja latencia sin tokens de razonamiento)
     const groqModel = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
@@ -137,7 +64,7 @@ export default defineAgent({
     // Crear el pipeline con AgentSession
     const session = new voice.AgentSession({
       vad,
-      // Deepgram STT dinámico según idioma
+      // Deepgram STT dinámico según idioma provisto por la estrategia
       stt: new deepgram.STT({
         model: 'nova-2-general',
         language: config.language,
@@ -147,7 +74,7 @@ export default defineAgent({
         model: groqModel,
         apiKey: process.env.GROQ_API_KEY,
       }),
-      // Cartesia TTS dinámico según la voz elegida
+      // Cartesia TTS dinámico según la voz provista por la estrategia
       tts: new cartesia.TTS({
         model: 'sonic-2',
         voice: config.voice,
@@ -209,4 +136,3 @@ cli.runApp(
     agent: fileURLToPath(import.meta.url),
   })
 );
-

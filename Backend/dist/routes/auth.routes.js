@@ -2,15 +2,20 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const cognito_1 = require("../config/cognito");
+const supabase_1 = require("../config/supabase");
 const users_service_1 = require("../services/users.service");
 const auth_middleware_1 = require("../middleware/auth.middleware");
+const rate_limit_middleware_1 = require("../middleware/rate-limit.middleware");
 const router = (0, express_1.Router)();
+// Lista de verificadores independientes según el Patrón Strategy (OCP / DIP)
+const authVerifiers = [
+    new auth_middleware_1.SupabaseAuthVerifier(supabase_1.supabase),
+    new auth_middleware_1.CognitoAuthVerifier(cognito_1.cognitoIdVerifier),
+];
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /auth/signup
-// Se llama DESPUÉS de que Cognito confirme el email del usuario.
-// Crea el registro del usuario en DynamoDB con su sub (UUID) de Cognito.
 // ──────────────────────────────────────────────────────────────────────────────
-router.post("/signup", async (req, res) => {
+router.post("/signup", rate_limit_middleware_1.authLimiter, async (req, res) => {
     const { uid, name, email } = req.body;
     if (!uid || !name || !email) {
         res.status(400).json({ success: false, message: "Faltan campos: uid, name, email" });
@@ -45,28 +50,35 @@ router.post("/signup", async (req, res) => {
 });
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /auth/signin
-// Recibe el ID Token de Cognito y lo valida.
-// Retorna sessionCookie = el mismo ID Token (el frontend lo guarda en cookie httpOnly).
 // ──────────────────────────────────────────────────────────────────────────────
-router.post("/signin", async (req, res) => {
+router.post("/signin", rate_limit_middleware_1.authLimiter, async (req, res) => {
     const { idToken } = req.body;
     if (!idToken) {
         res.status(400).json({ success: false, message: "idToken requerido" });
         return;
     }
     try {
-        // Verificar que el token sea válido (firmado por nuestro Cognito User Pool)
-        const payload = await cognito_1.cognitoIdVerifier.verify(idToken);
-        // Auto-crear usuario en DynamoDB si no existe
-        const uid = payload.sub;
-        const email = payload.email;
-        const name = payload.name || email.split("@")[0];
+        // Verificación polimórfica mediante la interfaz IAuthVerifier
+        let authUser = null;
+        for (const verifier of authVerifiers) {
+            authUser = await verifier.verifyToken(idToken);
+            if (authUser)
+                break;
+        }
+        if (!authUser) {
+            res.status(401).json({ success: false, message: "Token inválido o proveedor no reconocido." });
+            return;
+        }
+        const uid = authUser.id;
+        const email = authUser.email || "";
+        const name = authUser.name || email.split("@")[0] || "Usuario";
+        // Auto-crear usuario en DB si no existe
         const existing = await (0, users_service_1.getUserById)(uid);
         if (!existing) {
             await (0, users_service_1.createUser)({ id: uid, name, email });
-            console.log(`👤 Usuario ${email} auto-creado en DynamoDB (/signin)`);
+            console.log(`👤 Usuario ${email} auto-creado en la base de datos (/signin)`);
         }
-        // Retornar el mismo ID Token como "sessionCookie" 
+        // Retornar el mismo Token como "sessionCookie" 
         // (el cliente lo guarda como cookie httpOnly via /api/auth/session)
         res.status(200).json({
             success: true,
@@ -81,20 +93,20 @@ router.post("/signin", async (req, res) => {
 });
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /auth/me
-// Retorna el usuario actual a partir del Bearer token (ID Token de Cognito)
+// Retorna el usuario actual a partir del Bearer token
 // ──────────────────────────────────────────────────────────────────────────────
 router.get("/me", auth_middleware_1.requireAuth, async (req, res) => {
     try {
         let user = await (0, users_service_1.getUserById)(req.userId);
         if (!user) {
-            // Auto-crear usuario en DynamoDB si no existe
+            // Auto-crear usuario si no existe
             user = {
                 id: req.userId,
                 name: req.userName || req.userEmail?.split("@")[0] || "Usuario",
                 email: req.userEmail || "",
             };
             await (0, users_service_1.createUser)(user);
-            console.log(`👤 Usuario ${user.email} auto-creado en DynamoDB (/me)`);
+            console.log(`👤 Usuario ${user.email} auto-creado en la base de datos (/me)`);
         }
         res.status(200).json({ success: true, user });
     }
@@ -105,7 +117,7 @@ router.get("/me", auth_middleware_1.requireAuth, async (req, res) => {
 });
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /auth/verify-session
-// Verifica el ID Token de Cognito guardado como sessionCookie y retorna el usuario.
+// Verifica el token guardado como sessionCookie y retorna el usuario.
 // ──────────────────────────────────────────────────────────────────────────────
 router.post("/verify-session", async (req, res) => {
     const { sessionCookie } = req.body;
@@ -114,19 +126,29 @@ router.post("/verify-session", async (req, res) => {
         return;
     }
     try {
-        const payload = await cognito_1.cognitoIdVerifier.verify(sessionCookie);
-        const uid = payload.sub;
-        const email = payload.email;
-        const name = payload.name || email.split("@")[0];
+        let authUser = null;
+        for (const verifier of authVerifiers) {
+            authUser = await verifier.verifyToken(sessionCookie);
+            if (authUser)
+                break;
+        }
+        if (!authUser) {
+            res.status(401).json({ success: false, message: "Sesión inválida o expirada" });
+            return;
+        }
+        const uid = authUser.id;
+        const email = authUser.email || "";
+        const name = authUser.name || email.split("@")[0] || "Usuario";
         let user = await (0, users_service_1.getUserById)(uid);
         if (!user) {
             user = { id: uid, name, email };
             await (0, users_service_1.createUser)(user);
-            console.log(`👤 Usuario ${email} auto-creado en DynamoDB (/verify-session)`);
+            console.log(`👤 Usuario ${email} auto-creado en la base de datos (/verify-session)`);
         }
         res.status(200).json({ success: true, user });
     }
-    catch {
+    catch (error) {
+        console.error("Error en /auth/verify-session:", error);
         res.status(401).json({ success: false, message: "Sesión inválida o expirada" });
     }
 });

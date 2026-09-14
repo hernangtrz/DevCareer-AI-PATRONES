@@ -91,7 +91,7 @@ const Agent = ({
       const voiceOpt = VOICE_OPTIONS.find((opt) => opt.key === selectedVoice);
       const language = voiceOpt ? voiceOpt.lang : "es";
 
-      const { success, feedbackId: id } = await createFeedback(
+      const res = await createFeedback(
         {
           interviewId: interviewId!,
           transcript: cleanMsgs,
@@ -100,7 +100,7 @@ const Agent = ({
         idToken,
       );
 
-      if (success && id) {
+      if (res && res.success) {
         router.push(`/interview/${interviewId}/feedback`);
       } else {
         console.log("Error saving feedback");

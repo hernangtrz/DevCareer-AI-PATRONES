@@ -1,62 +1,33 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.setInterviewRepository = setInterviewRepository;
 exports.getInterviewsByUserId = getInterviewsByUserId;
 exports.getLatestInterviews = getLatestInterviews;
 exports.getInterviewById = getInterviewById;
 exports.createInterview = createInterview;
 exports.updateInterview = updateInterview;
-const lib_dynamodb_1 = require("@aws-sdk/lib-dynamodb");
-const dynamo_1 = require("../config/dynamo");
-const uuid_1 = require("uuid");
+const repository_factory_1 = require("../repositories/repository.factory");
+/**
+ * Servicio de Dominio para Entrevistas (DIP / OCP / SRP).
+ * Delega la persistencia al contrato IInterviewRepository obtenido mediante la factoría.
+ */
+let currentRepo = repository_factory_1.RepositoryFactory.getInterviewRepository();
+function setInterviewRepository(repo) {
+    currentRepo = repo;
+}
 async function getInterviewsByUserId(userId) {
-    const result = await dynamo_1.dynamo.send(new lib_dynamodb_1.QueryCommand({
-        TableName: dynamo_1.TABLES.INTERVIEWS,
-        IndexName: "userId-createdAt-index",
-        KeyConditionExpression: "userId = :userId",
-        ExpressionAttributeValues: { ":userId": userId },
-        ScanIndexForward: false, // desc por createdAt
-    }));
-    return (result.Items || []);
+    return currentRepo.getByUserId(userId);
 }
 async function getLatestInterviews(userId, limit = 20) {
-    // Trae entrevistas finalizadas de otros usuarios
-    const result = await dynamo_1.dynamo.send(new lib_dynamodb_1.ScanCommand({
-        TableName: dynamo_1.TABLES.INTERVIEWS,
-        FilterExpression: "finalized = :finalized AND userId <> :userId",
-        ExpressionAttributeValues: {
-            ":finalized": true,
-            ":userId": userId,
-        },
-        Limit: limit * 3, // sobreescanear para compensar el filtro
-    }));
-    const items = (result.Items || []);
-    // Ordenar por createdAt desc y limitar
-    return items
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, limit);
+    return currentRepo.getLatest(userId, limit);
 }
 async function getInterviewById(id) {
-    const result = await dynamo_1.dynamo.send(new lib_dynamodb_1.GetCommand({
-        TableName: dynamo_1.TABLES.INTERVIEWS,
-        Key: { id },
-    }));
-    if (!result.Item)
-        return null;
-    return result.Item;
+    return currentRepo.getById(id);
 }
 async function createInterview(interview) {
-    const id = (0, uuid_1.v4)();
-    const item = { id, ...interview };
-    await dynamo_1.dynamo.send(new lib_dynamodb_1.PutCommand({
-        TableName: dynamo_1.TABLES.INTERVIEWS,
-        Item: item,
-    }));
-    return id;
+    return currentRepo.create(interview);
 }
 async function updateInterview(interview) {
-    await dynamo_1.dynamo.send(new lib_dynamodb_1.PutCommand({
-        TableName: dynamo_1.TABLES.INTERVIEWS,
-        Item: interview,
-    }));
+    return currentRepo.update(interview);
 }
 //# sourceMappingURL=interviews.service.js.map

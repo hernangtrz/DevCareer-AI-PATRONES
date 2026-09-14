@@ -18,7 +18,7 @@ export interface GenerateQuestionsInput {
 
 /**
  * Servicio especializado en la generación y orquestación de preguntas para entrevistas (CC-05).
- * Aplica el patrón Service Layer / Facade (SRP / DIP), aislando la creación en base de datos,
+ * Aplica los principios SOLID (SRP / DIP), aislando la creación en base de datos,
  * la interacción con el proveedor de IA y el ciclo asíncrono en segundo plano.
  */
 export class QuestionGeneratorService {

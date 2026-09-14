@@ -39,7 +39,7 @@ export interface ImprovedProfileResult {
 
 /**
  * Servicio especializado en optimización y redacción de currículums (CC-06).
- * Aplica el patrón Service Layer (SRP / DIP), aislando las reglas de negocio,
+ * Aplica los principios SOLID (SRP / DIP), aislando las reglas de negocio,
  * formateo de prompts y estructuración del CV del controlador HTTP.
  */
 export class CvOptimizationService {

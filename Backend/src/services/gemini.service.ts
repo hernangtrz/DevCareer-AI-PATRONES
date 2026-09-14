@@ -1,15 +1,15 @@
 /**
- * gemini.service.ts (Fachada de compatibilidad - Patrón Facade / Strategy / Adapter)
+ * gemini.service.ts (Capa de compatibilidad orientada a objetos)
  *
- * Refactorización CC-04 (SOLID: SRP, DIP, OCP):
- * La lógica centralizada se ha segregado en servicios de responsabilidad única dentro de `src/services/ai/`:
- *  - IAIProvider (Contrato abstracto)
- *  - GeminiAdapter (Adaptador concreto para la API de Google Gemini)
- *  - AIProviderFactory (Factoría de resolución de proveedor)
- *  - InterviewEvaluationService (Evaluación de entrevistas de voz)
- *  - EnglishProficiencyService (Evaluación de nivel de inglés CEFR)
- *  - CvAnalysisService (Análisis de compatibilidad ATS)
- *  - CodeChallengeService (Evaluación de algoritmos y patrones de diseño)
+ * Refactorización CC-04 (Principios SOLID: SRP, DIP, OCP):
+ * La lógica centralizada del monolito anterior se segregó en servicios con responsabilidad única dentro de `src/services/ai/`:
+ *  - IAIProvider (Abstracción e Inversión de Dependencias - DIP / OCP)
+ *  - GeminiAdapter (Implementación concreta para la API de Google Gemini)
+ *  - AIProviderFactory (Resolución desacoplada de dependencias)
+ *  - InterviewEvaluationService (Responsabilidad única: Evaluación de entrevistas)
+ *  - EnglishProficiencyService (Responsabilidad única: Evaluación de nivel de inglés CEFR)
+ *  - CvAnalysisService (Responsabilidad única: Análisis de compatibilidad ATS)
+ *  - CodeChallengeService (Responsabilidad única: Evaluación técnica de código)
  *
  * Este archivo preserva la API pública hacia atrás para no romper código existente,
  * delegando completamente la ejecución a los servicios especializados.
@@ -90,7 +90,7 @@ export async function analyzeCvAts(params: AnalyzeCvAtsParams): Promise<CvAtsAna
 }
 
 /**
- * Evalúa una solución de código en cuanto a algoritmos, complejidad y patrones de diseño.
+ * Evalúa una solución de código en cuanto a algoritmos, complejidad y principios SOLID.
  */
 export async function evaluateCodeChallenge(
   params: EvaluateCodeChallengeParams

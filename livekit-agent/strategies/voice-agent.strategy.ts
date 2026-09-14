@@ -1,3 +1,9 @@
+/**
+ * voice-agent.strategy.ts
+ * Refactorización CC-08 (Principios SOLID: SRP y OCP).
+ * Desacopla la configuración de voces, idiomas y guiones del ciclo de transporte WebRTC del agente.
+ */
+
 export interface VoiceConfig {
   voice: string;
   language: string;

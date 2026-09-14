@@ -5,8 +5,8 @@ import {
 } from "./ai-provider.interface";
 
 /**
- * Adaptador para Google Gemini AI (Patrón Adapter).
- * Implementa IAIProvider traduciendo peticiones genéricas al protocolo REST de la API de Google Gemini.
+ * Implementación de infraestructura para Google Gemini AI (DIP / OCP).
+ * Implementa el contrato IAIProvider traduciendo peticiones genéricas al protocolo REST de la API de Google Gemini.
  */
 export class GeminiAdapter implements IAIProvider {
   private defaultModel: string;

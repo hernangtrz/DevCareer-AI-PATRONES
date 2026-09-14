@@ -14,7 +14,7 @@ import { authLimiter } from "../middleware/rate-limit.middleware";
 
 const router = Router();
 
-// Lista de verificadores independientes según el Patrón Strategy (OCP / DIP)
+// Lista de verificadores independientes basada en abstracción polimórfica (OCP / DIP)
 const authVerifiers: IAuthVerifier[] = [
   new SupabaseAuthVerifier(supabase),
   new CognitoAuthVerifier(cognitoIdVerifier),
@@ -75,7 +75,7 @@ router.post("/signin", authLimiter, async (req: Request, res: Response): Promise
   }
 
   try {
-    // Verificación polimórfica mediante la interfaz IAuthVerifier
+    // Verificación polimórfica mediante la interfaz IAuthVerifier (OCP / DIP)
     let authUser: AuthUser | null = null;
     for (const verifier of authVerifiers) {
       authUser = await verifier.verifyToken(idToken);

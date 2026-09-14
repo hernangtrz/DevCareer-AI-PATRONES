@@ -2,7 +2,7 @@ import { IAIProvider } from "./ai-provider.interface";
 import { GeminiAdapter } from "./gemini.adapter";
 
 /**
- * Factoría para Proveedores de Inteligencia Artificial (DIP / OCP).
+ * Resolución desacoplada de Proveedores de Inteligencia Artificial (DIP / OCP).
  * Permite resolver la implementación activa del proveedor de IA y sustituirla
  * fácilmente en entornos de pruebas o por nuevos proveedores (OpenAI, Anthropic, etc.).
  */

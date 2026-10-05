@@ -4,7 +4,7 @@ exports.CvOptimizationService = void 0;
 const ai_provider_factory_1 = require("./ai/ai-provider.factory");
 /**
  * Servicio especializado en optimización y redacción de currículums (CC-06).
- * Aplica el patrón Service Layer (SRP / DIP), aislando las reglas de negocio,
+ * Aplica los principios SOLID (SRP / DIP), aislando las reglas de negocio,
  * formateo de prompts y estructuración del CV del controlador HTTP.
  */
 class CvOptimizationService {

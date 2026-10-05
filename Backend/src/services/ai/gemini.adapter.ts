@@ -9,10 +9,14 @@ import {
  * Implementa el contrato IAIProvider traduciendo peticiones genéricas al protocolo REST de la API de Google Gemini.
  */
 export class GeminiAdapter implements IAIProvider {
-  private defaultModel: string;
+  private defaultModels: string[];
 
-  constructor(defaultModel = "gemini-3.1-flash-lite") {
-    this.defaultModel = defaultModel;
+  constructor(defaultModel = "gemini-3.5-flash-lite") {
+    this.defaultModels = [
+      defaultModel,
+      "gemini-3.6-flash",
+      "gemini-flash-latest",
+    ];
   }
 
   private getEndpoint(model: string): string {
@@ -60,32 +64,50 @@ export class GeminiAdapter implements IAIProvider {
     parts: AIContentPart[],
     options: AIGenerationOptions = {}
   ): Promise<T> {
-    const model = options.model || this.defaultModel;
-    const endpoint = this.getEndpoint(model);
+    const candidateModels = options.model
+      ? [options.model, ...this.defaultModels.filter((m) => m !== options.model)]
+      : this.defaultModels;
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          temperature: options.temperature ?? 0.3,
-          responseMimeType: "application/json",
-        },
-      }),
-    });
+    let lastError: any = null;
 
-    if (!res.ok) {
-      const errorBody = await res.text().catch(() => "");
-      throw new Error(`Gemini API Error (${res.status}): ${errorBody.slice(0, 300)}`);
+    for (const model of candidateModels) {
+      try {
+        const endpoint = this.getEndpoint(model);
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: {
+              temperature: options.temperature ?? 0.3,
+              responseMimeType: "application/json",
+            },
+          }),
+        });
+
+        if (!res.ok) {
+          const errorBody = await res.text().catch(() => "");
+          console.warn(`[GeminiAdapter] Falló modelo ${model} (${res.status}): ${errorBody.slice(0, 150)}. Intentando siguiente modelo...`);
+          lastError = new Error(`Gemini API Error (${res.status}): ${errorBody.slice(0, 300)}`);
+          continue;
+        }
+
+        const data = (await res.json()) as any;
+        const rawText: string = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        if (!rawText) {
+          console.warn(`[GeminiAdapter] Modelo ${model} devolvió respuesta vacía. Intentando siguiente...`);
+          lastError = new Error("Gemini devolvió una respuesta vacía.");
+          continue;
+        }
+
+        return this.sanitizeAndParseJson<T>(rawText);
+      } catch (err: any) {
+        console.warn(`[GeminiAdapter] Excepción con modelo ${model}:`, err?.message || err);
+        lastError = err;
+      }
     }
 
-    const data = (await res.json()) as any;
-    const rawText: string = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    if (!rawText) {
-      throw new Error("Gemini devolvió una respuesta vacía.");
-    }
-
-    return this.sanitizeAndParseJson<T>(rawText);
+    throw lastError || new Error("No se pudo obtener respuesta de ningún modelo de Gemini configurado.");
   }
 }

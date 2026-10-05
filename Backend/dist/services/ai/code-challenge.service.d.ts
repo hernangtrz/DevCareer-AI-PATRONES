@@ -25,7 +25,7 @@ export interface EvaluateCodeChallengeParams {
 }
 /**
  * Servicio especializado en evaluación técnica de retos de código (SRP).
- * Analiza corrección algorítmica, complejidad Big-O, antipatrones y aplicación de patrones SOLID.
+ * Analiza corrección algorítmica, complejidad Big-O, antipatrones y cumplimiento de principios SOLID.
  */
 export declare class CodeChallengeService {
     private aiProvider;

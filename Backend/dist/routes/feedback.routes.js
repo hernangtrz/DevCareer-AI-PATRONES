@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const feedback_service_1 = require("../services/feedback.service");
+const interviews_service_1 = require("../services/interviews.service");
 const gemini_service_1 = require("../services/gemini.service");
 const rate_limit_middleware_1 = require("../middleware/rate-limit.middleware");
 const router = (0, express_1.Router)();
@@ -12,12 +13,26 @@ router.use(auth_middleware_1.requireAuth);
 // ──────────────────────────────────────────────────────────────────────────────
 router.post("/", rate_limit_middleware_1.aiRateLimiter, async (req, res) => {
     const { interviewId, transcript, language } = req.body;
-    const isEnglish = language === "en";
+    let isEnglish = language === "en" || language === "english";
     if (!interviewId) {
         res.status(400).json({ success: false, message: "interviewId es requerido" });
         return;
     }
     try {
+        if (!isEnglish) {
+            try {
+                const interview = await (0, interviews_service_1.getInterviewById)(interviewId);
+                if (interview &&
+                    (interview.language === "en" ||
+                        interview.language === "english" ||
+                        interview.type?.toLowerCase().includes("english"))) {
+                    isEnglish = true;
+                }
+            }
+            catch {
+                // ignore
+            }
+        }
         const messages = Array.isArray(transcript) ? transcript : [];
         let formattedTranscript = messages
             .filter((s) => s && s.content)

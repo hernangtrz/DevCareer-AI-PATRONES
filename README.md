@@ -2,6 +2,7 @@
 
 > **Plataforma de Entrenamiento y Preparación Técnica para Desarrolladores de Software**  
 > *Proyecto Integrador: Universidad Popular del Cesar*  
+> *Asignatura: Patrones de Diseño de Software* 
 
 ---
 
@@ -9,7 +10,7 @@
 
 **DevCareer AI** es una plataforma integral orientada a la preparación técnica de profesionales en tecnología para procesos de selección y entrevistas laborales. Integra simulaciones de entrevistas de voz en tiempo real con Inteligencia Artificial, análisis y optimización de currículums bajo estándares ATS (*Applicant Tracking Systems*), y entornos interactivos para la resolución y evaluación de retos de código algorítmico y código limpio.
 
-La plataforma está diseñada con una arquitectura desacoplada de microservicios y clientes web que se comunican mediante WebRTC y APIs REST tipadas.
+La plataforma está diseñada bajo una arquitectura limpia y altamente modular basada en **Patrones de Diseño GoF** y **Principios SOLID**, garantizando desacoplamiento de infraestructura, extensibilidad y alta testabilidad.
 
 ---
 
@@ -49,6 +50,104 @@ La plataforma está diseñada con una arquitectura desacoplada de microservicios
 
 ---
 
+## 🧩 Patrones de Diseño de Software Implementados (GoF & Arquitectura)
+
+El sistema incorpora de manera formal y desacoplada los siguientes patrones de diseño:
+
+### 1. Abstract Factory (Creacional - GoF)
+* **Ubicación:** `Backend/src/repositories/factories/` y `Backend/src/repositories/repository.factory.ts`
+* **Propósito:** Proporciona una interfaz formal para crear familias completas de repositorios de persistencia sin acoplar los servicios de dominio a motores concretos de base de datos.
+* **Componentes:**
+  * **Fábrica Abstracta Base:** `DataStoreFactory` (`createInterviewRepository()`, `createFeedbackRepository()`, `createUserRepository()`).
+  * **Fábrica Concreta 1:** `SupabaseDataStoreFactory` (instancia la familia completa para PostgreSQL / Supabase).
+  * **Fábrica Concreta 2:** `DynamoDataStoreFactory` (instancia la familia completa para AWS DynamoDB).
+  * **Fábrica Concreta 3:** `MockDataStoreFactory` (instancia repositorios en memoria para pruebas unitarias sin dependencias externas).
+  * **Registry / Despachador:** `RepositoryFactory` (administra la inyección y selección dinámica de la fábrica activa).
+* **Modularización:** Cada fábrica concreta y la base abstracta residen en su propio archivo independiente respetando SRP.
+
+```mermaid
+classDiagram
+    direction TB
+    class DataStoreFactory {
+        <<abstract>>
+        +createInterviewRepository()* IInterviewRepository
+        +createFeedbackRepository()* IFeedbackRepository
+        +createUserRepository()* IUserRepository
+    }
+    class SupabaseDataStoreFactory {
+        +createInterviewRepository() IInterviewRepository
+        +createFeedbackRepository() IFeedbackRepository
+        +createUserRepository() IUserRepository
+    }
+    class DynamoDataStoreFactory {
+        +createInterviewRepository() IInterviewRepository
+        +createFeedbackRepository() IFeedbackRepository
+        +createUserRepository() IUserRepository
+    }
+    class MockDataStoreFactory {
+        +createInterviewRepository() IInterviewRepository
+        +createFeedbackRepository() IFeedbackRepository
+        +createUserRepository() IUserRepository
+    }
+    DataStoreFactory <|-- SupabaseDataStoreFactory
+    DataStoreFactory <|-- DynamoDataStoreFactory
+    DataStoreFactory <|-- MockDataStoreFactory
+```
+
+---
+
+### 2. Factory Method (Creacional - GoF)
+* **Ubicación:** `Backend/src/services/ai/creators/` y `Backend/src/services/ai/ai-provider.factory.ts`
+* **Propósito:** Define una clase base creadora que delega la instanciación de proveedores de Inteligencia Artificial (`IAIProvider`) a subclases especializadas, permitiendo alternar entre modelos sin alterar los servicios de dominio.
+* **Componentes:**
+  * **Creador Abstracto Base:** `AIProviderCreator` (declara el método de fábrica `createProvider(): IAIProvider`).
+  * **Creador Concreto 1:** `GeminiProviderCreator` (instancia `GeminiAdapter` con `gemini-2.5-flash-lite`).
+  * **Creador Concreto 2:** `OpenAIProviderCreator` (instancia `OpenAIAdapter` con `gpt-4o-mini`).
+  * **Creador Concreto 3:** `MockAIProviderCreator` (instancia respuestas simuladas para testing y ejecución offline).
+  * **Registry / Selector:** `AIProviderFactory` (resuelve el proveedor activo según la variable de entorno `AI_PROVIDER` o inyección explícita).
+
+```mermaid
+classDiagram
+    direction TB
+    class IAIProvider {
+        <<interface>>
+        +generateJson(parts, options) Promise
+    }
+    class AIProviderCreator {
+        <<abstract>>
+        +createProvider()* IAIProvider
+        +getProviderInstance() IAIProvider
+    }
+    class GeminiProviderCreator {
+        +createProvider() IAIProvider
+    }
+    class OpenAIProviderCreator {
+        +createProvider() IAIProvider
+    }
+    class MockAIProviderCreator {
+        +createProvider() IAIProvider
+    }
+    AIProviderCreator <|-- GeminiProviderCreator
+    AIProviderCreator <|-- OpenAIProviderCreator
+    AIProviderCreator <|-- MockAIProviderCreator
+    GeminiProviderCreator ..> GeminiAdapter : crea
+    OpenAIProviderCreator ..> OpenAIAdapter : crea
+```
+
+---
+
+### 3. Adapter Pattern (Estructural - GoF)
+* **Ubicación:** `Backend/src/services/ai/gemini.adapter.ts` y `Backend/src/services/ai/openai.adapter.ts`
+* **Propósito:** Convierte y homogeniza las interfaces incompatibles de los SDKs de Google `@google/genai` y OpenAI `openai` en una interfaz estándar unificada `IAIProvider` consumida por los servicios de negocio (`InterviewEvaluationService`, `CvAnalysisService`, `CodeChallengeService`, etc.).
+
+---
+
+### 4. Strategy Pattern (Comportamiento - GoF)
+* **Ubicación:** `livekit-agent/strategies/voice-agent.strategy.ts`
+* **Propósito:** Encapsula las configuraciones, prompts de sistema, vocabularios y parámetros acústicos del agente en tiempo real según el idioma seleccionado (`SpanishVoiceStrategy` y `EnglishVoiceStrategy`), desacoplando el orquestador WebRTC de la lógica conversacional.
+
+---
+
 ## 🛠️ Tecnologías Utilizadas
 
 | Capa / Componente | Tecnología | Propósito |
@@ -62,7 +161,7 @@ La plataforma está diseñada con una arquitectura desacoplada de microservicios
 | **Síntesis de Audio (TTS)** | Cartesia Sonic-2 | Generación de voz natural de ultra baja latencia |
 | **Detección de Actividad Vocal** | Silero VAD | Manejo de turnos de conversación e interrupciones del usuario |
 | **Transporte WebRTC** | LiveKit Cloud / LiveKit Agents SDK | Infraestructura de audio en tiempo real y señalización |
-| **Inteligencia Artificial de Análisis** | Google Gemini Flash (`gemini-3.1-flash-lite`) | Generación de preguntas, reportes de feedback, análisis ATS y retos de código |
+| **Inteligencia Artificial de Análisis** | Google Gemini Flash / OpenAI GPT-4o | Generación de preguntas, reportes de feedback, análisis ATS y retos de código |
 | **Bases de Datos** | AWS DynamoDB (Producción) / Supabase PostgreSQL (Desarrollo) | Persistencia políglota de usuarios, entrevistas y feedback |
 | **Gestión de Identidad** | AWS Cognito User Pools / Supabase Auth | Autenticación y validación de tokens JWT |
 | **Infraestructura como Código** | Terraform | Aprovisionamiento automatizado de infraestructura AWS |
@@ -70,35 +169,29 @@ La plataforma está diseñada con una arquitectura desacoplada de microservicios
 
 ---
 
-## 🏗️ Novedades de la Segunda Entrega: Refactorización SOLID y Antipatrones
+## 🏗️ Refactorización SOLID y Calidad de Código
 
-En esta segunda entrega se llevó a cabo una auditoría sistemática del código fuente de la Entrega 1, identificando y resolviendo **8 fallos de diseño** mediante la aplicación estricta de los **cinco principios SOLID** y la erradicación de antipatrones:
+El backend implementa de forma integral los cinco principios SOLID y erradica antipatrones de diseño:
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                    ARQUITECTURA REFACTORIZADA (ENTREGA 2)                        │
-├────────────────────────┬────────────────────────┬────────────────────────────────┤
-│ Capa de Controladores  │ Capa de Servicios      │ Capa de Abstracción / Infra    │
-├────────────────────────┼────────────────────────┼────────────────────────────────┤
-│ livekit.routes.ts      │ QuestionGeneratorSvc   │ IInterviewRepository (DIP/OCP) │
-│ cv.routes.ts           │ CvOptimizationService  │ IFeedbackRepository  (DIP/LSP) │
-│ auth.routes.ts         │ Domain Services        │ IUserRepository      (DIP/OCP) │
-│ feedback.routes.ts     │ InterviewEvaluationSvc │ IAuthVerifier        (OCP/ISP) │
-│ code.routes.ts         │ CodeChallengeService   │ IAIProvider          (DIP/OCP) │
-│ LiveKit Voice Agent    │ VoiceAgentConfig       │ Spanish / English Strategy     │
-└────────────────────────┴────────────────────────┴────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        ARQUITECTURA MODULAR REFACTORIZADA                              │
+├────────────────────────┬────────────────────────┬──────────────────────────────────────┤
+│ Capa de Controladores  │ Capa de Servicios      │ Capa de Abstracción / Infra          │
+├────────────────────────┼────────────────────────┼──────────────────────────────────────┤
+│ livekit.routes.ts      │ QuestionGeneratorSvc   │ DataStoreFactory (Abstract Factory)  │
+│ cv.routes.ts           │ CvOptimizationService  │ IInterviewRepository (DIP / OCP)     │
+│ auth.routes.ts         │ Domain Services        │ IFeedbackRepository  (DIP / LSP)     │
+│ feedback.routes.ts     │ InterviewEvaluationSvc │ IUserRepository      (DIP / OCP / ISP)│
+│ code.routes.ts         │ CodeChallengeService   │ AIProviderCreator (Factory Method)   │
+│ LiveKit Voice Agent    │ VoiceAgentConfig       │ IAIProvider / Adapters (Adapter)     │
+└────────────────────────┴────────────────────────┴──────────────────────────────────────┘
 ```
 
-### Resumen de los 8 Cambios Implementados (Control de Cambios):
-
-* **CC-01 (DIP / OCP):** Se creó la interfaz `IInterviewRepository` y las implementaciones independientes `SupabaseInterviewRepository` y `DynamoInterviewRepository`, eliminando los condicionales `if-else` repetidos (*Shotgun Surgery*) en `interviews.service.ts`.
-* **CC-02 (DIP / LSP):** Se abstrajo la persistencia de retroalimentación mediante `IFeedbackRepository`, desacoplando `feedback.service.ts` de librerías concretas (*Tight Coupling*).
-* **CC-03 (DIP / OCP):** Se diseñó `IUserRepository` para encapsular el acceso a datos de usuarios, independizando los controladores de autenticación del motor de base de datos (*Hardcoded Data Access*).
-* **CC-04 (SRP / DIP):** Se descompuso la clase dios `gemini.service.ts` (352 líneas) en 4 servicios especializados (`InterviewEvaluationService`, `EnglishProficiencyService`, `CvAnalysisService` y `CodeChallengeService`) comunicados a través del contrato `IAIProvider` (*God Class*).
-* **CC-05 (SRP):** Se extrajo la lógica de creación y orquestación asíncrona de preguntas de `livekit.routes.ts` a `QuestionGeneratorService`, convirtiendo el endpoint en un controlador ligero (*Spaghetti Code / Smart Controller*).
-* **CC-06 (SRP):** Se modularizó la optimización y traducción de currículums de `cv.routes.ts` hacia `CvOptimizationService` (*Fat Controller*).
-* **CC-07 (OCP / ISP):** Se refactorizó la validación de tokens en `auth.middleware.ts` creando la interfaz `IAuthVerifier` con implementaciones polimórficas (`SupabaseAuthVerifier` y `CognitoAuthVerifier`), permitiendo agregar nuevos proveedores de autenticación sin modificar el código existente (*Hardcoded Fallback*).
-* **CC-08 (SRP / OCP):** Se aisló la configuración de idiomas, prompts y voces del agente en tiempo real mediante `VoiceAgentConfigStrategy` (`SpanishVoiceStrategy` y `EnglishVoiceStrategy`), manteniendo `agent.ts` centrado únicamente en el flujo de audio WebRTC (*Feature Envy*).
+* **DIP / OCP:** Repositorios de datos desacoplados mediante interfaces segregadas y fábricas abstractas.
+* **SRP:** División de clases monolíticas en servicios especializados de responsabilidad única (un archivo por clase).
+* **ISP:** Interfaces de persistencia delgadas (`IInterviewRepository`, `IFeedbackRepository`, `IUserRepository`) donde los clientes consumen únicamente los métodos que necesitan.
+* **LSP:** Reemplazabilidad transparente de implementaciones concretas (Supabase, DynamoDB, Mocks) sin romper contratos.
 
 ---
 
@@ -117,27 +210,40 @@ DevCareer-AI/
 │   │   │   └── code-challenge/   # Retos de código interactivos
 │   │   ├── api/                  # Endpoints de servidor Next.js
 │   │   └── page.tsx              # Landing page
-│   ├── components/               # Componentes UI reutilizables (Agent, Navbar, etc.)
-│   ├── contexts/                 # Contextos de estado global (Auth, Interview)
+│   ├── components/               # Componentes UI reutilizables
+│   ├── contexts/                 # Contextos de estado global
 │   └── lib/                      # Clientes de API REST y configuración
 │
 ├── Backend/                      # Servidor API REST Express
 │   └── src/
 │       ├── config/               # Inicialización de clientes (Supabase, DynamoDB, Cognito)
 │       ├── middleware/           # Middlewares de seguridad (IAuthVerifier, Rate Limiting)
-│       ├── repositories/         # Capa de persistencia desacoplada (DIP / OCP)
-│       │   ├── interview.repository.ts
-│       │   ├── feedback.repository.ts
-│       │   ├── user.repository.ts
+│       ├── repositories/         # Capa de persistencia (Abstract Factory)
+│       │   ├── factories/        # Fábricas modulares de persistencia
+│       │   │   ├── datastore.factory.ts           # Fábrica Abstracta Base
+│       │   │   ├── supabase-datastore.factory.ts  # Fábrica Concreta Supabase
+│       │   │   ├── dynamo-datastore.factory.ts    # Fábrica Concreta DynamoDB
+│       │   │   ├── mock-datastore.factory.ts      # Fábrica Concreta Mocks
+│       │   │   └── index.ts
+│       │   ├── repository.factory.ts              # Registry Centralizado
+│       │   ├── interview.repository.ts            # Contrato IInterviewRepository
+│       │   ├── feedback.repository.ts             # Contrato IFeedbackRepository
+│       │   ├── user.repository.ts                 # Contrato IUserRepository
 │       │   ├── supabase/         # Implementaciones concretas para Supabase
-│       │   ├── dynamo/           # Implementaciones concretas para DynamoDB
-│       │   └── repository.factory.ts
+│       │   └── dynamo/           # Implementaciones concretas para DynamoDB
 │       ├── routes/               # Controladores HTTP delgados (Auth, LiveKit, CV, Code)
 │       ├── services/             # Servicios de dominio
-│       │   ├── ai/               # Módulo de IA desacoplado (SRP / DIP)
-│       │   │   ├── ai-provider.interface.ts
-│       │   │   ├── gemini.adapter.ts
-│       │   │   ├── ai-provider.factory.ts
+│       │   ├── ai/               # Módulo de IA desacoplado (Factory Method & Adapter)
+│       │   │   ├── creators/     # Creadores modulares del Factory Method
+│       │   │   │   ├── ai-provider.creator.ts     # Creador Abstracto Base
+│       │   │   │   ├── gemini-provider.creator.ts # Creador Concreto Gemini
+│       │   │   │   ├── openai-provider.creator.ts # Creador Concreto OpenAI
+│       │   │   │   ├── mock-ai-provider.creator.ts# Creador Concreto Mock
+│       │   │   │   └── index.ts
+│       │   │   ├── ai-provider.interface.ts       # Interfaz IAIProvider
+│       │   │   ├── gemini.adapter.ts              # Adaptador para Google Gemini
+│       │   │   ├── openai.adapter.ts              # Adaptador para OpenAI
+│       │   │   ├── ai-provider.factory.ts         # Registry Centralizado
 │       │   │   ├── interview-evaluation.service.ts
 │       │   │   ├── english-proficiency.service.ts
 │       │   │   ├── cv-analysis.service.ts
@@ -148,11 +254,27 @@ DevCareer-AI/
 │
 ├── livekit-agent/                # Agente de Voz en Tiempo Real (Worker)
 │   ├── agent.ts                  # Orquestación de WebRTC y flujo de audio
-│   └── strategies/               # Estrategias de voz y prompts (SRP / OCP)
+│   └── strategies/               # Estrategias de voz y prompts (Strategy Pattern)
 │       └── voice-agent.strategy.ts
 │
 ├── terraform-aws/                # Infraestructura como Código (AWS ECS, ALB, DynamoDB)
-└── scripts/                      # Scripts de compilación, generación de PDFs y utilidades
+└── scripts/                      # Scripts de pruebas automatizadas y utilidades
+    ├── test-abstract-factory.js  # Test de verificación del Abstract Factory
+    └── test-factory-method.js    # Test de verificación del Factory Method
+```
+
+---
+
+## 🧪 Pruebas Automatizadas de los Patrones
+
+El repositorio incluye suites de pruebas automatizadas en JavaScript/Node.js para validar de forma aislada e independiente la correcta ejecución de los patrones implementados:
+
+```bash
+# 1. Probar el patrón Abstract Factory (Supabase, DynamoDB y Mocks)
+node scripts/test-abstract-factory.js
+
+# 2. Probar el patrón Factory Method y Adapter (Gemini, OpenAI y Mocks)
+node scripts/test-factory-method.js
 ```
 
 ---
@@ -230,6 +352,7 @@ LIVEKIT_API_KEY=tu-livekit-api-key
 LIVEKIT_API_SECRET=tu-livekit-api-secret
 LIVEKIT_URL=https://tu-proyecto.livekit.cloud
 GOOGLE_GENERATIVE_AI_API_KEY=tu-gemini-api-key
+# AI_PROVIDER=gemini # Opcional: gemini u openai
 ```
 
 Crear el archivo `frontend/.env`:
@@ -290,12 +413,8 @@ AWS Cloud
 └── Amazon Cognito (User Pool con autenticación JWT administrada)
 ```
 
-### Pasos para Despliegue con Terraform:
+---
 
-```bash
-cd terraform-aws
-terraform init
-terraform plan
-terraform apply
-```
+## 📄 Licencia
 
+Este proyecto está bajo la Licencia MIT.

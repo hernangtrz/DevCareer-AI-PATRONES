@@ -1,5 +1,7 @@
 export * from "./ai-provider.interface";
 export * from "./gemini.adapter";
+export * from "./openai.adapter";
+export * from "./creators";
 export * from "./ai-provider.factory";
 export * from "./interview-evaluation.service";
 export * from "./english-proficiency.service";

@@ -3,7 +3,7 @@ import { IInterviewRepository } from "../repositories/interview.repository";
 import { Interview } from "../types";
 
 /**
- * Servicio de Dominio para Entrevistas (DIP / OCP / SRP).
+ * Servicio de Dominio para Entrevistas (DIP / OCP).
  * Delega la persistencia al contrato IInterviewRepository obtenido mediante la factoría.
  */
 let currentRepo: IInterviewRepository = RepositoryFactory.getInterviewRepository();

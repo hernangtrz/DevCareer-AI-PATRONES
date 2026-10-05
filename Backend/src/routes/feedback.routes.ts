@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import { createFeedbackRecord, getFeedbackByInterviewId } from "../services/feedback.service";
+import { getInterviewById } from "../services/interviews.service";
 import {
   generateInterviewFeedback,
   generateEnglishProficiencyFeedback,
@@ -19,7 +20,7 @@ router.post(
   aiRateLimiter,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { interviewId, transcript, language } = req.body;
-    const isEnglish = language === "en";
+    let isEnglish = language === "en" || language === "english";
 
     if (!interviewId) {
       res.status(400).json({ success: false, message: "interviewId es requerido" });
@@ -27,6 +28,22 @@ router.post(
     }
 
     try {
+      if (!isEnglish) {
+        try {
+          const interview = await getInterviewById(interviewId);
+          if (
+            interview &&
+            ((interview as any).language === "en" ||
+              (interview as any).language === "english" ||
+              interview.type?.toLowerCase().includes("english"))
+          ) {
+            isEnglish = true;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       const messages = Array.isArray(transcript) ? transcript : [];
       let formattedTranscript = messages
         .filter((s: any) => s && s.content)

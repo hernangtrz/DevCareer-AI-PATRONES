@@ -8,7 +8,7 @@ exports.createInterview = createInterview;
 exports.updateInterview = updateInterview;
 const repository_factory_1 = require("../repositories/repository.factory");
 /**
- * Servicio de Dominio para Entrevistas (DIP / OCP / SRP).
+ * Servicio de Dominio para Entrevistas (DIP / OCP).
  * Delega la persistencia al contrato IInterviewRepository obtenido mediante la factoría.
  */
 let currentRepo = repository_factory_1.RepositoryFactory.getInterviewRepository();

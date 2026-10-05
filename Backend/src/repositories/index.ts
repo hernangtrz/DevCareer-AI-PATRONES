@@ -7,4 +7,5 @@ export * from "./supabase/supabase-feedback.repository";
 export * from "./dynamo/dynamo-feedback.repository";
 export * from "./supabase/supabase-user.repository";
 export * from "./dynamo/dynamo-user.repository";
+export * from "./factories";
 export * from "./repository.factory";

@@ -4,7 +4,7 @@ exports.CodeChallengeService = void 0;
 const ai_provider_factory_1 = require("./ai-provider.factory");
 /**
  * Servicio especializado en evaluación técnica de retos de código (SRP).
- * Analiza corrección algorítmica, complejidad Big-O, antipatrones y aplicación de patrones SOLID.
+ * Analiza corrección algorítmica, complejidad Big-O, antipatrones y cumplimiento de principios SOLID.
  */
 class CodeChallengeService {
     constructor(aiProvider = ai_provider_factory_1.AIProviderFactory.getProvider()) {

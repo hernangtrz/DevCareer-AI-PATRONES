@@ -1,37 +1,46 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RepositoryFactory = void 0;
-const supabase_interview_repository_1 = require("./supabase/supabase-interview.repository");
-const dynamo_interview_repository_1 = require("./dynamo/dynamo-interview.repository");
-const supabase_feedback_repository_1 = require("./supabase/supabase-feedback.repository");
-const dynamo_feedback_repository_1 = require("./dynamo/dynamo-feedback.repository");
-const supabase_user_repository_1 = require("./supabase/supabase-user.repository");
-const dynamo_user_repository_1 = require("./dynamo/dynamo-user.repository");
-const supabase_1 = require("../config/supabase");
-const dynamo_1 = require("../config/dynamo");
+exports.RepositoryFactory = exports.MockDataStoreFactory = exports.DynamoDataStoreFactory = exports.SupabaseDataStoreFactory = exports.DataStoreFactory = void 0;
+const factories_1 = require("./factories");
+Object.defineProperty(exports, "DataStoreFactory", { enumerable: true, get: function () { return factories_1.DataStoreFactory; } });
+Object.defineProperty(exports, "SupabaseDataStoreFactory", { enumerable: true, get: function () { return factories_1.SupabaseDataStoreFactory; } });
+Object.defineProperty(exports, "DynamoDataStoreFactory", { enumerable: true, get: function () { return factories_1.DynamoDataStoreFactory; } });
+Object.defineProperty(exports, "MockDataStoreFactory", { enumerable: true, get: function () { return factories_1.MockDataStoreFactory; } });
 /**
- * Factoría de Inyección de Dependencias (DIP / OCP):
- * Centraliza la resolución de implementaciones para los repositorios del sistema según la configuración de entorno.
+ * ============================================================================
+ * PATRÓN ABSTRACT FACTORY: REGISTRY / SELECTOR CENTRALIZADO
+ * ============================================================================
+ * Administra la fábrica de persistencia activa en el sistema y delega
+ * la resolución de repositorios a la instancia de DataStoreFactory correspondiente.
  */
 class RepositoryFactory {
+    /**
+     * Permite inyectar o cambiar la fábrica de persistencia activa en tiempo de ejecución.
+     */
+    static setFactory(factory) {
+        this.activeFactory = factory;
+    }
+    /**
+     * Resuelve el repositorio de entrevistas mediante la Abstract Factory activa.
+     */
     static getInterviewRepository() {
-        if (process.env.SUPABASE_URL) {
-            return new supabase_interview_repository_1.SupabaseInterviewRepository(supabase_1.supabase);
-        }
-        return new dynamo_interview_repository_1.DynamoInterviewRepository(dynamo_1.dynamo);
+        return this.activeFactory.createInterviewRepository();
     }
+    /**
+     * Resuelve el repositorio de feedback mediante la Abstract Factory activa.
+     */
     static getFeedbackRepository() {
-        if (process.env.SUPABASE_URL) {
-            return new supabase_feedback_repository_1.SupabaseFeedbackRepository(supabase_1.supabase);
-        }
-        return new dynamo_feedback_repository_1.DynamoFeedbackRepository(dynamo_1.dynamo);
+        return this.activeFactory.createFeedbackRepository();
     }
+    /**
+     * Resuelve el repositorio de usuarios mediante la Abstract Factory activa.
+     */
     static getUserRepository() {
-        if (process.env.SUPABASE_URL) {
-            return new supabase_user_repository_1.SupabaseUserRepository(supabase_1.supabase);
-        }
-        return new dynamo_user_repository_1.DynamoUserRepository(dynamo_1.dynamo);
+        return this.activeFactory.createUserRepository();
     }
 }
 exports.RepositoryFactory = RepositoryFactory;
+RepositoryFactory.activeFactory = process.env.SUPABASE_URL
+    ? new factories_1.SupabaseDataStoreFactory()
+    : new factories_1.DynamoDataStoreFactory();
 //# sourceMappingURL=repository.factory.js.map

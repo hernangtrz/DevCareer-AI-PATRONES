@@ -7,7 +7,7 @@ const users_service_1 = require("../services/users.service");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const rate_limit_middleware_1 = require("../middleware/rate-limit.middleware");
 const router = (0, express_1.Router)();
-// Lista de verificadores independientes según el Patrón Strategy (OCP / DIP)
+// Lista de verificadores independientes basada en abstracción polimórfica (OCP / DIP)
 const authVerifiers = [
     new auth_middleware_1.SupabaseAuthVerifier(supabase_1.supabase),
     new auth_middleware_1.CognitoAuthVerifier(cognito_1.cognitoIdVerifier),
@@ -58,7 +58,7 @@ router.post("/signin", rate_limit_middleware_1.authLimiter, async (req, res) => 
         return;
     }
     try {
-        // Verificación polimórfica mediante la interfaz IAuthVerifier
+        // Verificación polimórfica mediante la interfaz IAuthVerifier (OCP / DIP)
         let authUser = null;
         for (const verifier of authVerifiers) {
             authUser = await verifier.verifyToken(idToken);

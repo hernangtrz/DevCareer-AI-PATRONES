@@ -6,7 +6,7 @@ const interviews_service_1 = require("./interviews.service");
 const ai_provider_factory_1 = require("./ai/ai-provider.factory");
 /**
  * Servicio especializado en la generación y orquestación de preguntas para entrevistas (CC-05).
- * Aplica el patrón Service Layer / Facade (SRP / DIP), aislando la creación en base de datos,
+ * Aplica los principios SOLID (SRP / DIP), aislando la creación en base de datos,
  * la interacción con el proveedor de IA y el ciclo asíncrono en segundo plano.
  */
 class QuestionGeneratorService {

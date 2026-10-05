@@ -14,6 +14,165 @@ La plataforma está diseñada bajo una arquitectura limpia y altamente modular b
 
 ---
 
+## 🔄 Comparativa de Arquitectura: Antes vs. Después
+
+### 1. Estado Inicial (Antes de la Implementación de Patrones)
+En las etapas tempranas del proyecto, la arquitectura presentaba acoplamientos fuertes hacia tecnologías concretas y antipatrones de diseño comunes en aplicaciones monolíticas:
+
+```mermaid
+classDiagram
+    direction TB
+
+    class DomainServices {
+        <<Clients>>
+        InterviewsService
+        FeedbackService
+        UsersService
+        InterviewEvaluationService
+    }
+
+    class LegacyDispatcher {
+        <<Monolithic Dispatcher / God Class>>
+        +getInterviewRepo()
+        +getFeedbackRepo()
+        +getUserRepo()
+        +getAIProvider()
+        -- Condicionales repetitivos: --
+        %% if (process.env.SUPABASE_URL) ... else if (DYNAMO) ...
+        %% if (process.env.AI_PROVIDER === 'openai') ...
+    }
+
+    class SupabaseSDK {
+        <<External Driver>>
+        @supabase/supabase-js
+    }
+    class DynamoSDK {
+        <<External Driver>>
+        @aws-sdk/lib-dynamodb
+    }
+    class GoogleGenAISDK {
+        <<External Driver>>
+        @google/genai
+    }
+    class OpenAISDK {
+        <<External Driver>>
+        openai
+    }
+
+    DomainServices ..> LegacyDispatcher : dependencia centralizada
+    LegacyDispatcher ..> SupabaseSDK : new SupabaseRepo() con if/else
+    LegacyDispatcher ..> DynamoSDK : new DynamoRepo() con if/else
+    LegacyDispatcher ..> GoogleGenAISDK : new Gemini() directo
+    LegacyDispatcher ..> OpenAISDK : new OpenAI() directo
+
+    note for LegacyDispatcher "🔴 DEFICIENCIAS ANTES DE LA REFACTORIZACIÓN:\n1. Violación OCP: Agregar MongoDB o Anthropic Claude exigía modificar múltiples if/else.\n2. Archivo Monolítico (Spaghetti): Clases, fábricas y lógica conviviendo en un solo archivo.\n3. Acoplamiento Fuerte: Los servicios conocían dependencias de bajo nivel.\n4. Imposibilidad de Testing: No se podían inyectar Mocks sin alterar variables de entorno globales."
+```
+
+#### Antipatrones Identificados:
+* **Hardcoded Fallbacks & Shotgun Surgery:** Lógica condicional `if (process.env.SUPABASE_URL)` esparcida en controladores y servicios. Modificar una regla de persistencia requería cambios en múltiples archivos a la vez.
+* **Tight Coupling (Alto Acoplamiento):** Dependencia directa de SDKs de terceros (`@google/genai`, `@supabase/supabase-js`, `@aws-sdk/client-dynamodb`).
+* **Fat/Monolithic Files:** Clases de persistencia y fábricas agrupadas en un solo archivo de cientos de líneas sin separación por responsabilidad.
+* **Testabilidad Nula sin Infraestructura:** No existía forma de ejecutar pruebas unitarias rápidas sin conexión a internet y credenciales activas en la nube.
+
+---
+
+### 2. Estado Refactorizado (Después: Clean Architecture + Patrones GoF)
+Se implementaron patrones creacionales, estructurales y de comportamiento, separando cada abstracción y fábrica en su propio archivo modular:
+
+```mermaid
+classDiagram
+    direction TB
+
+    %% Capa de Dominio
+    class DomainServices {
+        <<Domain Layer>>
+        InterviewsService
+        FeedbackService
+        UsersService
+        InterviewEvaluationService
+    }
+
+    %% Abstract Factory (Persistencia)
+    class DataStoreFactory {
+        <<abstract factory>>
+        +createInterviewRepository()*
+        +createFeedbackRepository()*
+        +createUserRepository()*
+    }
+    class SupabaseDataStoreFactory {
+        +createInterviewRepository()
+        +createFeedbackRepository()
+        +createUserRepository()
+    }
+    class DynamoDataStoreFactory {
+        +createInterviewRepository()
+        +createFeedbackRepository()
+        +createUserRepository()
+    }
+    class MockDataStoreFactory {
+        +createInterviewRepository()
+        +createFeedbackRepository()
+        +createUserRepository()
+    }
+    DataStoreFactory <|-- SupabaseDataStoreFactory
+    DataStoreFactory <|-- DynamoDataStoreFactory
+    DataStoreFactory <|-- MockDataStoreFactory
+
+    %% Factory Method (Proveedores de IA)
+    class AIProviderCreator {
+        <<abstract creator>>
+        +createProvider()* IAIProvider
+    }
+    class GeminiProviderCreator {
+        +createProvider()
+    }
+    class OpenAIProviderCreator {
+        +createProvider()
+    }
+    class MockAIProviderCreator {
+        +createProvider()
+    }
+    AIProviderCreator <|-- GeminiProviderCreator
+    AIProviderCreator <|-- OpenAIProviderCreator
+    AIProviderCreator <|-- MockAIProviderCreator
+
+    %% Interfaces y Adaptadores
+    class IAIProvider {
+        <<interface>>
+        +generateJson()
+    }
+    class GeminiAdapter {
+        +generateJson()
+    }
+    class OpenAIAdapter {
+        +generateJson()
+    }
+    IAIProvider <|.. GeminiAdapter
+    IAIProvider <|.. OpenAIAdapter
+
+    GeminiProviderCreator ..> GeminiAdapter : crea
+    OpenAIProviderCreator ..> OpenAIAdapter : crea
+
+    %% Conexiones de Dominio
+    DomainServices ..> DataStoreFactory : consume repositorios vía Abstract Factory
+    DomainServices ..> AIProviderCreator : resuelve inferencia vía Factory Method
+```
+
+---
+
+### 3. Matriz Comparativa: Antes vs. Después
+
+| Criterio / Aspecto | Antes (Código Legado) | Después (Patrones GoF + SOLID) | Beneficio Obtenido |
+| :--- | :--- | :--- | :--- |
+| **Persistencia Políglota** | Condicionales `if/else` en cada método para decidir entre Supabase o DynamoDB. | **Abstract Factory:** [DataStoreFactory](Backend/src/repositories/factories/datastore.factory.ts) con fábricas concretas independientes. | Garantía de consistencia de familia y cero condicionales en los servicios. |
+| **Proveedores de IA** | Acoplamiento rígido al SDK de Gemini en un solo archivo de 350+ líneas. | **Factory Method + Adapter:** [AIProviderCreator](Backend/src/services/ai/creators/ai-provider.creator.ts) con adaptadores para Gemini y OpenAI GPT-4o. | Capacidad de alternar proveedores de IA con 1 variable o inyección en runtime. |
+| **Organización de Código (SRP)** | Clases abstractas, concretas y despachadores mezclados en archivos únicos. | **Modularidad Estricta:** Un archivo por clase dentro de `factories/` y `creators/`. | Eliminación de código espagueti y fácil navegación del código. |
+| **Segregación de Interfaces (ISP)** | Servicios atados a implementaciones con dependencias pesadas. | Interfaces segregadas por entidad ([IInterviewRepository](Backend/src/repositories/interview.repository.ts), [IFeedbackRepository](Backend/src/repositories/feedback.repository.ts), [IUserRepository](Backend/src/repositories/user.repository.ts)). | Los servicios solo conocen y dependen de los métodos que realmente utilizan. |
+| **Pruebas Unitarias (Testing)** | Requería base de datos real y conexión activa a internet. | Fábricas simuladas ([MockDataStoreFactory](Backend/src/repositories/factories/mock-datastore.factory.ts), [MockAIProviderCreator](Backend/src/services/ai/creators/mock-ai-provider.creator.ts)). | Pruebas unitarias 100% aisladas, sin costo de API y en milisegundos. |
+| **Principio Abierto/Cerrado (OCP)** | Agregar una nueva base de datos exigía editar múltiples archivos existentes. | Se crea una nueva subclase sin tocar una sola línea del código existente. | Arquitectura escalable y resistente a regresiones. |
+
+---
+
 ## 🚀 Funcionalidades Principales
 
 ### 1. Entrevistas de Voz en Tiempo Real con IA
@@ -21,7 +180,7 @@ La plataforma está diseñada bajo una arquitectura limpia y altamente modular b
 * **Modalidades de Creación:**
   * *Basada en Formulario:* Selección de rol objetivo, nivel de experiencia (*Junior, Mid, Senior, Lead*), stack tecnológico, enfoque de la entrevista (*Técnica, Conductual o Mixta*) y cantidad de preguntas.
   * *Basada en Voz:* Agente conversacional que recopila los parámetros del usuario interactivamente y configura la entrevista.
-* **Retroalimentación Multidimensional:** Al finalizar la llamada, Google Gemini procesa la transcripción completa generando un informe de desempeño con puntuación global (0-100), evaluación por 5 categorías (*Comunicación, Conocimiento Técnico, Resolución de Problemas, Ajuste Cultural y Claridad*), fortalezas, áreas de mejora y dictamen final.
+* **Retroalimentación Multidimensional:** Al finalizar la llamada, el proveedor de IA procesa la transcripción completa generando un informe de desempeño con puntuación global (0-100), evaluación por 5 categorías (*Comunicación, Conocimiento Técnico, Resolución de Problemas, Ajuste Cultural y Claridad*), fortalezas, áreas de mejora y dictamen final.
 * **Evaluación de Nivel de Inglés (CEFR):** En entrevistas en inglés, genera en paralelo un reporte de competencia lingüística según el Marco Común Europeo (A1 a C2), con detección de errores gramaticales textuales y sugerencias de vocabulario técnico.
 * **Personalidades e Idiomas:** Soporte en Español e Inglés con voces masculinas y femeninas (Alejandro, Catalina, Katie, Daniel).
 
@@ -65,35 +224,6 @@ El sistema incorpora de manera formal y desacoplada los siguientes patrones de d
   * **Registry / Despachador:** `RepositoryFactory` (administra la inyección y selección dinámica de la fábrica activa).
 * **Modularización:** Cada fábrica concreta y la base abstracta residen en su propio archivo independiente respetando SRP.
 
-```mermaid
-classDiagram
-    direction TB
-    class DataStoreFactory {
-        <<abstract>>
-        +createInterviewRepository()* IInterviewRepository
-        +createFeedbackRepository()* IFeedbackRepository
-        +createUserRepository()* IUserRepository
-    }
-    class SupabaseDataStoreFactory {
-        +createInterviewRepository() IInterviewRepository
-        +createFeedbackRepository() IFeedbackRepository
-        +createUserRepository() IUserRepository
-    }
-    class DynamoDataStoreFactory {
-        +createInterviewRepository() IInterviewRepository
-        +createFeedbackRepository() IFeedbackRepository
-        +createUserRepository() IUserRepository
-    }
-    class MockDataStoreFactory {
-        +createInterviewRepository() IInterviewRepository
-        +createFeedbackRepository() IFeedbackRepository
-        +createUserRepository() IUserRepository
-    }
-    DataStoreFactory <|-- SupabaseDataStoreFactory
-    DataStoreFactory <|-- DynamoDataStoreFactory
-    DataStoreFactory <|-- MockDataStoreFactory
-```
-
 ---
 
 ### 2. Factory Method (Creacional - GoF)
@@ -105,34 +235,6 @@ classDiagram
   * **Creador Concreto 2:** `OpenAIProviderCreator` (instancia `OpenAIAdapter` con `gpt-4o-mini`).
   * **Creador Concreto 3:** `MockAIProviderCreator` (instancia respuestas simuladas para testing y ejecución offline).
   * **Registry / Selector:** `AIProviderFactory` (resuelve el proveedor activo según la variable de entorno `AI_PROVIDER` o inyección explícita).
-
-```mermaid
-classDiagram
-    direction TB
-    class IAIProvider {
-        <<interface>>
-        +generateJson(parts, options) Promise
-    }
-    class AIProviderCreator {
-        <<abstract>>
-        +createProvider()* IAIProvider
-        +getProviderInstance() IAIProvider
-    }
-    class GeminiProviderCreator {
-        +createProvider() IAIProvider
-    }
-    class OpenAIProviderCreator {
-        +createProvider() IAIProvider
-    }
-    class MockAIProviderCreator {
-        +createProvider() IAIProvider
-    }
-    AIProviderCreator <|-- GeminiProviderCreator
-    AIProviderCreator <|-- OpenAIProviderCreator
-    AIProviderCreator <|-- MockAIProviderCreator
-    GeminiProviderCreator ..> GeminiAdapter : crea
-    OpenAIProviderCreator ..> OpenAIAdapter : crea
-```
 
 ---
 
@@ -169,29 +271,13 @@ classDiagram
 
 ---
 
-## 🏗️ Refactorización SOLID y Calidad de Código
+## 🏗️ Resumen de Principios SOLID Aplicados
 
-El backend implementa de forma integral los cinco principios SOLID y erradica antipatrones de diseño:
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        ARQUITECTURA MODULAR REFACTORIZADA                              │
-├────────────────────────┬────────────────────────┬──────────────────────────────────────┤
-│ Capa de Controladores  │ Capa de Servicios      │ Capa de Abstracción / Infra          │
-├────────────────────────┼────────────────────────┼──────────────────────────────────────┤
-│ livekit.routes.ts      │ QuestionGeneratorSvc   │ DataStoreFactory (Abstract Factory)  │
-│ cv.routes.ts           │ CvOptimizationService  │ IInterviewRepository (DIP / OCP)     │
-│ auth.routes.ts         │ Domain Services        │ IFeedbackRepository  (DIP / LSP)     │
-│ feedback.routes.ts     │ InterviewEvaluationSvc │ IUserRepository      (DIP / OCP / ISP)│
-│ code.routes.ts         │ CodeChallengeService   │ AIProviderCreator (Factory Method)   │
-│ LiveKit Voice Agent    │ VoiceAgentConfig       │ IAIProvider / Adapters (Adapter)     │
-└────────────────────────┴────────────────────────┴──────────────────────────────────────┘
-```
-
-* **DIP / OCP:** Repositorios de datos desacoplados mediante interfaces segregadas y fábricas abstractas.
-* **SRP:** División de clases monolíticas en servicios especializados de responsabilidad única (un archivo por clase).
-* **ISP:** Interfaces de persistencia delgadas (`IInterviewRepository`, `IFeedbackRepository`, `IUserRepository`) donde los clientes consumen únicamente los métodos que necesitan.
-* **LSP:** Reemplazabilidad transparente de implementaciones concretas (Supabase, DynamoDB, Mocks) sin romper contratos.
+* **SRP (Single Responsibility Principle):** Cada archivo alberga una única clase con una responsabilidad bien delimitada (fábricas, creadores, adaptadores y repositorios en módulos separados).
+* **OCP (Open/Closed Principle):** Se pueden añadir nuevos motores de base de datos o modelos de IA creando nuevas subclases sin modificar los servicios existentes.
+* **LSP (Liskov Substitution Principle):** Cualquier implementación de `DataStoreFactory` o `AIProviderCreator` puede sustituir a su clase base sin alterar el comportamiento esperado del sistema.
+* **ISP (Interface Segregation Principle):** Interfaces segregadas por entidad (`IInterviewRepository`, `IFeedbackRepository`, `IUserRepository`), evitando interfaces gigantes y obligando a los clientes a depender solo de lo que necesitan.
+* **DIP (Dependency Inversion Principle):** Los servicios de alto nivel dependen exclusivamente de abstracciones (`IAIProvider`, `IInterviewRepository`, `DataStoreFactory`) y nunca de clases concretas o SDKs de base de datos.
 
 ---
 

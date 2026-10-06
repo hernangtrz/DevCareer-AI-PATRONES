@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const interviews_service_1 = require("../services/interviews.service");
-const constants_1 = require("../config/constants");
+const prototype_1 = require("../patterns/prototype");
 const router = (0, express_1.Router)();
 // Todas las rutas requieren autenticación
 router.use(auth_middleware_1.requireAuth);
@@ -32,6 +32,19 @@ router.get("/latest", async (req, res) => {
         res.status(500).json({ success: false, message: "Error al obtener entrevistas" });
     }
 });
+// GET /interviews/prototypes/templates
+// Patrón Prototype: Lista los identificadores de arquetipos de entrevistas disponibles en el catálogo
+router.get("/prototypes/templates", async (_req, res) => {
+    try {
+        const registry = prototype_1.InterviewPrototypeRegistry.getInstance();
+        const availableKeys = registry.listKeys();
+        res.status(200).json({ success: true, templates: availableKeys });
+    }
+    catch (error) {
+        console.error("Error listando prototipos de plantilla:", error);
+        res.status(500).json({ success: false, message: "Error al consultar plantillas" });
+    }
+});
 // GET /interviews/:id
 // Entrevista por ID
 router.get("/:id", async (req, res) => {
@@ -49,7 +62,7 @@ router.get("/:id", async (req, res) => {
     }
 });
 // POST /interviews/from-template
-// Crea una entrevista a partir de una plantilla predefinida
+// Patrón Prototype: Crea una entrevista clonando un arquetipo registrado en el catálogo
 router.post("/from-template", async (req, res) => {
     const { templateId } = req.body;
     if (!templateId) {
@@ -57,27 +70,37 @@ router.post("/from-template", async (req, res) => {
         return;
     }
     try {
-        const template = constants_1.interviewTemplates.find((t) => t.id === templateId);
-        if (!template) {
-            res.status(404).json({ success: false, message: "Plantilla no encontrada" });
+        const interviewId = await (0, interviews_service_1.createInterviewFromTemplate)(templateId, req.userId);
+        if (!interviewId) {
+            res.status(404).json({ success: false, message: "Plantilla arquetípica no encontrada en el registro" });
             return;
         }
-        const interviewId = await (0, interviews_service_1.createInterview)({
-            role: template.role,
-            level: template.level,
-            type: template.type,
-            techstack: template.techstack,
-            questions: template.questions,
-            userId: req.userId,
-            finalized: true,
-            coverImage: (0, constants_1.getRandomInterviewCover)(),
-            createdAt: new Date().toISOString(),
-        });
         res.status(201).json({ success: true, interviewId });
     }
     catch (error) {
-        console.error("Error creando entrevista desde plantilla:", error);
+        console.error("Error creando entrevista desde plantilla prototype:", error);
         res.status(500).json({ success: false, message: "Error al crear la entrevista" });
+    }
+});
+// POST /interviews/:id/clone
+// Patrón Prototype: Clona una entrevista histórica existente para reintentar la práctica
+router.post("/:id/clone", async (req, res) => {
+    const { id } = req.params;
+    try {
+        const clonedInterviewId = await (0, interviews_service_1.cloneInterview)(id, req.userId);
+        if (!clonedInterviewId) {
+            res.status(404).json({ success: false, message: "Entrevista a clonar no encontrada" });
+            return;
+        }
+        res.status(201).json({
+            success: true,
+            interviewId: clonedInterviewId,
+            message: "Entrevista clonada exitosamente para nueva práctica.",
+        });
+    }
+    catch (error) {
+        console.error("Error clonando entrevista:", error);
+        res.status(500).json({ success: false, message: "Error al clonar la entrevista" });
     }
 });
 exports.default = router;

@@ -1,4 +1,4 @@
-# DevCareer AI
+﻿# DevCareer AI
 
 > **Plataforma de Entrenamiento y Preparación Técnica para Desarrolladores de Software**  
 > *Proyecto Integrador: Universidad Popular del Cesar*  
@@ -248,6 +248,31 @@ El sistema incorpora de manera formal y desacoplada los siguientes patrones de d
 * **Ubicación:** `livekit-agent/strategies/voice-agent.strategy.ts`
 * **Propósito:** Encapsula las configuraciones, prompts de sistema, vocabularios y parámetros acústicos del agente en tiempo real según el idioma seleccionado (`SpanishVoiceStrategy` y `EnglishVoiceStrategy`), desacoplando el orquestador WebRTC de la lógica conversacional.
 
+
+
+---
+
+### 5. Builder Pattern (Creacional - GoF)
+* **Ubicación:** Backend/src/patterns/builder/
+* **Propósito:** Resuelve la construcción compleja, dispersa e inconsistente de entidades Interview. Permite ensamblar entrevistas paso a paso a través de una interfaz fluida (Fluent Interface), garantizando la validación estricta de invariantes de negocio antes de la persistencia.
+* **Componentes:**
+  * **Interfaz Abstracta:** IInterviewBuilder (define operaciones encadenables: .forUser(), .withRole(), .withTechStack(), .withQuestions(), .assignRandomCover(), .asDraft(), .asFinalized(), .build()).
+  * **Constructor Concreto:** InterviewBuilder (encapsula estado intermedio, deduplicación de tecnologías, sanitización de entradas y validación de campos obligatorios).
+  * **Director:** InterviewDirector (coordina recetas de construcción predefinidas: constructDraftInterview, constructTechnicalInterview, y constructFromPrototype).
+* **Integración en Dominio:** Consumido por QuestionGeneratorService para la generación asíncrona de entrevistas en borrador.
+
+---
+
+### 6. Prototype Pattern (Creacional - GoF)
+* **Ubicación:** Backend/src/patterns/prototype/
+* **Propósito:** Permite la clonación profunda e independiente (Deep Copy) de entrevistas arquetípicas y duplicación de entrevistas históricas, desacoplando la instanciación de clases concretas y evitando mutaciones de memoria cruzadas.
+* **Componentes:**
+  * **Interfaz Base:** ICloneable<T> (declara la operación estándar clone(): T).
+  * **Prototipo Concreto:** InterviewPrototype (realiza copias profundas de colecciones anidadas questions y techstack, y provee el método .prepareForUser() para reasignación de metadatos de sesión).
+  * **Catálogo / Registro:** InterviewPrototypeRegistry (Singleton que precarga plantillas arquetípicas en memoria y entrega clones independientes).
+* **Nueva Capacidad:** Habilita el endpoint POST /interviews/:id/clone para que los desarrolladores puedan reintentar cualquier entrevista previa con un clic.
+* **Diagrama de Clases UML:** Documentado en detalle en [docs/diagrams/DiagramaClases_Builder_Prototype.md](docs/diagrams/DiagramaClases_Builder_Prototype.md).
+
 ---
 
 ## 🛠️ Tecnologías Utilizadas
@@ -361,6 +386,12 @@ node scripts/test-abstract-factory.js
 
 # 2. Probar el patrón Factory Method y Adapter (Gemini, OpenAI y Mocks)
 node scripts/test-factory-method.js
+
+# 3. Probar el patrón Prototype (Clonación Profunda, Aislamiento y Catálogo de Arquetipos)
+node scripts/test-prototype.js
+
+# 4. Probar el patrón Builder (Ensamble Fluido, Validación de Invariantes y Director)
+node scripts/test-builder.js
 ```
 
 ---

@@ -3,7 +3,7 @@ import { IFeedbackRepository } from "../feedback.repository";
 import { IUserRepository } from "../user.repository";
 /**
  * ============================================================================
- * PATRÓN ABSTRACT FACTORY: FÁBRICA ABSTRACTA BASE (GoF)
+ * PATRÓN ABSTRACT FACTORY: FÁBRICA ABSTRACTA BASE
  * ============================================================================
  * Declara los métodos de creación para cada producto de la familia de persistencia.
  */

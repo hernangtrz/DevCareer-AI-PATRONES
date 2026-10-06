@@ -1,11 +1,11 @@
-import { getRandomInterviewCover } from "../config/constants";
-import {
+﻿import {
   createInterview,
   getInterviewById,
   updateInterview,
 } from "./interviews.service";
 import { IAIProvider } from "./ai/ai-provider.interface";
 import { AIProviderFactory } from "./ai/ai-provider.factory";
+import { InterviewBuilder, InterviewDirector } from "../patterns/builder";
 
 export interface GenerateQuestionsInput {
   role: string;
@@ -18,14 +18,21 @@ export interface GenerateQuestionsInput {
 
 /**
  * Servicio especializado en la generación y orquestación de preguntas para entrevistas (CC-05).
- * Aplica los principios SOLID (SRP / DIP), aislando la creación en base de datos,
- * la interacción con el proveedor de IA y el ciclo asíncrono en segundo plano.
+ * Aplica los principios SOLID (SRP / DIP) e integra el Patrón Builder (GoF) a través de InterviewDirector
+ * para garantizar la construcción paso a paso validada del objeto Interview antes de su persistencia.
  */
 export class QuestionGeneratorService {
-  constructor(private aiProvider: IAIProvider = AIProviderFactory.getProvider()) {}
+  private director: InterviewDirector;
+
+  constructor(
+    private aiProvider: IAIProvider = AIProviderFactory.getProvider(),
+    builder: InterviewBuilder = new InterviewBuilder()
+  ) {
+    this.director = new InterviewDirector(builder);
+  }
 
   /**
-   * Crea inmediatamente el registro de la entrevista y desencadena la generación de preguntas en segundo plano.
+   * Crea inmediatamente el registro de la entrevista (usando Builder) y desencadena la generación de preguntas en segundo plano.
    * @returns ID de la entrevista creada.
    */
   async createAndInitiateGeneration(input: GenerateQuestionsInput): Promise<string> {
@@ -36,18 +43,16 @@ export class QuestionGeneratorService {
         ? input.techstack
         : [];
 
-    // 1. Crear la entrevista en la base de datos como no finalizada
-    const interviewId = await createInterview({
-      role: input.role,
-      type: input.type,
-      level: input.level,
-      techstack: formattedTechstack,
-      questions: [],
+    // 1. Patrón Builder (Director): Ensambla de forma validada la entrevista en estado Borrador
+    const draftInterview = this.director.constructDraftInterview({
       userId: input.userId || "user_unknown",
-      finalized: false,
-      coverImage: getRandomInterviewCover(),
-      createdAt: new Date().toISOString(),
+      role: input.role,
+      level: input.level,
+      type: input.type,
+      techstack: formattedTechstack,
     });
+
+    const interviewId = await createInterview(draftInterview);
 
     // 2. Procesar la generación en segundo plano sin bloquear al cliente
     this.generateQuestionsInBackground(interviewId, input, formattedTechstack).catch(

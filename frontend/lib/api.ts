@@ -1,4 +1,4 @@
-/**
+﻿/**
  * lib/api.ts
  * Funciones HTTP para CLIENT COMPONENTS.
  * No importa "next/headers" — es seguro usarlo en el browser.
@@ -133,6 +133,27 @@ export async function createInterviewFromTemplate(
       {
         method: "POST",
         body: JSON.stringify({ templateId }),
+      },
+      bearerToken,
+    );
+    return res.interviewId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Patrón Prototype: Clona una entrevista previa para reintentar la práctica.
+ */
+export async function cloneInterview(
+  interviewId: string,
+  bearerToken: string,
+): Promise<string | null> {
+  try {
+    const res = await apiFetch<{ success: boolean; interviewId: string }>(
+      '/interviews/' + interviewId + '/clone',
+      {
+        method: "POST",
       },
       bearerToken,
     );

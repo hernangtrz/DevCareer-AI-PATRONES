@@ -7,6 +7,13 @@ import {
   generateEnglishProficiencyFeedback,
 } from "../services/gemini.service";
 import { aiRateLimiter } from "../middleware/rate-limit.middleware";
+import {
+  PerformanceReport,
+  InterviewFeedbackReport,
+  EnglishProficiencyReport,
+  resolveReportRenderer,
+  SUPPORTED_REPORT_FORMATS,
+} from "../patterns/bridge";
 
 const router = Router();
 
@@ -134,6 +141,56 @@ router.get("/:interviewId", async (req: AuthRequest, res: Response): Promise<voi
   } catch (error: any) {
     console.error("[FeedbackRoutes] Error obteniendo feedback:", error);
     res.status(500).json({ success: false, message: "Error al obtener el feedback" });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// GET /feedback/:interviewId/export?report=interview|english&format=md|html|txt
+// Patrón Bridge: combina cualquier tipo de reporte (Abstracción) con cualquier
+// formato de salida (Implementador) sin crear una clase por cada combinación.
+// ──────────────────────────────────────────────────────────────────────────────
+router.get("/:interviewId/export", async (req: AuthRequest, res: Response): Promise<void> => {
+  const { interviewId } = req.params;
+  const reportType = String(req.query.report || "interview").toLowerCase();
+  const renderer = resolveReportRenderer(req.query.format as string | undefined);
+
+  if (!renderer) {
+    res.status(400).json({
+      success: false,
+      message: `Formato no soportado. Usa uno de: ${SUPPORTED_REPORT_FORMATS.join(", ")}`,
+    });
+    return;
+  }
+
+  try {
+    const feedback = await getFeedbackByInterviewId(interviewId, req.userId!);
+
+    if (!feedback) {
+      res.status(404).json({ success: false, message: "Feedback no encontrado" });
+      return;
+    }
+
+    let report: PerformanceReport;
+    if (reportType === "english") {
+      if (!feedback.englishFeedback) {
+        res.status(404).json({ success: false, message: "Esta entrevista no tiene evaluación de inglés (CEFR)" });
+        return;
+      }
+      report = new EnglishProficiencyReport(interviewId, feedback.englishFeedback, renderer);
+    } else if (reportType === "interview") {
+      report = new InterviewFeedbackReport(feedback, renderer);
+    } else {
+      res.status(400).json({ success: false, message: "Tipo de reporte no soportado. Usa: interview, english" });
+      return;
+    }
+
+    const { content, contentType, filename } = report.export();
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(content);
+  } catch (error: any) {
+    console.error("[FeedbackRoutes] Error exportando feedback:", error);
+    res.status(500).json({ success: false, message: "Error al exportar el feedback" });
   }
 });
 

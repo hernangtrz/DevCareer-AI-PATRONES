@@ -1,6 +1,7 @@
 import { IReportRenderer } from "../report-renderer.interface";
 /**
  * Concrete Implementor: HTML (imprimible / guardable como PDF desde el navegador o enviable por correo).
+ * Diseño ejecutivo, responsivo, con soporte de modo oscuro y optimizado para impresión (Ctrl+P / PDF).
  */
 export declare class HtmlRenderer implements IReportRenderer {
     readonly format = "html";

@@ -1,14 +1,15 @@
 import { Router, Request, Response } from "express";
-import { CodeChallengeService } from "../services/ai";
+import { AIServiceFacade } from "../patterns/facade";
 import { aiRateLimiter } from "../middleware/rate-limit.middleware";
 
 const router = Router();
-const codeChallengeService = new CodeChallengeService();
+const aiFacade = new AIServiceFacade();
 
 // Apply AI rate limiting
 router.use(aiRateLimiter);
 
 // POST /code/feedback (or /api/code/feedback)
+// Patrón Estructural Facade (GoF): Consume aiFacade.evaluateCodeChallenge
 router.post("/feedback", async (req: Request, res: Response): Promise<void> => {
   try {
     const {
@@ -28,7 +29,7 @@ router.post("/feedback", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const feedback = await codeChallengeService.evaluate({
+    const feedback = await aiFacade.evaluateCodeChallenge({
       code,
       problemTitle,
       problemDescription: problemDescription || "",

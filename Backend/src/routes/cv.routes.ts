@@ -1,12 +1,10 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { aiRateLimiter } from "../middleware/rate-limit.middleware";
-import { CvAnalysisService } from "../services/ai";
-import { CvOptimizationService } from "../services/cv-optimization.service";
+import { AIServiceFacade } from "../patterns/facade";
 
 const router = Router();
-const cvAnalysisService = new CvAnalysisService();
-const cvOptimizationService = new CvOptimizationService();
+const aiFacade = new AIServiceFacade();
 
 // Configure multer for in-memory PDF uploads (max 8MB)
 const upload = multer({
@@ -18,7 +16,7 @@ const upload = multer({
 router.use(aiRateLimiter);
 
 // ──────────────────────────────────────────────────────────────────────────────
-// POST /api/cv/analyze
+// POST /api/cv/analyze (Patrón Facade: consume aiFacade.analyzeCvAts)
 // Soporta tanto subida de archivo PDF (multipart/form-data) como texto pegado (JSON)
 // ──────────────────────────────────────────────────────────────────────────────
 router.post(
@@ -51,7 +49,7 @@ router.post(
         pdfBase64 = file.buffer.toString("base64");
       }
 
-      const analysis = await cvAnalysisService.analyze({
+      const analysis = await aiFacade.analyzeCvAts({
         jobDescription,
         cvText: !pdfBase64 ? cvText : undefined,
         pdfBase64,
@@ -72,11 +70,11 @@ router.post(
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
-// POST /api/cv/improve - Optimizar hoja de vida (CC-06 Refactorizado)
+// POST /api/cv/improve - Optimizar hoja de vida (Patrón Facade: consume aiFacade.optimizeCv)
 // ──────────────────────────────────────────────────────────────────────────────
 router.post("/improve", async (req: Request, res: Response): Promise<void> => {
   try {
-    const improvedData = await cvOptimizationService.improveCv(req.body);
+    const improvedData = await aiFacade.optimizeCv(req.body);
 
     res.status(200).json({
       success: true,
@@ -92,11 +90,11 @@ router.post("/improve", async (req: Request, res: Response): Promise<void> => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// POST /api/cv/improve-profile - Optimizar resumen ejecutivo del perfil (CC-06 Refactorizado)
+// POST /api/cv/improve-profile - Optimizar perfil (Patrón Facade: consume aiFacade.optimizeProfile)
 // ──────────────────────────────────────────────────────────────────────────────
 router.post("/improve-profile", async (req: Request, res: Response): Promise<void> => {
   try {
-    const result = await cvOptimizationService.improveProfile(req.body);
+    const result = await aiFacade.optimizeProfile(req.body);
 
     res.status(200).json({
       success: true,

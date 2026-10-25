@@ -22,6 +22,11 @@ async function handler(req: NextRequest) {
   const authHeader = incomingHeaders.get("authorization");
   if (authHeader) {
     headers["authorization"] = authHeader;
+  } else {
+    const sessionCookie = req.cookies.get("session")?.value;
+    if (sessionCookie) {
+      headers["authorization"] = `Bearer ${sessionCookie}`;
+    }
   }
 
   let body: BodyInit | undefined = undefined;
@@ -38,10 +43,15 @@ async function handler(req: NextRequest) {
 
     const data = await res.arrayBuffer();
     const resContentType = res.headers.get("content-type") || "application/json";
+    const resHeaders: Record<string, string> = { "Content-Type": resContentType };
+    const contentDisposition = res.headers.get("content-disposition");
+    if (contentDisposition) {
+      resHeaders["Content-Disposition"] = contentDisposition;
+    }
 
     return new NextResponse(data, {
       status: res.status,
-      headers: { "Content-Type": resContentType },
+      headers: resHeaders,
     });
   } catch (error: any) {
     console.error("[ProxyRoute] Error proxying to backend:", error?.message || error);

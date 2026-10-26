@@ -5,6 +5,7 @@ import cors from "cors";
 import { generalLimiter } from "./middleware/rate-limit.middleware";
 import authRoutes from "./routes/auth.routes";
 import interviewsRoutes from "./routes/interviews.routes";
+import jobsRoutes from "./routes/jobs.routes";
 import feedbackRoutes from "./routes/feedback.routes";
 import livekitRoutes from "./routes/livekit.routes";
 import cvRoutes from "./routes/cv.routes";
@@ -37,6 +38,7 @@ app.get("/health", (_req, res) => {
 // ── Rutas de la Aplicación ────────────────────────────────────────────────────
 app.use("/auth", authRoutes);
 app.use("/interviews", interviewsRoutes);
+app.use("/jobs", jobsRoutes);
 app.use("/feedback", feedbackRoutes);
 app.use("/api/livekit", livekitRoutes);
 app.use("/api/cv", cvRoutes);

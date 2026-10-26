@@ -1,3 +1,4 @@
+import DashboardExportActions from "@/components/DashboardExportActions";
 export const dynamic = "force-dynamic";
 
 import React from "react";
@@ -225,7 +226,13 @@ const Page = async () => {
 
       {/* ─── My Interviews Section ─── */}
       <section className="flex flex-col gap-6 mt-12 text-left">
-        <h2 className="text-2xl font-bold text-white">{t.dash_my_interviews}</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+          <div>
+            <h2 className="text-2xl font-bold text-white">{t.dash_my_interviews}</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">Historial y estadísticas de simulacros con IA</p>
+          </div>
+          <DashboardExportActions />
+        </div>
         <div className="interviews-section">
           {hasPastInterviews ? (
             userInterviews?.map((interview) => (

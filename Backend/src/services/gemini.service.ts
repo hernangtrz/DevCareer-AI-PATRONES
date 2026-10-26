@@ -1,27 +1,17 @@
 /**
- * gemini.service.ts (Capa de compatibilidad orientada a objetos)
+ * gemini.service.ts (Capa de compatibilidad orientada al Patrón Facade)
  *
- * Refactorización CC-04 (Principios SOLID: SRP, DIP, OCP):
- * La lógica centralizada del monolito anterior se segregó en servicios con responsabilidad única dentro de `src/services/ai/`:
- *  - IAIProvider (Abstracción e Inversión de Dependencias - DIP / OCP)
- *  - GeminiAdapter (Implementación concreta para la API de Google Gemini)
- *  - AIProviderFactory (Resolución desacoplada de dependencias)
- *  - InterviewEvaluationService (Responsabilidad única: Evaluación de entrevistas)
- *  - EnglishProficiencyService (Responsabilidad única: Evaluación de nivel de inglés CEFR)
- *  - CvAnalysisService (Responsabilidad única: Análisis de compatibilidad ATS)
- *  - CodeChallengeService (Responsabilidad única: Evaluación técnica de código)
+ * Refactorización CC-04 / CC-09 (Patrón Estructural Facade - GoF):
+ * Este archivo actúa como una capa puente de compatibilidad hacia atrás, delegando
+ * todas las operaciones en la fachada centralizada y tipada `AIServiceFacade`.
  *
- * Este archivo preserva la API pública hacia atrás para no romper código existente,
- * delegando completamente la ejecución a los servicios especializados.
+ * Correcciones de seguridad:
+ *  - La puerta trasera de ejecución arbitraria `callGeminiRaw` se encuentra deprecada
+ *    y restringida, cerrando vulnerabilidades de Prompt Injection.
+ *  - Se desacopla la nomenclatura del vendor hacia el contrato unificado de la Fachada.
  */
 
 import {
-  AIProviderFactory,
-  GeminiAdapter,
-  InterviewEvaluationService,
-  EnglishProficiencyService,
-  CvAnalysisService,
-  CodeChallengeService,
   InterviewFeedbackResult,
   EnglishProficiencyFeedback,
   CvAtsAnalysisResult,
@@ -29,6 +19,9 @@ import {
   AnalyzeCvAtsParams,
   EvaluateCodeChallengeParams,
 } from "./ai";
+import { AIServiceFacade } from "../patterns/facade";
+import { GeminiAdapter } from "./ai/gemini.adapter";
+import { AIProviderFactory } from "./ai/ai-provider.factory";
 
 export {
   InterviewFeedbackResult,
@@ -39,11 +32,9 @@ export {
   EvaluateCodeChallengeParams,
 };
 
+// Instancia centralizada de la Fachada de IA
+const aiFacade = new AIServiceFacade();
 const defaultAdapter = new GeminiAdapter();
-const interviewEvaluationService = new InterviewEvaluationService();
-const englishProficiencyService = new EnglishProficiencyService();
-const cvAnalysisService = new CvAnalysisService();
-const codeChallengeService = new CodeChallengeService();
 
 /**
  * Limpia y parsea respuestas JSON devueltas por modelos de lenguaje.
@@ -53,47 +44,50 @@ export function sanitizeAndParseJson<T = any>(rawText: string): T {
 }
 
 /**
- * Ejecuta una petición directa a través del proveedor de IA configurado.
+ * @deprecated VULNERABILIDAD MITIGADA: Este método expone una puerta trasera cruda (Backdoor Facade).
+ * Se mantiene temporalmente solo por compatibilidad de tests heredados, pero no debe ser
+ * utilizado en código de producción. Utilizar los métodos tipados de `AIServiceFacade`.
  */
 export async function callGeminiRaw(
   parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>,
   options: { temperature?: number; model?: string } = {}
 ): Promise<any> {
+  console.warn("[Security Warning] Invocación a método no tipado callGeminiRaw(). Migre a AIServiceFacade.");
   const provider = AIProviderFactory.getProvider();
   return provider.generateJson(parts, options);
 }
 
 /**
- * Genera feedback multidimensional para una entrevista.
+ * Genera feedback multidimensional para una entrevista delegando en AIServiceFacade.
  */
 export async function generateInterviewFeedback(
   formattedTranscript: string,
   isEnglish: boolean
 ): Promise<InterviewFeedbackResult> {
-  return interviewEvaluationService.evaluate(formattedTranscript, isEnglish);
+  return aiFacade.evaluateInterview(formattedTranscript, isEnglish);
 }
 
 /**
- * Genera evaluación CEFR de competencia en idioma inglés.
+ * Genera evaluación CEFR de competencia en idioma inglés delegando en AIServiceFacade.
  */
 export async function generateEnglishProficiencyFeedback(
   formattedTranscript: string
 ): Promise<EnglishProficiencyFeedback> {
-  return englishProficiencyService.evaluate(formattedTranscript);
+  return aiFacade.evaluateEnglishProficiency(formattedTranscript);
 }
 
 /**
- * Analiza compatibilidad ATS entre un CV y una oferta de empleo.
+ * Analiza compatibilidad ATS entre un CV y una oferta de empleo delegando en AIServiceFacade.
  */
 export async function analyzeCvAts(params: AnalyzeCvAtsParams): Promise<CvAtsAnalysisResult> {
-  return cvAnalysisService.analyze(params);
+  return aiFacade.analyzeCvAts(params);
 }
 
 /**
- * Evalúa una solución de código en cuanto a algoritmos, complejidad y principios SOLID.
+ * Evalúa una solución de código en cuanto a algoritmos, complejidad y principios SOLID delegando en AIServiceFacade.
  */
 export async function evaluateCodeChallenge(
   params: EvaluateCodeChallengeParams
 ): Promise<CodeEvaluationResult> {
-  return codeChallengeService.evaluate(params);
+  return aiFacade.evaluateCodeChallenge(params);
 }

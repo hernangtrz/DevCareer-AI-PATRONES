@@ -9,3 +9,5 @@ export * from "./supabase/supabase-user.repository";
 export * from "./dynamo/dynamo-user.repository";
 export * from "./factories";
 export * from "./repository.factory";
+export * from "./job-application.repository";
+export * from "./memory-job-application.repository";

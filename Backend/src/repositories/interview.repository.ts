@@ -9,4 +9,5 @@ export interface IInterviewRepository {
   getLatest(userId: string, limit?: number): Promise<Interview[]>;
   create(interview: Omit<Interview, "id">): Promise<string>;
   update(interview: Interview): Promise<void>;
+  delete(id: string): Promise<void>;
 }

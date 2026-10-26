@@ -80,3 +80,37 @@ export async function cloneInterview(
 
   return currentRepo.create(cloned.toEntity());
 }
+
+
+export async function deleteInterview(
+  id: string,
+  userId: string
+): Promise<boolean> {
+  const existing = await currentRepo.getById(id);
+  if (!existing) return false;
+  if (existing.userId !== userId) {
+    throw new Error("No autorizado para eliminar esta entrevista");
+  }
+  await currentRepo.delete(id);
+  return true;
+}
+
+export async function editInterview(
+  id: string,
+  userId: string,
+  updates: Partial<Pick<Interview, "role" | "level" | "techstack" | "questions" | "finalized" | "type">>
+): Promise<Interview | null> {
+  const existing = await currentRepo.getById(id);
+  if (!existing) return null;
+  if (existing.userId !== userId) {
+    throw new Error("No autorizado para editar esta entrevista");
+  }
+  const updated: Interview = {
+    ...existing,
+    ...updates,
+    id: existing.id,
+    userId: existing.userId,
+  };
+  await currentRepo.update(updated);
+  return updated;
+}

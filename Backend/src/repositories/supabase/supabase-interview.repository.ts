@@ -108,4 +108,16 @@ export class SupabaseInterviewRepository implements IInterviewRepository {
       throw error;
     }
   }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from("interviews")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("[SupabaseInterviewRepository] delete error:", error);
+      throw error;
+    }
+  }
 }

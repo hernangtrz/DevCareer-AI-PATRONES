@@ -57,6 +57,12 @@ class DynamoInterviewRepository {
             Item: interview,
         }));
     }
+    async delete(id) {
+        await this.dynamo.send(new lib_dynamodb_1.DeleteCommand({
+            TableName: dynamo_1.TABLES.INTERVIEWS,
+            Key: { id },
+        }));
+    }
 }
 exports.DynamoInterviewRepository = DynamoInterviewRepository;
 //# sourceMappingURL=dynamo-interview.repository.js.map

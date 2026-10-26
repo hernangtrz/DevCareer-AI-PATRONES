@@ -26,6 +26,7 @@ export class MockDataStoreFactory extends DataStoreFactory {
       async getLatest(userId: string, limit = 20) { return (Object.values(data) as any[]).slice(0, limit); },
       async create(interview: any) { const id = "mock_interview_id"; data[id] = { id, ...interview }; return id; },
       async update(interview: any) { data[interview.id] = interview; },
+      async delete(id: string) { delete data[id]; },
     };
   }
 

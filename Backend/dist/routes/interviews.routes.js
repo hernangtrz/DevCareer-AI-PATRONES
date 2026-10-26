@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const builder_1 = require("../patterns/builder");
 const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const interviews_service_1 = require("../services/interviews.service");
@@ -101,6 +102,71 @@ router.post("/:id/clone", async (req, res) => {
     catch (error) {
         console.error("Error clonando entrevista:", error);
         res.status(500).json({ success: false, message: "Error al clonar la entrevista" });
+    }
+});
+// PUT /interviews/:id
+// Actualiza datos de la entrevista (título/rol, nivel, stack tecnológico, etc.)
+router.put("/:id", async (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+    try {
+        const updated = await (0, interviews_service_1.editInterview)(id, req.userId, updates);
+        if (!updated) {
+            res.status(404).json({ success: false, message: "Entrevista no encontrada" });
+            return;
+        }
+        res.status(200).json({ success: true, interview: updated });
+    }
+    catch (error) {
+        console.error("Error editando entrevista:", error);
+        const status = error.message.includes("No autorizado") ? 403 : 500;
+        res.status(status).json({ success: false, message: error.message || "Error al actualizar la entrevista" });
+    }
+});
+// DELETE /interviews/:id
+// Elimina una entrevista del usuario autenticado
+router.delete("/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+        const deleted = await (0, interviews_service_1.deleteInterview)(id, req.userId);
+        if (!deleted) {
+            res.status(404).json({ success: false, message: "Entrevista no encontrada" });
+            return;
+        }
+        res.status(200).json({ success: true, message: "Entrevista eliminada correctamente" });
+    }
+    catch (error) {
+        console.error("Error eliminando entrevista:", error);
+        const status = error.message.includes("No autorizado") ? 403 : 500;
+        res.status(status).json({ success: false, message: error.message || "Error al eliminar la entrevista" });
+    }
+});
+// POST /interviews
+// Patrón Builder: Crea una entrevista personalizada estructurada paso a paso
+router.post("/", async (req, res) => {
+    const { role, level, type, techstack, questions, coverImage } = req.body;
+    if (!role || !level) {
+        res.status(400).json({ success: false, message: "role y level son requeridos" });
+        return;
+    }
+    try {
+        const builder = new builder_1.InterviewBuilder();
+        const director = new builder_1.InterviewDirector(builder);
+        const interviewData = director.constructTechnicalInterview({
+            userId: req.userId,
+            role,
+            level,
+            type: type || "Technical",
+            techstack: Array.isArray(techstack) ? techstack : [techstack].filter(Boolean),
+            questions: Array.isArray(questions) ? questions : [],
+            coverImage,
+        });
+        const interviewId = await (0, interviews_service_1.createInterview)(interviewData);
+        res.status(201).json({ success: true, interviewId });
+    }
+    catch (error) {
+        console.error("Error creando entrevista personalizada con Builder:", error);
+        res.status(500).json({ success: false, message: "Error al crear la entrevista" });
     }
 });
 exports.default = router;

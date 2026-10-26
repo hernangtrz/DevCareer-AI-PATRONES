@@ -11,6 +11,7 @@ import { getCurrentUser, getSessionCookie, getLanguageCookie } from "@/lib/api.s
 import { getFeedbackByInterviewId, getInterviewById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { translations } from "@/lib/translations";
+import FeedbackExportButtons from "@/components/FeedbackExportButtons";
 
 const Page = async ({ params }: RouteParams) => {
   const { id } = await params;
@@ -163,6 +164,12 @@ const Page = async ({ params }: RouteParams) => {
           )}
         </div>
       )}
+
+      {/* Patrón Bridge: Exportación Multiformato de Reportes */}
+      <FeedbackExportButtons
+        interviewId={id}
+        hasEnglishFeedback={!!feedback?.englishFeedback}
+      />
 
       <div className="buttons">
         <Button className="btn-secondary flex-1">

@@ -5,6 +5,7 @@ import {
   PutCommand,
   QueryCommand,
   ScanCommand,
+  DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { TABLES } from "../../config/dynamo";
 import { v4 as uuidv4 } from "uuid";
@@ -80,6 +81,15 @@ export class DynamoInterviewRepository implements IInterviewRepository {
       new PutCommand({
         TableName: TABLES.INTERVIEWS,
         Item: interview,
+      })
+    );
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.dynamo.send(
+      new DeleteCommand({
+        TableName: TABLES.INTERVIEWS,
+        Key: { id },
       })
     );
   }

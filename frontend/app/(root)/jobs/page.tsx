@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getJobs, applyToJob, getUserJobApplications, createJobInterview, JobOfferDto, JobApplicationDto } from "@/lib/api";
 import {
   Briefcase,
   Search,
@@ -25,6 +26,7 @@ import {
   Send,
   ArrowRight,
   TrendingUp,
+  Table,
   Bookmark,
   RefreshCw,
   Globe,
@@ -155,7 +157,87 @@ export default function JobsPage() {
   const router = useRouter();
 
   // Navigation sub-tabs in Jobs (Feed / Saved)
-  const [activeMainTab, setActiveMainTab] = useState<"feed" | "saved">("feed");
+  const [activeMainTab, setActiveMainTab] = useState<"feed" | "saved" | "applications">("feed");
+  const [liveApplications, setLiveApplications] = useState<JobApplicationDto[]>([]);
+  const [isApplyingWithFacade, setIsApplyingWithFacade] = useState(false);
+  const [simulatingJobId, setSimulatingJobId] = useState<string | null>(null);
+
+  
+  React.useEffect(() => {
+    async function loadData() {
+      try {
+        const apps = await getUserJobApplications();
+        if (apps && apps.length > 0) setLiveApplications(apps);
+      } catch (e) {
+        console.error("Error cargando postulaciones:", e);
+      }
+    }
+    loadData();
+  }, []);
+
+    const handleSimulateInterviewForJob = async (job: any) => {
+    setSimulatingJobId(job.id);
+    try {
+      const res = await createJobInterview({
+        jobTitle: job.title,
+        company: job.company,
+        description: job.description || `Vacante para ${job.title} en ${job.company}`,
+        requiredSkills: job.matchedSkills || ["TypeScript", "React", "Node.js"],
+        seniority: job.seniority || "Mid-Level",
+      });
+
+      if (res.success && res.interviewId) {
+        router.push(`/interview/${res.interviewId}`);
+      } else {
+        alert(res.message || "No se pudo iniciar el simulacro de entrevista");
+      }
+    } catch (e: any) {
+      alert("Error iniciando entrevista personalizada: " + e.message);
+    } finally {
+      setSimulatingJobId(null);
+    }
+  };
+
+  const handleConfirmAiApplication = async () => {
+    if (!selectedJob) return;
+    setIsApplyingWithFacade(true);
+    try {
+      const jobDto: JobOfferDto = {
+        id: selectedJob.id,
+        title: selectedJob.title,
+        company: selectedJob.company,
+        location: selectedJob.location,
+        type: selectedJob.remote ? "Remote" : "Full-time",
+        salary: selectedJob.salaryMonthlyUSD,
+        description: `Vacante para ${selectedJob.title} en ${selectedJob.company}`,
+        requiredSkills: selectedJob.matchedSkills || [],
+        seniority: selectedJob.seniority,
+        platform: selectedJob.platform,
+        matchScore: selectedJob.matchScore,
+        matchedSkills: selectedJob.matchedSkills,
+        createdAt: new Date().toISOString(),
+      };
+
+      const res = await applyToJob({
+        job: jobDto,
+        userSkills: selectedJob?.matchedSkills || ["TypeScript", "React", "Node.js"],
+        userExperienceSummary: profileData.headline,
+      });
+
+      if (res.success && res.application) {
+        setLiveApplications((prev) => [res.application!, ...prev]);
+        setShowApplyModal(false);
+        setActiveMainTab("applications");
+        alert("¡Postulación procesada con éxito mediante JobApplicationFacade! Puedes consultar el simulacro y el reporte.");
+      } else {
+        alert(res.message || "Error procesando postulación");
+      }
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setIsApplyingWithFacade(false);
+    }
+  };
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
@@ -301,12 +383,170 @@ export default function JobsPage() {
               {savedJobs.length}
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveMainTab("applications")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeMainTab === "applications"
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 ring-2 ring-indigo-400"
+                : "bg-zinc-950/60 text-zinc-400 hover:text-white border border-zinc-800"
+            }`}
+          >
+            <Send className="w-4 h-4 text-emerald-400" />
+            <span>Mis Postulaciones & Métricas</span>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[10px] text-emerald-300 font-mono font-bold">
+              {liveApplications.length}
+            </span>
+          </button>
         </div>
       </div>
 
       {/* ────────────────────────────────────────────────────────── */}
       {/* VISTA 1 & 2: FEED DE OFERTAS & OFERTAS GUARDADAS            */}
       {/* ────────────────────────────────────────────────────────── */}
+      
+      {/* ============================================================ */}
+      {/* VISTA 3: MIS POSTULACIONES & MÉTRICAS (PATRÓN BRIDGE)        */}
+      {/* ============================================================ */}
+      {activeMainTab === "applications" && (
+        <div className="flex flex-col gap-6">
+          {/* Header con Exportador Bridge (Excel, HTML, Markdown) */}
+          <div className="p-6 bg-gradient-to-r from-zinc-900 via-indigo-950/40 to-zinc-900 border border-indigo-500/30 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
+                  Patrón Bridge Aplicado
+                </span>
+                <span className="text-xs text-zinc-400">• Exportación Desacoplada</span>
+              </div>
+              <h3 className="text-xl font-bold text-white mt-1">
+                Historial de Postulaciones y Métricas
+              </h3>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Descarga tus postulaciones, el CV adaptado para ATS y las cartas de presentación en el formato deseado.
+              </p>
+            </div>
+
+            {/* Botones de Descarga en Formatos Bridge */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-xs text-zinc-400 mr-1 font-semibold">Exportar:</span>
+              <a
+                href="/api/proxy/jobs/applications/export?format=excel"
+                target="_blank"
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 transition shadow-lg shadow-emerald-500/10"
+                title="Descargar en formato Excel compatible (.csv)"
+              >
+                <Table className="w-4 h-4 text-emerald-400" />
+                <span>Excel (.csv)</span>
+              </a>
+              <a
+                href="/api/proxy/jobs/applications/export?format=html"
+                target="_blank"
+                className="px-3 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-white border border-white/10 flex items-center gap-1.5 transition"
+              >
+                <FileText className="w-4 h-4 text-zinc-300" />
+                <span>HTML</span>
+              </a>
+              <a
+                href="/api/proxy/jobs/applications/export?format=md"
+                target="_blank"
+                className="px-3 py-2 rounded-xl text-xs font-semibold bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 flex items-center gap-1.5 transition"
+              >
+                <Code2 className="w-4 h-4 text-blue-400" />
+                <span>Markdown</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Listado de Postulaciones */}
+          {liveApplications.length === 0 ? (
+            <div className="p-12 text-center border border-zinc-800/80 rounded-2xl bg-zinc-950/40">
+              <Send className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
+              <h4 className="text-base font-bold text-white">No tienes postulaciones registradas aún</h4>
+              <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+                Explora las vacantes en &quot;Explorar Ofertas&quot; y haz clic en &quot;Postularme con IA&quot; para generar tu carta de presentación y simular la entrevista.
+              </p>
+              <button
+                onClick={() => setActiveMainTab("feed")}
+                className="mt-4 px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition"
+              >
+                Explorar Ofertas
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {liveApplications.map((app) => (
+                <div
+                  key={app.id}
+                  className="p-5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700/80 transition flex flex-col gap-4 shadow-lg"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-zinc-800/60 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-base font-bold text-white">{app.jobTitle}</h4>
+                        <span className="text-xs px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 font-medium">
+                          {app.company}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        {app.location || "Remoto"} • Aplicado el {new Date(app.appliedAt).toLocaleDateString("es-CO")}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        {app.status || "APLICADO"}
+                      </span>
+                      {app.interviewId && (
+                        <Link
+                          href={`/interview/${app.interviewId}`}
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white flex items-center gap-1.5 transition shadow-md shadow-violet-600/20"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Practicar Entrevista</span>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* CV Adaptado y Carta */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    {app.adaptedResumeSummary && (
+                      <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800/60">
+                        <p className="font-bold text-indigo-300 uppercase tracking-wider text-[10px] mb-1.5">
+                          Hoja de Vida Adaptada (Palabras Clave ATS)
+                        </p>
+                        <p className="text-zinc-300 leading-relaxed">{app.adaptedResumeSummary}</p>
+                      </div>
+                    )}
+
+                    {app.coverLetter && (
+                      <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800/60">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="font-bold text-teal-300 uppercase tracking-wider text-[10px]">
+                            Carta de Presentación Enviada
+                          </p>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(app.coverLetter!);
+                              alert("Carta copiada al portapapeles");
+                            }}
+                            className="text-[10px] text-zinc-400 hover:text-white underline"
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                        <p className="text-zinc-400 line-clamp-4 leading-relaxed italic">{app.coverLetter}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {(activeMainTab === "feed" || activeMainTab === "saved") && (
         <>
           {/* Connected Job Platforms (Greenhouse, Lever, LinkedIn, Wellfound) */}
@@ -499,12 +739,14 @@ export default function JobsPage() {
                         {/* Action buttons */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-zinc-800/80">
                           <button
-                            onClick={() => router.push("/interview")}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-pink-400 hover:text-pink-300 transition-colors cursor-pointer"
-                          >
-                            <Mic className="w-4 h-4" />
-                            <span>Simular entrevista para esta oferta</span>
-                          </button>
+                              onClick={() => handleSimulateInterviewForJob(job)}
+                              disabled={simulatingJobId === job.id}
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-pink-400 hover:text-pink-300 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Crear y abrir simulación técnica personalizada con el patrón Builder"
+                            >
+                              <Mic className={`w-4 h-4 ${simulatingJobId === job.id ? "animate-spin" : ""}`} />
+                              <span>{simulatingJobId === job.id ? "Creando entrevista a la medida..." : "Simular entrevista para esta oferta"}</span>
+                            </button>
 
                           <div className="flex items-center gap-2">
                             <button
@@ -782,7 +1024,7 @@ export default function JobsPage() {
                   }}
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center gap-2"
                 >
-                  <span>Copiar Carta y Abrir en {selectedJob.platform}</span>
+                  <span>{isApplyingWithFacade ? "Procesando con Facade..." : `Confirmar Postulación & Generar Entrevista`}</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </button>
               </div>

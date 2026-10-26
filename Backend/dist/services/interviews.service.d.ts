@@ -16,3 +16,5 @@ export declare function createInterviewFromTemplate(templateId: string, userId: 
  * o duplicarla sin afectar la entrevista original.
  */
 export declare function cloneInterview(interviewId: string, userId: string): Promise<string | null>;
+export declare function deleteInterview(id: string, userId: string): Promise<boolean>;
+export declare function editInterview(id: string, userId: string, updates: Partial<Pick<Interview, "role" | "level" | "techstack" | "questions" | "finalized" | "type">>): Promise<Interview | null>;

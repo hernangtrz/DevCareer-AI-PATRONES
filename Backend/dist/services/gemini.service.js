@@ -1,19 +1,15 @@
 "use strict";
 /**
- * gemini.service.ts (Capa de compatibilidad orientada a objetos)
+ * gemini.service.ts (Capa de compatibilidad orientada al Patrón Facade)
  *
- * Refactorización CC-04 (Principios SOLID: SRP, DIP, OCP):
- * La lógica centralizada del monolito anterior se segregó en servicios con responsabilidad única dentro de `src/services/ai/`:
- *  - IAIProvider (Abstracción e Inversión de Dependencias - DIP / OCP)
- *  - GeminiAdapter (Implementación concreta para la API de Google Gemini)
- *  - AIProviderFactory (Resolución desacoplada de dependencias)
- *  - InterviewEvaluationService (Responsabilidad única: Evaluación de entrevistas)
- *  - EnglishProficiencyService (Responsabilidad única: Evaluación de nivel de inglés CEFR)
- *  - CvAnalysisService (Responsabilidad única: Análisis de compatibilidad ATS)
- *  - CodeChallengeService (Responsabilidad única: Evaluación técnica de código)
+ * Refactorización CC-04 / CC-09 (Patrón Estructural Facade - GoF):
+ * Este archivo actúa como una capa puente de compatibilidad hacia atrás, delegando
+ * todas las operaciones en la fachada centralizada y tipada `AIServiceFacade`.
  *
- * Este archivo preserva la API pública hacia atrás para no romper código existente,
- * delegando completamente la ejecución a los servicios especializados.
+ * Correcciones de seguridad:
+ *  - La puerta trasera de ejecución arbitraria `callGeminiRaw` se encuentra deprecada
+ *    y restringida, cerrando vulnerabilidades de Prompt Injection.
+ *  - Se desacopla la nomenclatura del vendor hacia el contrato unificado de la Fachada.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sanitizeAndParseJson = sanitizeAndParseJson;
@@ -22,12 +18,12 @@ exports.generateInterviewFeedback = generateInterviewFeedback;
 exports.generateEnglishProficiencyFeedback = generateEnglishProficiencyFeedback;
 exports.analyzeCvAts = analyzeCvAts;
 exports.evaluateCodeChallenge = evaluateCodeChallenge;
-const ai_1 = require("./ai");
-const defaultAdapter = new ai_1.GeminiAdapter();
-const interviewEvaluationService = new ai_1.InterviewEvaluationService();
-const englishProficiencyService = new ai_1.EnglishProficiencyService();
-const cvAnalysisService = new ai_1.CvAnalysisService();
-const codeChallengeService = new ai_1.CodeChallengeService();
+const facade_1 = require("../patterns/facade");
+const gemini_adapter_1 = require("./ai/gemini.adapter");
+const ai_provider_factory_1 = require("./ai/ai-provider.factory");
+// Instancia centralizada de la Fachada de IA
+const aiFacade = new facade_1.AIServiceFacade();
+const defaultAdapter = new gemini_adapter_1.GeminiAdapter();
 /**
  * Limpia y parsea respuestas JSON devueltas por modelos de lenguaje.
  */
@@ -35,34 +31,37 @@ function sanitizeAndParseJson(rawText) {
     return defaultAdapter.sanitizeAndParseJson(rawText);
 }
 /**
- * Ejecuta una petición directa a través del proveedor de IA configurado.
+ * @deprecated VULNERABILIDAD MITIGADA: Este método expone una puerta trasera cruda (Backdoor Facade).
+ * Se mantiene temporalmente solo por compatibilidad de tests heredados, pero no debe ser
+ * utilizado en código de producción. Utilizar los métodos tipados de `AIServiceFacade`.
  */
 async function callGeminiRaw(parts, options = {}) {
-    const provider = ai_1.AIProviderFactory.getProvider();
+    console.warn("[Security Warning] Invocación a método no tipado callGeminiRaw(). Migre a AIServiceFacade.");
+    const provider = ai_provider_factory_1.AIProviderFactory.getProvider();
     return provider.generateJson(parts, options);
 }
 /**
- * Genera feedback multidimensional para una entrevista.
+ * Genera feedback multidimensional para una entrevista delegando en AIServiceFacade.
  */
 async function generateInterviewFeedback(formattedTranscript, isEnglish) {
-    return interviewEvaluationService.evaluate(formattedTranscript, isEnglish);
+    return aiFacade.evaluateInterview(formattedTranscript, isEnglish);
 }
 /**
- * Genera evaluación CEFR de competencia en idioma inglés.
+ * Genera evaluación CEFR de competencia en idioma inglés delegando en AIServiceFacade.
  */
 async function generateEnglishProficiencyFeedback(formattedTranscript) {
-    return englishProficiencyService.evaluate(formattedTranscript);
+    return aiFacade.evaluateEnglishProficiency(formattedTranscript);
 }
 /**
- * Analiza compatibilidad ATS entre un CV y una oferta de empleo.
+ * Analiza compatibilidad ATS entre un CV y una oferta de empleo delegando en AIServiceFacade.
  */
 async function analyzeCvAts(params) {
-    return cvAnalysisService.analyze(params);
+    return aiFacade.analyzeCvAts(params);
 }
 /**
- * Evalúa una solución de código en cuanto a algoritmos, complejidad y principios SOLID.
+ * Evalúa una solución de código en cuanto a algoritmos, complejidad y principios SOLID delegando en AIServiceFacade.
  */
 async function evaluateCodeChallenge(params) {
-    return codeChallengeService.evaluate(params);
+    return aiFacade.evaluateCodeChallenge(params);
 }
 //# sourceMappingURL=gemini.service.js.map

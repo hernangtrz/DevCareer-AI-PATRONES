@@ -23,6 +23,7 @@ class MockDataStoreFactory extends datastore_factory_1.DataStoreFactory {
             async getLatest(userId, limit = 20) { return Object.values(data).slice(0, limit); },
             async create(interview) { const id = "mock_interview_id"; data[id] = { id, ...interview }; return id; },
             async update(interview) { data[interview.id] = interview; },
+            async delete(id) { delete data[id]; },
         };
     }
     createFeedbackRepository() {

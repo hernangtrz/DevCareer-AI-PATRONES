@@ -9,6 +9,7 @@ const cors_1 = __importDefault(require("cors"));
 const rate_limit_middleware_1 = require("./middleware/rate-limit.middleware");
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const interviews_routes_1 = __importDefault(require("./routes/interviews.routes"));
+const jobs_routes_1 = __importDefault(require("./routes/jobs.routes"));
 const feedback_routes_1 = __importDefault(require("./routes/feedback.routes"));
 const livekit_routes_1 = __importDefault(require("./routes/livekit.routes"));
 const cv_routes_1 = __importDefault(require("./routes/cv.routes"));
@@ -33,6 +34,7 @@ app.get("/health", (_req, res) => {
 // ── Rutas de la Aplicación ────────────────────────────────────────────────────
 app.use("/auth", auth_routes_1.default);
 app.use("/interviews", interviews_routes_1.default);
+app.use("/jobs", jobs_routes_1.default);
 app.use("/feedback", feedback_routes_1.default);
 app.use("/api/livekit", livekit_routes_1.default);
 app.use("/api/cv", cv_routes_1.default);

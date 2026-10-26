@@ -9,6 +9,7 @@ import DisplayTechIcons from "@/components/DisplayTechIcons";
 import { getFeedbackByInterviewId } from "@/lib/api";
 import { getSessionCookie, getLanguageCookie } from "@/lib/api.server";
 import StartTemplateButton from "@/components/StartTemplateButton";
+import InterviewCardActions from "@/components/InterviewCardActions";
 import "dayjs/locale/en";
 
 const InterviewCard = async ({
@@ -47,6 +48,15 @@ const InterviewCard = async ({
           <div className="absolute top-0 right-0 w-fit px-4 py-2 rounded-bl-lg bg-light-600">
             <p className="badge-text">{normalizedType}</p>
           </div>
+          {isOwner && (
+            <div className="absolute top-2 left-2 z-10">
+              <InterviewCardActions
+                interviewId={id!}
+                initialRole={role}
+                initialTechstack={techstack || []}
+              />
+            </div>
+          )}
           <Image src={getRandomInterviewCover()} alt="cover image" width={90} height={90} className="rounded-full object-fit size-[90px]" />
           <h3 className="mt-5 capitalize">
             {lang === "es" ? `Entrevista de ${role}` : `${role} Interview`}

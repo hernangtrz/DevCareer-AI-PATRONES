@@ -25,4 +25,6 @@ __exportStar(require("./supabase/supabase-user.repository"), exports);
 __exportStar(require("./dynamo/dynamo-user.repository"), exports);
 __exportStar(require("./factories"), exports);
 __exportStar(require("./repository.factory"), exports);
+__exportStar(require("./job-application.repository"), exports);
+__exportStar(require("./memory-job-application.repository"), exports);
 //# sourceMappingURL=index.js.map

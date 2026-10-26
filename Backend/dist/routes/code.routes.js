@@ -1,13 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const ai_1 = require("../services/ai");
+const facade_1 = require("../patterns/facade");
 const rate_limit_middleware_1 = require("../middleware/rate-limit.middleware");
 const router = (0, express_1.Router)();
-const codeChallengeService = new ai_1.CodeChallengeService();
+const aiFacade = new facade_1.AIServiceFacade();
 // Apply AI rate limiting
 router.use(rate_limit_middleware_1.aiRateLimiter);
 // POST /code/feedback (or /api/code/feedback)
+// Patrón Estructural Facade (GoF): Consume aiFacade.evaluateCodeChallenge
 router.post("/feedback", async (req, res) => {
     try {
         const { code, problemTitle, problemDescription, passedCount, totalCount, isDesignPattern, } = req.body;
@@ -18,7 +19,7 @@ router.post("/feedback", async (req, res) => {
             });
             return;
         }
-        const feedback = await codeChallengeService.evaluate({
+        const feedback = await aiFacade.evaluateCodeChallenge({
             code,
             problemTitle,
             problemDescription: problemDescription || "",

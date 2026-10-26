@@ -1,5 +1,7 @@
 "use client";
 
+import DashboardExportActions from "@/components/DashboardExportActions";
+
 import React, { useState } from "react";
 import Link from "next/link";
 import {
@@ -125,11 +127,58 @@ export default function AnalyticsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 flex items-center gap-2">
             <Calendar className="w-3.5 h-3.5 text-indigo-400" />
             <span>Última actualización: hoy, 18:42 h</span>
           </div>
+          <DashboardExportActions />
+        </div>
+      </div>
+
+      
+      {/* ── Banner de Exportación con Patrón Bridge (Excel, HTML, Markdown) ── */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-zinc-900/90 via-indigo-950/40 to-zinc-900/90 border border-indigo-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-white flex items-center gap-2">
+              <span>Exportar Reporte de Rendimiento & Analíticas</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">
+                Patrón Bridge
+              </span>
+            </h4>
+            <p className="text-[11px] text-zinc-400">
+              Descarga tu radiografía técnica, radar de competencias y brechas en el formato deseado.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <a
+            href="/api/proxy/feedback/user/analytics-export?format=excel"
+            target="_blank"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+            title="Descargar en formato Excel (.csv) con BOM UTF-8"
+          >
+            <span>Excel (.csv)</span>
+          </a>
+          <a
+            href="/api/proxy/feedback/user/analytics-export?format=html"
+            target="_blank"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-white border border-white/15 flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <span>HTML</span>
+          </a>
+          <a
+            href="/api/proxy/feedback/user/analytics-export?format=md"
+            target="_blank"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <span>Markdown</span>
+          </a>
         </div>
       </div>
 

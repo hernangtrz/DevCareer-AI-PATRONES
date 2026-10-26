@@ -104,6 +104,16 @@ class SupabaseInterviewRepository {
             throw error;
         }
     }
+    async delete(id) {
+        const { error } = await this.supabase
+            .from("interviews")
+            .delete()
+            .eq("id", id);
+        if (error) {
+            console.error("[SupabaseInterviewRepository] delete error:", error);
+            throw error;
+        }
+    }
 }
 exports.SupabaseInterviewRepository = SupabaseInterviewRepository;
 //# sourceMappingURL=supabase-interview.repository.js.map

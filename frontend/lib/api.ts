@@ -210,3 +210,140 @@ export async function getFeedbackByInterviewId(
     return null;
   }
 }
+
+
+export async function updateInterview(
+  id: string,
+  data: Partial<{ role: string; level: string; techstack: string[]; finalized: boolean }>
+): Promise<{ success: boolean; interview?: Interview; message?: string }> {
+  try {
+    return await apiFetch<{ success: boolean; interview?: Interview; message?: string }>(
+      `/interviews/${id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
+  } catch (err: any) {
+    return { success: false, message: err.message || "Error al actualizar entrevista" };
+  }
+}
+
+export async function deleteInterview(
+  id: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    return await apiFetch<{ success: boolean; message?: string }>(
+      `/interviews/${id}`,
+      {
+        method: "DELETE",
+      }
+    );
+  } catch (err: any) {
+    return { success: false, message: err.message || "Error al eliminar entrevista" };
+  }
+}
+
+
+export interface JobOfferDto {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  type: string;
+  salary?: string;
+  description: string;
+  requiredSkills: string[];
+  seniority: string;
+  platform: string;
+  url?: string;
+  matchScore?: number;
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  createdAt: string;
+}
+
+export interface JobApplicationDto {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  company: string;
+  platform: string;
+  location: string;
+  salary?: string;
+  appliedAt: string;
+  status: "applied" | "interviewing" | "offered" | "rejected";
+  coverLetter?: string;
+  adaptedResumeSummary?: string;
+  matchScore?: number;
+  interviewId?: string;
+  notes?: string;
+}
+
+export async function getJobs(params?: { query?: string; platform?: string; skills?: string[] }): Promise<JobOfferDto[]> {
+  try {
+    const searchParams = new URLSearchParams();
+    if (params?.query) searchParams.set("query", params.query);
+    if (params?.platform) searchParams.set("platform", params.platform);
+    if (params?.skills && params.skills.length > 0) searchParams.set("skills", params.skills.join(","));
+
+    const queryStr = searchParams.toString();
+    const res = await apiFetch<{ success: boolean; jobs: JobOfferDto[] }>(
+      `/jobs${queryStr ? "?" + queryStr : ""}`
+    );
+    return res.jobs || [];
+  } catch (err) {
+    console.error("Error fetching jobs:", err);
+    return [];
+  }
+}
+
+export async function applyToJob(params: {
+  job: JobOfferDto;
+  userSkills?: string[];
+  userExperienceSummary?: string;
+  notes?: string;
+}): Promise<{ success: boolean; application?: JobApplicationDto; interviewId?: string; message?: string }> {
+  try {
+    return await apiFetch<{ success: boolean; application?: JobApplicationDto; interviewId?: string; message?: string }>(
+      "/jobs/apply",
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      }
+    );
+  } catch (err: any) {
+    return { success: false, message: err.message || "Error al procesar postulación" };
+  }
+}
+
+export async function getUserJobApplications(): Promise<JobApplicationDto[]> {
+  try {
+    const res = await apiFetch<{ success: boolean; applications: JobApplicationDto[] }>("/jobs/applications");
+    return res.applications || [];
+  } catch (err) {
+    console.error("Error fetching applications:", err);
+    return [];
+  }
+}
+
+
+export async function createJobInterview(params: {
+  jobTitle: string;
+  company: string;
+  description?: string;
+  requiredSkills: string[];
+  seniority?: string;
+}): Promise<{ success: boolean; interviewId?: string; message?: string }> {
+  try {
+    return await apiFetch<{ success: boolean; interviewId?: string; message?: string }>(
+      "/jobs/create-interview",
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      }
+    );
+  } catch (err: any) {
+    return { success: false, message: err.message || "Error al crear entrevista para el empleo" };
+  }
+}

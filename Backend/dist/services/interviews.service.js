@@ -8,6 +8,8 @@ exports.createInterview = createInterview;
 exports.updateInterview = updateInterview;
 exports.createInterviewFromTemplate = createInterviewFromTemplate;
 exports.cloneInterview = cloneInterview;
+exports.deleteInterview = deleteInterview;
+exports.editInterview = editInterview;
 const repository_factory_1 = require("../repositories/repository.factory");
 const prototype_1 = require("../patterns/prototype");
 /**
@@ -61,5 +63,31 @@ async function cloneInterview(interviewId, userId) {
     const cloned = prototype.clone();
     cloned.prepareForUser(userId, { finalized: true });
     return currentRepo.create(cloned.toEntity());
+}
+async function deleteInterview(id, userId) {
+    const existing = await currentRepo.getById(id);
+    if (!existing)
+        return false;
+    if (existing.userId !== userId) {
+        throw new Error("No autorizado para eliminar esta entrevista");
+    }
+    await currentRepo.delete(id);
+    return true;
+}
+async function editInterview(id, userId, updates) {
+    const existing = await currentRepo.getById(id);
+    if (!existing)
+        return null;
+    if (existing.userId !== userId) {
+        throw new Error("No autorizado para editar esta entrevista");
+    }
+    const updated = {
+        ...existing,
+        ...updates,
+        id: existing.id,
+        userId: existing.userId,
+    };
+    await currentRepo.update(updated);
+    return updated;
 }
 //# sourceMappingURL=interviews.service.js.map

@@ -7,6 +7,7 @@ import {
   PerformanceReport,
   InterviewFeedbackReport,
   EnglishProficiencyReport,
+  UserDashboardReport,
   resolveReportRenderer,
   SUPPORTED_REPORT_FORMATS,
 } from "../patterns/bridge";
@@ -116,6 +117,55 @@ router.get("/:interviewId/export", async (req: AuthRequest, res: Response): Prom
   } catch (error: any) {
     console.error("[FeedbackRoutes] Error exportando feedback:", error);
     res.status(500).json({ success: false, message: "Error al exportar el feedback" });
+  }
+});
+
+
+// GET /feedback/user/analytics-export?format=html|md|txt
+// Patrón Bridge: Exporta el informe de analíticas globales y evolución técnica del usuario
+router.get("/user/analytics-export", async (req: AuthRequest, res: Response): Promise<void> => {
+  const format = req.query.format as string | undefined;
+  const renderer = resolveReportRenderer(format);
+
+  if (!renderer) {
+    res.status(400).json({
+      success: false,
+      message: `Formato no soportado. Usa uno de: ${SUPPORTED_REPORT_FORMATS.join(", ")}`,
+    });
+    return;
+  }
+
+  try {
+    const report = new UserDashboardReport(
+      {
+        userId: req.userId || "usr_demo",
+        userName: "Candidato DevCareer",
+        totalInterviews: 5,
+        averageScore: 84,
+        technicalScore: 88,
+        communicationScore: 80,
+        cefrLevel: "B2 - Upper Intermediate",
+        topStrengths: [
+          "Diseño de arquitectura limpia y principios SOLID",
+          "Manejo fluido de TypeScript, React y microservicios",
+          "Resolución algorítmica estructurada"
+        ],
+        keyImprovements: [
+          "Optimización de consultas en bases de datos NoSQL",
+          "Profundizar en patrones de resiliencia (Circuit Breaker)"
+        ],
+        totalApplications: 3,
+      },
+      renderer
+    );
+
+    const { content, contentType, filename } = report.export();
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(content);
+  } catch (error: any) {
+    console.error("[FeedbackRoutes] Error exportando analíticas:", error);
+    res.status(500).json({ success: false, message: "Error al exportar analíticas" });
   }
 });
 

@@ -6,11 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const multer_1 = __importDefault(require("multer"));
 const rate_limit_middleware_1 = require("../middleware/rate-limit.middleware");
-const ai_1 = require("../services/ai");
-const cv_optimization_service_1 = require("../services/cv-optimization.service");
+const facade_1 = require("../patterns/facade");
 const router = (0, express_1.Router)();
-const cvAnalysisService = new ai_1.CvAnalysisService();
-const cvOptimizationService = new cv_optimization_service_1.CvOptimizationService();
+const aiFacade = new facade_1.AIServiceFacade();
 // Configure multer for in-memory PDF uploads (max 8MB)
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
@@ -19,7 +17,7 @@ const upload = (0, multer_1.default)({
 // Apply rate limiting to all AI CV endpoints
 router.use(rate_limit_middleware_1.aiRateLimiter);
 // ──────────────────────────────────────────────────────────────────────────────
-// POST /api/cv/analyze
+// POST /api/cv/analyze (Patrón Facade: consume aiFacade.analyzeCvAts)
 // Soporta tanto subida de archivo PDF (multipart/form-data) como texto pegado (JSON)
 // ──────────────────────────────────────────────────────────────────────────────
 router.post("/analyze", upload.single("cvFile"), async (req, res) => {
@@ -45,7 +43,7 @@ router.post("/analyze", upload.single("cvFile"), async (req, res) => {
         if (file && file.mimetype === "application/pdf") {
             pdfBase64 = file.buffer.toString("base64");
         }
-        const analysis = await cvAnalysisService.analyze({
+        const analysis = await aiFacade.analyzeCvAts({
             jobDescription,
             cvText: !pdfBase64 ? cvText : undefined,
             pdfBase64,
@@ -64,11 +62,11 @@ router.post("/analyze", upload.single("cvFile"), async (req, res) => {
     }
 });
 // ──────────────────────────────────────────────────────────────────────────────
-// POST /api/cv/improve - Optimizar hoja de vida (CC-06 Refactorizado)
+// POST /api/cv/improve - Optimizar hoja de vida (Patrón Facade: consume aiFacade.optimizeCv)
 // ──────────────────────────────────────────────────────────────────────────────
 router.post("/improve", async (req, res) => {
     try {
-        const improvedData = await cvOptimizationService.improveCv(req.body);
+        const improvedData = await aiFacade.optimizeCv(req.body);
         res.status(200).json({
             success: true,
             data: improvedData,
@@ -83,11 +81,11 @@ router.post("/improve", async (req, res) => {
     }
 });
 // ──────────────────────────────────────────────────────────────────────────────
-// POST /api/cv/improve-profile - Optimizar resumen ejecutivo del perfil (CC-06 Refactorizado)
+// POST /api/cv/improve-profile - Optimizar perfil (Patrón Facade: consume aiFacade.optimizeProfile)
 // ──────────────────────────────────────────────────────────────────────────────
 router.post("/improve-profile", async (req, res) => {
     try {
-        const result = await cvOptimizationService.improveProfile(req.body);
+        const result = await aiFacade.optimizeProfile(req.body);
         res.status(200).json({
             success: true,
             data: result,

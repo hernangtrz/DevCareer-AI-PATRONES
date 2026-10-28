@@ -5,6 +5,7 @@ export interface User {
 }
 
 export interface Interview {
+  company?: string;
   id: string;
   role: string;
   level: string;

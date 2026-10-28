@@ -2,12 +2,17 @@ import { AIProviderFactory } from "../services/ai/ai-provider.factory";
 import { InterviewBuilder, InterviewDirector } from "../patterns/builder";
 import { createInterview } from "../services/interviews.service";
 import { Router, Response } from "express";
-import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
+import { flexibleAuth, AuthRequest, SupabaseAuthVerifier, CognitoAuthVerifier } from "../middleware/auth.middleware";
+import { supabase } from "../config/supabase";
+import { cognitoIdVerifier } from "../config/cognito";
 import {
   getJobsForUser,
   getJobById,
   applyToJob,
   getUserJobApplications,
+  updateJobApplicationStatus,
+  updateJobApplicationNotes,
+  deleteJobApplication,
 } from "../services/jobs.service";
 import {
   resolveReportRenderer,
@@ -16,7 +21,9 @@ import {
 } from "../patterns/bridge";
 
 const router = Router();
-router.use(requireAuth);
+
+
+// router.use(flexibleAuth); -> Aplicado selectivamente a rutas que requieren usuario
 
 // GET /jobs
 // Lista ofertas de empleo agregadas de los adaptadores con Match Score personalizado
@@ -38,7 +45,7 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
 
 // GET /jobs/applications
 // Historial de postulaciones del usuario
-router.get("/applications", async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/applications", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const applications = await getUserJobApplications(req.userId!);
     res.status(200).json({ success: true, applications });
@@ -50,7 +57,7 @@ router.get("/applications", async (req: AuthRequest, res: Response): Promise<voi
 
 // GET /jobs/applications/export?format=html|md|txt
 // Patrón Bridge: Exporta el historial de postulaciones, métricas y cartas en el formato deseado
-router.get("/applications/export", async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/applications/export", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   const format = req.query.format as string | undefined;
   const renderer = resolveReportRenderer(format);
 
@@ -78,7 +85,7 @@ router.get("/applications/export", async (req: AuthRequest, res: Response): Prom
 
 // POST /jobs/apply
 // Patrón Facade: Procesa la postulación completa (Cover Letter IA + CV adaptado + Mock Interview)
-router.post("/apply", async (req: AuthRequest, res: Response): Promise<void> => {
+router.post("/apply", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   const { job, userSkills, userExperienceSummary, notes } = req.body;
 
   if (!job || !job.title || !job.company) {
@@ -90,8 +97,6 @@ router.post("/apply", async (req: AuthRequest, res: Response): Promise<void> => 
     const result = await applyToJob({
       userId: req.userId!,
       job,
-      userSkills,
-      userExperienceSummary,
       notes,
     });
 
@@ -125,7 +130,7 @@ router.get("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
 // POST /jobs/create-interview
 // Patrón Builder (Director): Crea una entrevista técnica personalizada y adaptada
 // a la descripción, empresa y tecnologías específicas de la vacante de empleo.
-router.post("/create-interview", async (req: AuthRequest, res: Response): Promise<void> => {
+router.post("/create-interview", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   const { jobTitle, company, description, requiredSkills, seniority } = req.body;
 
   if (!jobTitle || !company) {
@@ -177,6 +182,7 @@ Responde ÚNICAMENTE un array JSON con las preguntas en español, sin texto adic
     const interviewData = director.constructTechnicalInterview({
       userId: req.userId!,
       role: `${jobTitle} @ ${company}`,
+      company,
       level,
       type: "Technical",
       techstack: skills,
@@ -193,6 +199,46 @@ Responde ÚNICAMENTE un array JSON con las preguntas en español, sin texto adic
   } catch (error: any) {
     console.error("[JobsRoutes] Error creando entrevista personalizada para oferta:", error);
     res.status(500).json({ success: false, message: "Error al crear la entrevista personalizada" });
+  }
+});
+
+
+// PATCH /jobs/applications/:id/status
+// Actualiza el estado de la postulación (applied, interviewing, offered, rejected)
+router.patch("/applications/:id/status", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { status } = req.body;
+    if (!status) {
+      res.status(400).json({ success: false, message: "Status es requerido" });
+      return;
+    }
+    await updateJobApplicationStatus(req.params.id, status);
+    res.status(200).json({ success: true, message: "Estado de postulación actualizado" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Error actualizando estado" });
+  }
+});
+
+// PATCH /jobs/applications/:id/notes
+// Actualiza notas personales del usuario sobre su proceso
+router.patch("/applications/:id/notes", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { notes } = req.body;
+    await updateJobApplicationNotes(req.params.id, notes || "");
+    res.status(200).json({ success: true, message: "Notas actualizadas" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Error actualizando notas" });
+  }
+});
+
+// DELETE /jobs/applications/:id
+// Elimina una postulación del historial
+router.delete("/applications/:id", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    await deleteJobApplication(req.params.id);
+    res.status(200).json({ success: true, message: "Postulación eliminada" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Error eliminando postulación" });
   }
 });
 

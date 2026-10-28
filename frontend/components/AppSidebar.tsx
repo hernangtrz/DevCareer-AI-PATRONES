@@ -66,7 +66,7 @@ export default function AppSidebar({ userName, userEmail }: AppSidebarProps) {
       label: t("nav_analytics") || "Progreso & Analytics",
       icon: <BarChart3 className="w-4 h-4" />,
       active: pathname.startsWith("/analytics"),
-      badge: "Próximamente",
+      badge: null,
     },
     {
       href: "/profile",

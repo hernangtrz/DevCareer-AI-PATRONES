@@ -1,7 +1,8 @@
 /**
- * voice-agent.strategy.ts
- * Refactorización CC-08 (Principios SOLID: SRP y OCP).
- * Desacopla la configuración de voces, idiomas y guiones del ciclo de transporte WebRTC del agente.
+ * Patrón Strategy (GoF) para la Configuración y Comportamiento del Agente de Voz
+ * 
+ * Permite variar independientemente los parámetros de voz (TTS), idioma (STT),
+ * prompts de sistema, preguntas de respaldo y saludos iniciales según el idioma seleccionado.
  */
 
 export interface VoiceConfig {
@@ -10,12 +11,19 @@ export interface VoiceConfig {
   name: string;
 }
 
+export interface GreetingContext {
+  interviewerName: string;
+  role?: string;
+  company?: string;
+  techstack?: string[];
+}
+
 export interface VoiceAgentConfigStrategy {
   readonly language: string;
   getVoiceConfig(voiceKey?: string): VoiceConfig;
-  getGreeting(interviewerName: string): string;
+  getGreeting(interviewerName: string, context?: GreetingContext): string;
   getFallbackQuestions(): string[];
-  getInstructions(role: string, questions: string[]): string;
+  getInstructions(role: string, questions: string[], context?: GreetingContext): string;
 }
 
 export class SpanishVoiceAgentStrategy implements VoiceAgentConfigStrategy {
@@ -41,37 +49,50 @@ export class SpanishVoiceAgentStrategy implements VoiceAgentConfigStrategy {
     return SpanishVoiceAgentStrategy.VOICES['jeronimo-es'];
   }
 
-  getGreeting(interviewerName: string): string {
-    return `Hola, bienvenido a tu entrevista de simulación en DevCareer AI. Soy ${interviewerName} y hoy seré tu entrevistador. ¿Estás listo para comenzar con la primera pregunta?`;
+  getGreeting(interviewerName: string, context?: GreetingContext): string {
+    const role = context?.role || 'Desarrollador de Software';
+    const company = context?.company;
+    const companyText = company ? ` en ${company}` : '';
+
+    return `¡Hola! Te doy la bienvenida a tu entrevista técnica en DevCareer AI. Soy ${interviewerName} y hoy seré tu evaluador para el puesto de ${role}${companyText}. ¿Cómo te encuentras hoy? ¿Listo para comenzar?`;
   }
 
   getFallbackQuestions(): string[] {
     return [
-      '¿Podrías describirme tu experiencia en el desarrollo de software?',
-      '¿Cuáles son tus tecnologías favoritas y por qué?',
-      '¿Cómo manejas situaciones de desacuerdo con tu equipo técnico?',
+      '¿Podrías describir tu experiencia desarrollando software y tus proyectos más retadores?',
+      '¿Cuáles son tus tecnologías principales y qué buenas prácticas de arquitectura aplicas?',
+      '¿Cómo manejas desacuerdos técnicos o decisiones de diseño con tu equipo de desarrollo?',
     ];
   }
 
-  getInstructions(role: string, questions: string[]): string {
+  getInstructions(role: string, questions: string[], context?: GreetingContext): string {
     const formattedQuestions = questions
       .map((q, idx) => `- Pregunta ${idx + 1}: ${q}`)
       .join('\n');
 
+    const companyPart = context?.company ? ` en "${context.company}"` : '';
+    const stackPart = context?.techstack && context.techstack.length > 0
+      ? ` evaluando el stack técnico: ${context.techstack.join(', ')}`
+      : '';
+    const interviewerName = context?.interviewerName || 'Alejandro';
+
     return (
-      `Eres un entrevistador profesional y reclutador técnico experto de DevCareer AI. Estás conduciendo una entrevista en tiempo real con un candidato.\n` +
-      `El puesto para el que está aplicando es: "${role}".\n\n` +
-      `Debes realizar las siguientes preguntas secuencialmente en el orden establecido, esperando a que el usuario responda a cada una antes de pasar a la siguiente:\n` +
+      `Eres un evaluador técnico y reclutador experto de DevCareer AI llamado ${interviewerName}. Estás realizando una entrevista técnica por voz en tiempo real con un candidato.\n` +
+      `El puesto para el que está aplicando es: "${role}"${companyPart}${stackPart}.\n\n` +
+      `CONTEXTO DEL SALUDO INICIAL:\n` +
+      `Ya saludaste al candidato y le diste la bienvenida para el cargo de ${role}${companyPart}.\n\n` +
+      `FLUIDEZ Y CONVERSACIÓN ACTIVA (MUY IMPORTANTE):\n` +
+      `- Responde de inmediato a cualquier confirmación del usuario ("sí", "estoy listo", "bien gracias", "hola", etc.) con una frase corta y amigable (ej: "¡Excelente! Comencemos entonces con la primera pregunta.") e introduce la Pregunta 1 sin demora.\n` +
+      `- Cada una de tus intervenciones debe ser concisa (2 a 3 oraciones máximo) para que la conversación fluya de manera dinámica y no monopolices la palabra.\n` +
+      `- Escucha activamente: cuando el candidato termine de responder, haz un breve comentario de validación técnica (1 frase) y prosigue con la siguiente pregunta.\n` +
+      `- Si el usuario da una respuesta corta o parece dudar, anímalo amablemente o haz una repregunta puntual, pero NUNCA te quedes en silencio.\n\n` +
+      `Preguntas técnicas a formular secuencialmente:\n` +
       `${formattedQuestions}\n\n` +
-      `Pautas importantes:\n` +
-      `- Saluda al usuario cordialmente y pregúntale si está listo.\n` +
-      `- Formula una pregunta a la vez. No las leas todas juntas.\n` +
-      `- Escucha la respuesta del usuario de forma activa. Reconócela o haz un comentario muy breve antes de pasar a la siguiente pregunta.\n` +
-      `- Si su respuesta es demasiado corta o vaga, puedes hacer una pregunta de seguimiento muy breve sobre el tema.\n` +
-      `- Mantén las respuestas de tu parte muy cortas (máximo 2 frases) para que sea un diálogo ágil.\n` +
-      `- Sé profesional pero amable y motivador.\n` +
-      `- Habla SIEMPRE en español. No uses inglés.\n` +
-      `- Al finalizar todas las preguntas, agradece formalmente al usuario por su tiempo, dile que su entrevista ha concluido y que el sistema generará su reporte en el dashboard de inmediato. Despídete amablemente.`
+      `Pautas de evaluación:\n` +
+      `- Formula una sola pregunta a la vez. No las leas todas juntas.\n` +
+      `- Mantén un tono profesional, empático, técnico y natural.\n` +
+      `- Habla SIEMPRE en español.\n` +
+      `- Al terminar todas las preguntas de la lista, agradece cordialmente al candidato por su tiempo para ${role}${companyPart}, felicítalo por completar la entrevista e infórmale que su análisis detallado ya se encuentra disponible en su dashboard. Despídete amablemente.`
     );
   }
 }
@@ -99,50 +120,64 @@ export class EnglishVoiceAgentStrategy implements VoiceAgentConfigStrategy {
     return EnglishVoiceAgentStrategy.VOICES['katie-en'];
   }
 
-  getGreeting(interviewerName: string): string {
-    return `Hello, welcome to your simulation interview at DevCareer AI. I am ${interviewerName} and I will be your interviewer today. Are you ready to begin with the first question?`;
+  getGreeting(interviewerName: string, context?: GreetingContext): string {
+    const role = context?.role || 'Software Developer';
+    const company = context?.company;
+    const companyText = company ? ` at ${company}` : '';
+
+    return `Hello! Welcome to your technical interview at DevCareer AI. My name is ${interviewerName} and I will be your interviewer today for the ${role}${companyText} role. How are you doing today? Ready to get started?`;
   }
 
   getFallbackQuestions(): string[] {
     return [
-      'Could you describe your experience in software development?',
-      'What are your favorite technologies and why?',
-      'How do you handle disagreements with your technical team?',
+      'Could you describe your experience in software development and challenging engineering projects?',
+      'What are your primary technologies and what architecture principles do you apply?',
+      'How do you handle technical disagreements or architectural trade-offs in your engineering team?',
     ];
   }
 
-  getInstructions(role: string, questions: string[]): string {
+  getInstructions(role: string, questions: string[], context?: GreetingContext): string {
     const formattedQuestions = questions
       .map((q, idx) => `- Question ${idx + 1}: ${q}`)
       .join('\n');
 
+    const companyPart = context?.company ? ` at "${context.company}"` : '';
+    const stackPart = context?.techstack && context.techstack.length > 0
+      ? ` evaluating the tech stack: ${context.techstack.join(', ')}`
+      : '';
+    const interviewerName = context?.interviewerName || 'Katie';
+
     return (
-      `You are a professional interviewer and expert technical recruiter from DevCareer AI. You are conducting a real-time voice interview with a candidate.\n` +
-      `The position they are applying for is: "${role}".\n\n` +
-      `You must ask the following questions sequentially in the order established, waiting for the user to respond to each before moving to the next:\n` +
+      `You are an expert technical interviewer and recruiter at DevCareer AI named ${interviewerName}. You are conducting a live voice technical interview with a candidate.\n` +
+      `The candidate is interviewing for the position of: "${role}"${companyPart}${stackPart}.\n\n` +
+      `INITIAL GREETING CONTEXT:\n` +
+      `You have already greeted the candidate and welcomed them for the ${role}${companyPart} position.\n\n` +
+      `CONVERSATIONAL FLUENCY & ACTIVE LISTENING (CRITICAL):\n` +
+      `- Respond immediately to any candidate greeting or confirmation ("yes", "I am ready", "doing well", "hello", etc.) with a brief friendly sentence (e.g. "Awesome! Let us dive into the first question.") and introduce Question 1 right away.\n` +
+      `- Keep every turn concise (2 to 3 sentences maximum) so the conversation moves fast and naturally.\n` +
+      `- Active listening: when the candidate finishes their response, acknowledge their answer with brief technical validation (1 sentence) and proceed to the next question.\n` +
+      `- If the candidate gives a short answer, encourage them or ask a focused follow-up question. NEVER remain silent.\n\n` +
+      `Technical questions to ask sequentially:\n` +
       `${formattedQuestions}\n\n` +
-      `Important guidelines:\n` +
-      `- Greet the user cordially and ask if they are ready.\n` +
-      `- Ask one question at a time. Do not read them all together.\n` +
-      `- Listen to the user's response actively. Acknowledge it or make a very brief comment before asking the next question.\n` +
-      `- If their answer is too short or vague, you can ask a very brief follow-up question on the topic.\n` +
-      `- Keep your responses very short (maximum 2 sentences) to make it an active dialogue.\n` +
-      `- Be professional but polite and encouraging.\n` +
-      `- Speak ALWAYS in English. Do not use Spanish.\n` +
-      `- Upon completing all questions, formally thank the user for their time, tell them that the interview has concluded and the system will generate their report in the dashboard immediately. Say goodbye politely.`
+      `Interview Guidelines:\n` +
+      `- Ask only one question at a time. Never dump multiple questions.\n` +
+      `- Maintain a professional, encouraging, and natural conversational tone.\n` +
+      `- Speak ALWAYS in English.\n` +
+      `- Once all questions are finished, warmly thank the candidate for their time, congratulate them on finishing, and explain that their feedback report is now processing on their dashboard. Say a warm goodbye.`
     );
   }
 }
 
 export class VoiceAgentStrategyResolver {
   private static readonly strategies: Record<string, VoiceAgentConfigStrategy> = {
-    'es': new SpanishVoiceAgentStrategy(),
-    'en': new EnglishVoiceAgentStrategy(),
+    es: new SpanishVoiceAgentStrategy(),
+    en: new EnglishVoiceAgentStrategy(),
   };
 
-  static getStrategy(voiceKey: string): VoiceAgentConfigStrategy {
-    const isEnglish = voiceKey.endsWith('-en');
-    return isEnglish ? this.strategies['en'] : this.strategies['es'];
+  public static getStrategy(voiceKey?: string): VoiceAgentConfigStrategy {
+    if (voiceKey && voiceKey.endsWith('-en')) {
+      return VoiceAgentStrategyResolver.strategies.en;
+    }
+    return VoiceAgentStrategyResolver.strategies.es;
   }
 }
-

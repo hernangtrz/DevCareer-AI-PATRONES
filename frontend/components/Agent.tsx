@@ -15,7 +15,15 @@ import {
   Loader2,
   Globe,
   Headphones,
-  Activity
+  Activity,
+  Mic,
+  MicOff,
+  Clock,
+  ShieldCheck,
+  Layers,
+  Briefcase,
+  Code2,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Room,
@@ -25,7 +33,7 @@ import {
   LocalParticipant,
   Track,
   ConnectionState,
-  TranscriptionSegment
+  TranscriptionSegment,
 } from "livekit-client";
 
 enum CallStatus {
@@ -43,10 +51,10 @@ interface SavedMessage {
 }
 
 const VOICE_OPTIONS = [
-  { key: "jeronimo-es", label: "Alejandro — Español LatAm (Hombre)", lang: "es" },
-  { key: "catalina-es", label: "Catalina — Español LatAm (Mujer)", lang: "es" },
-  { key: "katie-en", label: "Katie — English US (Female)", lang: "en" },
-  { key: "daniel-en", label: "Daniel — English US (Male)", lang: "en" },
+  { key: "jeronimo-es", label: "Alejandro — Español LatAm (Hombre)", lang: "es", name: "Alejandro" },
+  { key: "catalina-es", label: "Catalina — Español LatAm (Mujer)", lang: "es", name: "Catalina" },
+  { key: "katie-en", label: "Katie — English US (Female)", lang: "en", name: "Katie" },
+  { key: "daniel-en", label: "Daniel — English US (Male)", lang: "en", name: "Daniel" },
 ];
 
 const Agent = ({
@@ -55,39 +63,64 @@ const Agent = ({
   type,
   interviewId,
   questions,
+  role = "Backend Developer",
+  company = "",
+  level = "Mid-Senior",
+  interviewType = "Técnica",
+  techstack = [],
 }: AgentProps) => {
   const router = useRouter();
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
   const [messages, setMessages] = useState<SavedMessage[]>([]);
-  // Ref para leer siempre los mensajes más recientes sin añadirlos como dep del efecto de redirección
+  const [latestSpeaker, setLatestSpeaker] = useState<"agent" | "user">("agent");
   const messagesRef = useRef<SavedMessage[]>([]);
-  const [lkRoom, setLkRoom] = useState<Room | null>(null);
+  messagesRef.current = messages;
+
   const [selectedVoice, setSelectedVoice] = useState("jeronimo-es");
+  const [lkRoom, setLkRoom] = useState<Room | null>(null);
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  // Mantener el ref sincronizado con el estado de mensajes
+  // Active call duration timer
   useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (callStatus === CallStatus.ACTIVE) {
+      interval = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
     return () => {
-      if (lkRoom) {
-        lkRoom.disconnect();
-      }
+      if (interval) clearInterval(interval);
     };
-  }, [lkRoom]);
+  }, [callStatus]);
+
+  const formatTimer = (totalSecs: number) => {
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const toggleMic = async () => {
+    if (!lkRoom || callStatus !== CallStatus.ACTIVE) return;
+    try {
+      const nextMuted = !isMicMuted;
+      await lkRoom.localParticipant.setMicrophoneEnabled(!nextMuted);
+      setIsMicMuted(nextMuted);
+    } catch (e) {
+      console.warn("Could not toggle mic:", e);
+    }
+  };
 
   const handleGenerateFeedback = async (msgs: SavedMessage[]) => {
-    console.log("Generate feedback here.");
+    console.log("[Agent] Generando reporte y feedback de entrevista...");
     setCallStatus(CallStatus.GENERATING_FEEDBACK);
 
     try {
-      // Obtener ID Token de Cognito desde localStorage
       const idToken = getCognitoIdToken();
-
       const cleanMsgs = msgs.map(({ role, content }) => ({ role, content }));
-
       const voiceOpt = VOICE_OPTIONS.find((opt) => opt.key === selectedVoice);
       const language = voiceOpt ? voiceOpt.lang : "es";
 
@@ -97,13 +130,12 @@ const Agent = ({
           transcript: cleanMsgs,
           language,
         },
-        idToken,
+        idToken
       );
 
       if (res && res.success) {
         router.push(`/interview/${interviewId}/feedback`);
       } else {
-        console.log("Error saving feedback");
         router.push("/dashboard");
       }
     } catch (e) {
@@ -117,27 +149,26 @@ const Agent = ({
       if (type === "generate") {
         router.push("/dashboard");
       } else {
-        // Leer mensajes desde el ref para evitar closure stale y no añadir 'messages' como dep
         handleGenerateFeedback(messagesRef.current);
       }
     }
-    // IMPORTANTE: NO incluir 'messages' aquí para evitar que la llegada de un
-    // nuevo transcripto re-ejecute este efecto mientras la llamada está activa.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callStatus, type, userId]);
+  }, [callStatus]);
 
   const handleCall = async () => {
     setCallStatus(CallStatus.CONNECTING);
+    setIsMicMuted(false);
 
     try {
-      const roomName = type === "generate"
-        ? `generate_${userId || "unknown"}_${selectedVoice}_${Date.now()}`
-        : `interview_${interviewId || "unknown"}_${selectedVoice}_${Date.now()}`;
+      const roomName =
+        type === "generate"
+          ? `generate_${userId || "unknown"}_${selectedVoice}_${Date.now()}`
+          : `interview_${interviewId || "unknown"}_${selectedVoice}_${Date.now()}`;
       const identity = `developer_${userId || Math.floor(Math.random() * 1000)}`;
 
-      const apiUrl = typeof window !== "undefined"
-        ? "/api/proxy"
-        : process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const apiUrl =
+        typeof window !== "undefined"
+          ? "/api/proxy"
+          : process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const tokenResponse = await fetch(`${apiUrl}/api/livekit/token?room=${roomName}&identity=${identity}`);
 
       if (!tokenResponse.ok) {
@@ -186,31 +217,30 @@ const Agent = ({
         setIsSpeaking(isAgentSpeaking);
       });
 
-      currentRoom.on(RoomEvent.TranscriptionReceived, (segments: TranscriptionSegment[], participant?: Participant) => {
-        if (!participant) return;
-        const isSelf = participant instanceof LocalParticipant;
-        const sender = isSelf ? "user" : "agent";
+      currentRoom.on(
+        RoomEvent.TranscriptionReceived,
+        (segments: TranscriptionSegment[], participant?: Participant) => {
+          if (!participant) return;
+          const isSelf = participant instanceof LocalParticipant;
+          const sender = isSelf ? "user" : "assistant";
+          setLatestSpeaker(isSelf ? "user" : "agent");
 
-        setMessages((prev) => {
-          const newMessages = [...prev];
-          segments.forEach((segment) => {
-            const index = newMessages.findIndex((m) => m.id === segment.id);
-            if (index !== -1) {
-              newMessages[index] = {
-                ...newMessages[index],
-                content: segment.text,
-              };
-            } else if (segment.text.trim()) {
-              newMessages.push({
-                id: segment.id,
-                role: sender === "agent" ? "assistant" : "user",
-                content: segment.text,
-              });
-            }
-          });
-          return newMessages;
-        });
-      });
+          const text = segments
+            .map((s) => s.text)
+            .join(" ")
+            .trim();
+
+          if (text) {
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.role === sender) {
+                return [...prev.slice(0, -1), { ...last, content: text }];
+              }
+              return [...prev, { role: sender, content: text }];
+            });
+          }
+        }
+      );
 
       await currentRoom.connect(url, token);
       setLkRoom(currentRoom);
@@ -218,9 +248,8 @@ const Agent = ({
       try {
         await currentRoom.localParticipant.setMicrophoneEnabled(true);
       } catch (micErr) {
-        console.warn("[LiveKit] No se pudo habilitar el micrófono (¿permisos denegados?):", micErr);
+        console.warn("[LiveKit] No se pudo habilitar el micrófono:", micErr);
       }
-
     } catch (err) {
       console.error("Error al iniciar llamada con LiveKit:", err);
       setCallStatus(CallStatus.INACTIVE);
@@ -238,93 +267,162 @@ const Agent = ({
   const isCallInactiveOrFinished =
     callStatus === CallStatus.INACTIVE || callStatus === CallStatus.FINISHED;
 
-  const isEs = VOICE_OPTIONS.find((opt) => opt.key === selectedVoice)?.lang === "es";
+  const currentVoiceObj = VOICE_OPTIONS.find((opt) => opt.key === selectedVoice) || VOICE_OPTIONS[0];
+  const isEs = currentVoiceObj.lang === "es";
+
+  // Effective company and role
+  let displayRole = role;
+  let displayCompany = company;
+  if (!displayCompany && role.includes(" @ ")) {
+    const parts = role.split(" @ ");
+    displayRole = parts[0].trim();
+    displayCompany = parts[1].trim();
+  } else if (!displayCompany && role.includes(" en ")) {
+    const parts = role.split(" en ");
+    displayRole = parts[0].trim();
+    displayCompany = parts[1].trim();
+  }
+
+  // Fallback techstack if empty
+  const displayTechs =
+    techstack && techstack.length > 0
+      ? techstack
+      : ["Java", "Go", "Docker", "Microservicios", "SOLID"];
 
   if (callStatus === CallStatus.GENERATING_FEEDBACK) {
     return (
-      <div className="flex flex-col items-center justify-center gap-8 py-16">
-        <div className="relative flex items-center justify-center">
-          <div className="w-24 h-24 rounded-full border-4 border-zinc-900 border-t-indigo-500 animate-spin" />
-          <div className="absolute w-16 h-16 rounded-full border-4 border-zinc-900 border-b-indigo-500 animate-spin" style={{ animationDirection: "reverse", animationDuration: "0.9s" }} />
+      <div className="flex flex-col items-center justify-center gap-6 p-8 rounded-3xl bg-[#0c0d14]/90 border border-white/[0.08] max-w-lg mx-auto text-center shadow-2xl">
+        <div className="relative flex items-center justify-center w-20 h-20">
+          <div className="absolute inset-0 rounded-full bg-indigo-500/20 animate-ping [animation-duration:2s]" />
+          <div className="relative z-10 p-5 rounded-full bg-indigo-600/30 border border-indigo-500/40 text-indigo-400">
+            <Sparkles className="w-8 h-8 animate-pulse" />
+          </div>
         </div>
-
-        <div className="flex flex-col items-center gap-3 text-center">
-          <h3 className="text-white text-xl font-extrabold tracking-tight">
-            {isEs ? "Analizando tu entrevista..." : "Analyzing your interview..."}
-          </h3>
-          <p className="text-zinc-400 text-sm max-w-sm font-light leading-relaxed">
-            {isEs 
-              ? "Estamos generando tu retroalimentación personalizada." 
-              : "We are generating your personalized feedback."}
-            <br />
-            <span className="text-indigo-400 font-semibold">{isEs ? "Por favor no cierres esta página." : "Please do not close this page."}</span>
+        <div>
+          <h3 className="text-xl font-bold text-white">Generando Evaluación Técnica</h3>
+          <p className="text-xs text-zinc-400 mt-2 max-w-sm">
+            {isEs
+              ? "Procesando transcripción y calculando radar de competencias de arquitectura y comunicación..."
+              : "Analyzing technical answers and compiling detailed assessment report..."}
           </p>
         </div>
-
-        <div className="w-64 h-1.5 bg-zinc-900 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-indigo-500 rounded-full"
-            style={{
-              animation: "feedback-progress 2s ease-in-out infinite",
-            }}
-          />
+        <div className="w-full max-w-xs h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+          <div className="h-full bg-indigo-500 rounded-full animate-pulse w-3/4" />
         </div>
-
-        <style jsx>{`
-          @keyframes feedback-progress {
-            0%   { width: 0%;   margin-left: 0%; }
-            50%  { width: 70%;  margin-left: 15%; }
-            100% { width: 0%;   margin-left: 100%; }
-          }
-        `}</style>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col gap-6">
-      {/* ─── Immersive Room Container ─── */}
-      <div className="relative w-full min-h-[500px] overflow-hidden bg-gradient-to-b from-[#111025] via-zinc-950 to-black border border-zinc-800/80 rounded-3xl p-6 md:p-8 flex flex-col items-center justify-between shadow-2xl">
-        {/* Cinematic Grid Overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#312e810f_1px,transparent_1px),linear-gradient(to_bottom,#312e810f_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
+    <div className="w-full max-w-4xl mx-auto flex flex-col gap-4 select-none">
+      {/* ── 1. Top Context Bar: Role, Company & Live Badges ── */}
+      <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:px-5 rounded-2xl bg-[#0f111a]/90 border border-white/[0.08] shadow-lg backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+            <Briefcase className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-sm sm:text-base font-bold text-white capitalize">
+                Entrevista de {displayRole}
+              </h2>
+              {displayCompany && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
+                  {displayCompany}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400 font-medium">
+              <span className="text-indigo-400">{level}</span>
+              <span>•</span>
+              <span className="text-zinc-300">{interviewType}</span>
+              <span>•</span>
+              <span className="text-zinc-400">{questions?.length || 5} preguntas</span>
+            </div>
+          </div>
+        </div>
 
-        {/* 1. Header Control Bar */}
-        <div className="relative w-full flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-zinc-900 pb-4 z-10">
-          {/* Status Label */}
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className={cn(
-                "absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping",
-                callStatus === CallStatus.ACTIVE && "bg-emerald-400",
-                callStatus === CallStatus.CONNECTING && "bg-amber-400",
-                isCallInactiveOrFinished && "bg-zinc-500"
-              )} />
-              <span className={cn(
-                "relative inline-flex rounded-full h-2 w-2",
-                callStatus === CallStatus.ACTIVE && "bg-emerald-500",
-                callStatus === CallStatus.CONNECTING && "bg-amber-500",
-                isCallInactiveOrFinished && "bg-zinc-600"
-              )} />
+        {/* Live Status Beacon & Stopwatch */}
+        <div className="flex items-center gap-2.5 self-end sm:self-auto">
+          {callStatus === CallStatus.ACTIVE ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>EN VIVO</span>
+              <span className="text-zinc-500 font-normal">|</span>
+              <div className="flex items-center gap-1 text-white">
+                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{formatTimer(elapsedSeconds)}</span>
+              </div>
+            </div>
+          ) : callStatus === CallStatus.CONNECTING ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Conectando...</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs font-medium">
+              <span className="w-2 h-2 rounded-full bg-zinc-500" />
+              <span>Sala Preparada</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── 2. Evaluated Tech Stack Chips Banner ── */}
+      <div className="flex items-center gap-2 px-1 flex-wrap">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
+          <Code2 className="w-3.5 h-3.5 text-indigo-400" />
+          Stack Evaluado:
+        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {displayTechs.map((tech, idx) => (
+            <span
+              key={idx}
+              className="text-xs font-mono font-medium px-2.5 py-1 rounded-lg bg-zinc-900/90 text-zinc-200 border border-zinc-800/80 hover:border-indigo-500/40 transition shadow-sm"
+            >
+              {tech}
             </span>
-            <span className="text-xs font-semibold text-zinc-400 tracking-wider uppercase">
-              {callStatus === CallStatus.ACTIVE && (isEs ? "Entrevista en curso" : "Call active")}
-              {callStatus === CallStatus.CONNECTING && (isEs ? "Conectando..." : "Connecting...")}
-              {isCallInactiveOrFinished && (isEs ? "Inactivo" : "Disconnected")}
-            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 3. Main Realistic Virtual Conference Room ── */}
+      <div className="relative w-full min-h-[460px] md:min-h-[500px] rounded-3xl bg-gradient-to-b from-[#0e101a] via-[#090a10] to-[#05060a] border border-white/[0.08] shadow-2xl p-6 md:p-8 flex flex-col justify-between overflow-hidden relative">
+        {/* Subtle Room Grid & Ambient Glow */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#312e8108_1px,transparent_1px),linear-gradient(to_bottom,#312e8108_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
+
+        {/* Room Header: Interviewer Identity & Audio Settings */}
+        <div className="relative w-full flex flex-col sm:flex-row items-center justify-between gap-3 pb-4 border-b border-zinc-800/70 z-10">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-xs font-bold shadow-md">
+              AI
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-white">
+                  {currentVoiceObj.name}
+                </span>
+                <span className="text-[10px] text-zinc-400">• Evaluador Técnico DevCareer</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              </div>
+              <p className="text-[10px] text-zinc-400">
+                {callStatus === CallStatus.ACTIVE ? "Enlace de audio WebRTC activo (48kHz)" : "Listo para sesión de voz"}
+              </p>
+            </div>
           </div>
 
-          {/* Voice Selector */}
+          {/* Voice Selector as Audio Output Setting */}
           <div className="flex items-center gap-2">
-            <Globe className="h-3.5 w-3.5 text-zinc-500" />
+            <Globe className="w-3.5 h-3.5 text-zinc-400" />
             <select
               value={selectedVoice}
               onChange={(e) => setSelectedVoice(e.target.value)}
               disabled={callStatus === CallStatus.CONNECTING || callStatus === CallStatus.ACTIVE}
-              className="bg-zinc-900/80 text-zinc-300 border border-zinc-800 rounded-full px-4 py-1.5 text-xs outline-none focus:border-indigo-500 disabled:opacity-50 transition-all cursor-pointer font-medium hover:bg-zinc-900"
+              className="bg-zinc-900/90 text-zinc-200 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-indigo-500 disabled:opacity-50 transition cursor-pointer font-medium hover:bg-zinc-800"
             >
               {VOICE_OPTIONS.map((opt) => (
-                <option key={opt.key} value={opt.key} className="bg-zinc-950 text-zinc-300">
+                <option key={opt.key} value={opt.key} className="bg-zinc-950 text-zinc-200">
                   {opt.label}
                 </option>
               ))}
@@ -332,123 +430,191 @@ const Agent = ({
           </div>
         </div>
 
-        {/* 2. Interactive Voice Orb Visualizer */}
-        <div className="relative flex flex-col items-center justify-center my-auto py-10 z-10">
+        {/* Center Visualizer: Dynamic Audio Orb & Frequency Spectrum */}
+        <div className="relative flex flex-col items-center justify-center my-auto py-8 z-10 select-none">
           <div className="relative flex items-center justify-center">
-            {/* Pulsing Concentric Aura */}
-            <div className={cn(
-              "absolute rounded-full border border-indigo-500/10 pointer-events-none transition-all duration-1000",
-              callStatus === CallStatus.ACTIVE && isSpeaking ? "w-48 h-48 opacity-100 animate-pulse" : "w-36 h-36 opacity-30"
-            )} />
-            <div className={cn(
-              "absolute rounded-full border border-indigo-500/5 pointer-events-none transition-all duration-1000",
-              callStatus === CallStatus.ACTIVE && isSpeaking ? "w-64 h-64 opacity-100 animate-ping [animation-duration:3s]" : "w-44 h-44 opacity-0"
-            )} />
-            <div className={cn(
-              "absolute rounded-full border border-violet-500/10 pointer-events-none transition-all duration-1000",
-              callStatus === CallStatus.ACTIVE && !isSpeaking ? "w-40 h-40 opacity-100 animate-pulse [animation-duration:2s]" : "w-36 h-36 opacity-0"
-            )} />
-
-            {/* Glowing Main Orb */}
-            <div className={cn(
-              "z-10 flex items-center justify-center rounded-full transition-all duration-500 shadow-2xl relative overflow-hidden",
-              callStatus === CallStatus.ACTIVE && isSpeaking ? "w-32 h-32 bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 scale-105 shadow-purple-500/20" : "",
-              callStatus === CallStatus.ACTIVE && !isSpeaking ? "w-28 h-28 bg-gradient-to-tr from-indigo-900 to-violet-950 scale-100 shadow-indigo-500/10" : "",
-              callStatus === CallStatus.CONNECTING ? "w-28 h-28 bg-zinc-900 border border-amber-500/50 scale-100 shadow-amber-500/5 animate-pulse" : "",
-              isCallInactiveOrFinished ? "w-28 h-28 bg-zinc-900 border border-zinc-800 scale-100 shadow-black/50" : ""
-            )}>
-              {/* Spinner when connecting */}
-              {callStatus === CallStatus.CONNECTING && (
-                <Loader2 className="h-8 w-8 text-amber-400 animate-spin" />
+            {/* Concentric sound halos */}
+            <div
+              className={cn(
+                "absolute rounded-full border border-indigo-500/20 pointer-events-none transition-all duration-700",
+                callStatus === CallStatus.ACTIVE && isSpeaking
+                  ? "w-52 h-52 opacity-100 animate-pulse"
+                  : "w-36 h-36 opacity-20"
               )}
-              {/* Audio waves when active */}
+            />
+            <div
+              className={cn(
+                "absolute rounded-full border border-indigo-500/10 pointer-events-none transition-all duration-700",
+                callStatus === CallStatus.ACTIVE && isSpeaking
+                  ? "w-64 h-64 opacity-100 animate-ping [animation-duration:2.5s]"
+                  : "w-44 h-44 opacity-0"
+              )}
+            />
+
+            {/* Main Center Audio Orb */}
+            <div
+              className={cn(
+                "z-10 flex items-center justify-center rounded-full transition-all duration-500 shadow-2xl relative overflow-hidden",
+                callStatus === CallStatus.ACTIVE && isSpeaking
+                  ? "w-32 h-32 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 scale-105 shadow-indigo-500/30 ring-4 ring-indigo-500/20"
+                  : "",
+                callStatus === CallStatus.ACTIVE && !isSpeaking
+                  ? "w-28 h-28 bg-gradient-to-tr from-zinc-900 to-indigo-950/80 scale-100 shadow-indigo-500/10 border border-indigo-500/30"
+                  : "",
+                callStatus === CallStatus.CONNECTING
+                  ? "w-28 h-28 bg-zinc-900 border border-amber-500/50 scale-100 shadow-amber-500/10 animate-pulse"
+                  : "",
+                isCallInactiveOrFinished
+                  ? "w-28 h-28 bg-zinc-900/90 border border-zinc-800 scale-100 shadow-black/60"
+                  : ""
+              )}
+            >
+              {callStatus === CallStatus.CONNECTING && (
+                <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+              )}
+
               {callStatus === CallStatus.ACTIVE && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   {isSpeaking ? (
                     <>
-                      <div className="w-1 bg-white/90 rounded-full animate-vocalBar1 h-8" />
-                      <div className="w-1 bg-white/90 rounded-full animate-vocalBar2 h-12" />
-                      <div className="w-1 bg-white/90 rounded-full animate-vocalBar3 h-6" />
-                      <div className="w-1 bg-white/90 rounded-full animate-vocalBar2 h-10" />
-                      <div className="w-1 bg-white/90 rounded-full animate-vocalBar1 h-8" />
+                      <div className="w-1 bg-white rounded-full animate-vocalBar1 h-8" />
+                      <div className="w-1 bg-white rounded-full animate-vocalBar2 h-12" />
+                      <div className="w-1 bg-white rounded-full animate-vocalBar3 h-6" />
+                      <div className="w-1 bg-white rounded-full animate-vocalBar2 h-10" />
+                      <div className="w-1 bg-white rounded-full animate-vocalBar1 h-8" />
                     </>
                   ) : (
-                    <Activity className="h-5 w-5 text-indigo-300 opacity-60 animate-pulse" />
+                    <div className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:200ms]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:400ms]" />
+                    </div>
                   )}
                 </div>
               )}
-              {/* Headphone icon when inactive */}
+
               {isCallInactiveOrFinished && (
-                <Headphones className="h-8 w-8 text-zinc-500" />
+                <Headphones className="w-8 h-8 text-zinc-500" />
               )}
             </div>
           </div>
 
-          <div className="mt-6 flex flex-col items-center gap-1">
-            <h4 className="text-white font-bold tracking-wide text-sm">
-              {callStatus === CallStatus.ACTIVE ? (isSpeaking ? (isEs ? "Entrevistador hablando..." : "Interviewer speaking...") : (isEs ? "Escuchando..." : "Listening...")) : (isEs ? "Entrevistador IA" : "AI Interviewer")}
+          {/* Conversational Status readout */}
+          <div className="mt-5 flex flex-col items-center gap-1 text-center">
+            <h4 className="text-white font-bold text-sm tracking-wide">
+              {callStatus === CallStatus.ACTIVE
+                ? isSpeaking
+                  ? `${currentVoiceObj.name} hablando...`
+                  : isEs
+                  ? "Escuchándote activamente..."
+                  : "Listening to your response..."
+                : callStatus === CallStatus.CONNECTING
+                ? isEs
+                  ? "Estableciendo enlace de audio..."
+                  : "Establishing secure audio link..."
+                : isEs
+                ? "Listo para comenzar la entrevista"
+                : "Ready to begin technical interview"}
             </h4>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">
-              {callStatus === CallStatus.ACTIVE ? (isEs ? "Llamada activa" : "webrtc connected") : (isEs ? "Haga clic abajo para llamar" : "click below to connect")}
+            <p className="text-[11px] text-zinc-400 font-mono">
+              {callStatus === CallStatus.ACTIVE
+                ? isSpeaking
+                  ? "Puedes hablar en cualquier momento para intervenir"
+                  : "Habla con claridad, tu micrófono está activo"
+                : isEs
+                ? "Haz clic en 'Iniciar Entrevista' para conectar"
+                : "Click 'Start Interview' below to connect"}
             </p>
           </div>
         </div>
 
-        {/* 3. Subtitle / Transcript bar */}
-        <div className="relative w-full min-h-[72px] bg-zinc-950/40 border border-zinc-900/60 rounded-xl p-4 flex items-center justify-center text-center z-10 max-h-24 overflow-y-auto no-scrollbar mb-6">
+        {/* Closed Captions HUD / Live Subtitle Box */}
+        <div className="relative w-full min-h-[76px] bg-zinc-950/70 border border-zinc-800/80 rounded-2xl p-3.5 flex items-center justify-center text-center z-10 max-h-24 overflow-y-auto no-scrollbar mb-5 backdrop-blur-md">
           {latestMessage ? (
-            <p
-              key={latestMessage}
-              className={cn(
-                "text-xs md:text-sm leading-relaxed text-zinc-200 transition-opacity duration-300 font-light",
-                "animate-fadeIn opacity-100",
-              )}
-            >
-              {latestMessage}
-            </p>
+            <div className="flex items-center gap-2 max-w-2xl text-left">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 shrink-0">
+                {latestSpeaker === "user" ? "Tú" : currentVoiceObj.name}
+              </span>
+              <p className="text-xs md:text-sm text-zinc-200 leading-relaxed font-light">
+                {latestMessage}
+              </p>
+            </div>
           ) : (
-            <p className="text-xs text-zinc-600 italic">
-              {callStatus === CallStatus.ACTIVE 
-                ? (isEs ? "El audio transcrito aparecerá aquí en tiempo real..." : "Transcribed audio will appear here in real time...") 
-                : (isEs ? "Esperando llamada..." : "Waiting for call...")}
+            <p className="text-xs text-zinc-500 italic">
+              {callStatus === CallStatus.ACTIVE
+                ? isEs
+                  ? "La transcripción en vivo aparecerá aquí en tiempo real..."
+                  : "Live speech transcript will appear here in real time..."
+                : isEs
+                ? "Esperando inicio de la sesión..."
+                : "Waiting for interview to begin..."}
             </p>
           )}
         </div>
 
-        {/* 4. Action Button Bar */}
-        <div className="relative w-full flex justify-center z-10">
+        {/* Meeting Controls Bar / Floating Dock */}
+        <div className="relative w-full flex items-center justify-between gap-3 pt-3 border-t border-zinc-800/70 z-10">
+          {/* Candidate Mic Toggle Button */}
+          <button
+            onClick={toggleMic}
+            disabled={callStatus !== CallStatus.ACTIVE}
+            className={cn(
+              "px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer border",
+              isMicMuted
+                ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 disabled:opacity-40"
+            )}
+            title={isMicMuted ? "Activar micrófono" : "Silenciar micrófono"}
+          >
+            {isMicMuted ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4 text-emerald-400" />}
+            <span className="hidden sm:inline">
+              {isMicMuted ? "Micrófono Silenciado" : "Micrófono Activo"}
+            </span>
+          </button>
+
+          {/* Main Action Button: Start or End Meeting */}
           {callStatus !== CallStatus.ACTIVE ? (
-            <button 
-              className={cn(
-                "relative flex items-center justify-center gap-2 px-8 py-3.5 rounded-full font-bold text-sm text-white transition-all duration-300 cursor-pointer shadow-[0_0_30px_rgba(99,102,241,0.2)] hover:scale-105",
-                callStatus === CallStatus.CONNECTING 
-                  ? "bg-amber-600 cursor-not-allowed shadow-[0_0_30px_rgba(245,158,11,0.2)]" 
-                  : "bg-indigo-600 hover:bg-indigo-500 hover:shadow-[0_0_40px_rgba(99,102,241,0.4)]"
-              )} 
+            <button
               onClick={handleCall}
               disabled={callStatus === CallStatus.CONNECTING}
+              className={cn(
+                "flex items-center justify-center gap-2.5 px-7 py-3 rounded-2xl font-bold text-xs sm:text-sm text-white transition-all duration-300 cursor-pointer shadow-lg",
+                callStatus === CallStatus.CONNECTING
+                  ? "bg-amber-600 cursor-not-allowed opacity-80"
+                  : "bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 hover:shadow-indigo-500/25 hover:scale-[1.02]"
+              )}
             >
               {callStatus === CallStatus.CONNECTING ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{isEs ? "Conectando..." : "Connecting..."}</span>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{isEs ? "Conectando Sala..." : "Connecting..."}</span>
                 </>
               ) : (
                 <>
-                  <Phone className="h-4 w-4 fill-white" />
+                  <Phone className="w-4 h-4 fill-white" />
                   <span>{isEs ? "Iniciar Entrevista" : "Start Interview"}</span>
                 </>
               )}
             </button>
           ) : (
-            <button 
-              className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-full font-bold text-sm bg-red-600 hover:bg-red-500 text-white transition-all duration-300 hover:scale-105 cursor-pointer shadow-[0_0_30px_rgba(239,68,68,0.2)] hover:shadow-[0_0_40px_rgba(239,68,68,0.4)]" 
+            <button
               onClick={handleDisconnect}
+              className="flex items-center justify-center gap-2 px-7 py-3 rounded-2xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-lg shadow-rose-600/20"
             >
-              <PhoneOff className="h-4 w-4 fill-white" />
+              <PhoneOff className="w-4 h-4 fill-white" />
               <span>{isEs ? "Finalizar Entrevista" : "End Interview"}</span>
             </button>
           )}
+
+          {/* Candidate Profile Avatar */}
+          <div className="flex items-center gap-2 text-xs text-zinc-400">
+            <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white text-[11px] font-bold">
+              {userName ? userName.slice(0, 1).toUpperCase() : "U"}
+            </div>
+            <span className="hidden md:inline font-medium text-zinc-300 truncate max-w-[100px]">
+              {userName || "Candidato"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -480,5 +646,5 @@ const Agent = ({
     </div>
   );
 };
-export default Agent;
 
+export default Agent;

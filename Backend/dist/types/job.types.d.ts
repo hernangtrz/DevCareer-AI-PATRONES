@@ -9,7 +9,7 @@ export interface JobOffer {
     description: string;
     requiredSkills: string[];
     seniority: "Junior" | "Mid-Level" | "Senior" | "Lead";
-    platform: "RemoteOK" | "Internal" | "LinkedIn" | "Wellfound";
+    platform: "RemoteOK" | "Internal" | "LinkedIn" | "Wellfound" | "Greenhouse" | "Lever" | string;
     url?: string;
     matchScore?: number;
     matchedSkills?: string[];

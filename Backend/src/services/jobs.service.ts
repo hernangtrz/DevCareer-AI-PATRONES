@@ -63,20 +63,27 @@ export async function getJobById(jobId: string): Promise<JobOffer | null> {
 export async function applyToJob(params: {
   userId: string;
   job: JobOffer;
-  userSkills?: string[];
-  userExperienceSummary?: string;
   notes?: string;
 }) {
   return jobFacade.processCompleteApplication({
     userId: params.userId,
     job: params.job,
-    userSkills: params.userSkills,
-    userExperienceSummary: params.userExperienceSummary,
-    createMockInterview: true,
     notes: params.notes,
   });
 }
 
 export async function getUserJobApplications(userId: string): Promise<JobApplication[]> {
   return appRepo.getByUserId(userId);
+}
+
+export async function updateJobApplicationStatus(id: string, status: JobApplication["status"]): Promise<void> {
+  await appRepo.updateStatus(id, status);
+}
+
+export async function updateJobApplicationNotes(id: string, notes: string): Promise<void> {
+  await appRepo.updateNotes(id, notes);
+}
+
+export async function deleteJobApplication(id: string): Promise<void> {
+  await appRepo.delete(id);
 }

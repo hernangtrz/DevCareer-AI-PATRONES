@@ -3,9 +3,6 @@ export const dynamic = "force-dynamic";
 import { getCurrentUser, getSessionCookie } from "@/lib/api.server";
 import { getInterviewById } from "@/lib/api";
 import { redirect } from "next/navigation";
-import Image from "next/image";
-import { getRandomInterviewCover } from "@/lib/utils";
-import DisplayTechIcons from "@/components/DisplayTechIcons";
 import Agent from "@/components/Agent";
 
 const Page = async ({ params }: RouteParams) => {
@@ -17,25 +14,30 @@ const Page = async ({ params }: RouteParams) => {
   if (!interview) redirect("/dashboard");
 
   const typeTranslations: Record<string, string> = {
-    Technical: "Técnica", Behavioral: "Conductual", Mixed: "Mixta",
-    tecnica: "Técnica", conductual: "Conductual", combinada: "Combinada",
+    Technical: "Técnica",
+    Behavioral: "Conductual",
+    Mixed: "Mixta",
+    tecnica: "Técnica",
+    conductual: "Conductual",
+    combinada: "Combinada",
   };
-  const displayType = typeTranslations[interview.type] || interview.type;
+  const displayType = typeTranslations[interview.type] || interview.type || "Técnica";
 
   return (
-    <>
-      <div className="flex flex-row gap-4 justify-between">
-        <div className="flex flex-row gap-4 items-center max-sm:flex-col">
-          <div className="flex flex-row gap-4 items-center">
-            <Image src={getRandomInterviewCover()} alt="cover-image" width={40} height={40} className="rounded-full object-cover size-[40px]" />
-            <h3 className="capitalize">Entrevista de {interview.role}</h3>
-          </div>
-          <DisplayTechIcons techStack={interview.techstack} />
-        </div>
-        <p className="bg-dark-200 px-4 py-2 rounded-lg h-fit capitalize">{displayType}</p>
-      </div>
-      <Agent userName={user?.name || ""} userId={user?.id} interviewId={id} type="interview" questions={interview.questions} />
-    </>
+    <div className="w-full min-h-[calc(100vh-8rem)] flex flex-col justify-center items-center py-2 md:py-6">
+      <Agent
+        userName={user?.name || ""}
+        userId={user?.id}
+        interviewId={id}
+        type="interview"
+        questions={interview.questions}
+        role={interview.role}
+        company={interview.company}
+        level={interview.level}
+        interviewType={displayType}
+        techstack={interview.techstack}
+      />
+    </div>
   );
 };
 export default Page;

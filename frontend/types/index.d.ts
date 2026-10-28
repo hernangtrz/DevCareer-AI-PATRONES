@@ -23,6 +23,7 @@ interface Feedback {
 }
 
 interface Interview {
+  company?: string;
   id: string;
   role: string;
   level: string;
@@ -65,6 +66,11 @@ interface AgentProps {
   feedbackId?: string;
   type: "generate" | "interview";
   questions?: string[];
+  role?: string;
+  company?: string;
+  level?: string;
+  interviewType?: string;
+  techstack?: string[];
 }
 
 interface RouteParams {

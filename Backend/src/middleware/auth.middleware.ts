@@ -142,3 +142,37 @@ export function requireAuth(
     return executeAuth(req, res, next, defaultVerifiers);
   };
 }
+
+
+export async function flexibleAuth(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : null;
+
+  if (token) {
+    const defaultVerifiers: IAuthVerifier[] = [
+      new SupabaseAuthVerifier(supabase),
+      new CognitoAuthVerifier(cognitoIdVerifier),
+    ];
+    for (const verifier of defaultVerifiers) {
+      try {
+        const user = await verifier.verifyToken(token);
+        if (user) {
+          req.userId = user.id;
+          req.userEmail = user.email;
+          req.userName = user.name;
+          return next();
+        }
+      } catch {}
+    }
+  }
+
+  // Fallback demo user para pruebas locales y descargas directas del navegador
+  req.userId = "3aa77ca5-52cf-4204-8d4a-85c0456e716f";
+  req.userEmail = "hernan@devcareer.ai";
+  req.userName = "Hernán Gutiérrez";
+  next();
+}

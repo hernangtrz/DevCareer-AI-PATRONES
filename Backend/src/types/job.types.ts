@@ -9,7 +9,7 @@ export interface JobOffer {
   description: string;
   requiredSkills: string[];
   seniority: "Junior" | "Mid-Level" | "Senior" | "Lead";
-  platform: "RemoteOK" | "Internal" | "LinkedIn" | "Wellfound";
+  platform: "Greenhouse" | "Lever" | "RemoteOK" | string;
   url?: string;
   matchScore?: number; // 0 - 100
   matchedSkills?: string[];
@@ -33,12 +33,12 @@ export interface JobApplication {
   matchScore?: number;
   interviewId?: string;
   notes?: string;
+  url?: string;
+  techstack?: string[];
 }
 
 export interface CreateJobApplicationInput {
   userId: string;
   job: JobOffer;
-  coverLetter?: string;
-  adaptedResumeSummary?: string;
   notes?: string;
 }

@@ -4,6 +4,7 @@ import { InterviewPrototype } from "../prototype/interview.prototype";
 
 export interface ConstructDraftParams {
   userId: string;
+  company?: string;
   role: string;
   level: string;
   type: string;
@@ -11,6 +12,7 @@ export interface ConstructDraftParams {
 }
 
 export interface ConstructFullParams extends ConstructDraftParams {
+  company?: string;
   questions: string[];
   coverImage?: string;
 }
@@ -40,6 +42,7 @@ export class InterviewDirector {
       .reset()
       .forUser(params.userId)
       .withRole(params.role)
+      .withCompany(params.company)
       .withLevel(params.level)
       .ofType(params.type)
       .withTechStack(params.techstack)

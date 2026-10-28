@@ -8,6 +8,7 @@ export interface IInterviewBuilder {
   reset(): this;
   forUser(userId: string): this;
   withRole(role: string): this;
+  withCompany(company?: string): this;
   withLevel(level: string): this;
   ofType(type: string): this;
   withTechStack(techstack: string[]): this;
@@ -36,6 +37,7 @@ export interface IInterviewBuilder {
 export class InterviewBuilder implements IInterviewBuilder {
   private userId: string = "";
   private role: string = "";
+  private company?: string;
   private level: string = "";
   private type: string = "";
   private techstack: string[] = [];
@@ -51,6 +53,7 @@ export class InterviewBuilder implements IInterviewBuilder {
   public reset(): this {
     this.userId = "";
     this.role = "";
+    this.company = undefined;
     this.level = "";
     this.type = "";
     this.techstack = [];
@@ -63,6 +66,11 @@ export class InterviewBuilder implements IInterviewBuilder {
 
   public forUser(userId: string): this {
     this.userId = userId ? userId.trim() : "";
+    return this;
+  }
+
+  public withCompany(company?: string): this {
+    this.company = company && company.trim() ? company.trim() : undefined;
     return this;
   }
 
@@ -161,6 +169,7 @@ export class InterviewBuilder implements IInterviewBuilder {
     const builtEntity: Omit<Interview, "id"> = {
       userId: this.userId,
       role: this.role,
+      company: this.company,
       level: this.level,
       type: this.type,
       techstack: [...this.techstack],

@@ -264,6 +264,7 @@ export interface JobOfferDto {
 }
 
 export interface JobApplicationDto {
+  userId?: string;
   id: string;
   jobId: string;
   jobTitle: string;
@@ -278,6 +279,8 @@ export interface JobApplicationDto {
   matchScore?: number;
   interviewId?: string;
   notes?: string;
+  url?: string;
+  techstack?: string[];
 }
 
 export async function getJobs(params?: { query?: string; platform?: string; skills?: string[] }): Promise<JobOfferDto[]> {
@@ -345,5 +348,54 @@ export async function createJobInterview(params: {
     );
   } catch (err: any) {
     return { success: false, message: err.message || "Error al crear entrevista para el empleo" };
+  }
+}
+
+export async function updateJobApplicationStatus(
+  id: string,
+  status: "applied" | "interviewing" | "offered" | "rejected"
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    return await apiFetch<{ success: boolean; message?: string }>(
+      `/jobs/applications/${id}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }
+    );
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
+export async function updateJobApplicationNotes(
+  id: string,
+  notes: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    return await apiFetch<{ success: boolean; message?: string }>(
+      `/jobs/applications/${id}/notes`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ notes }),
+      }
+    );
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
+export async function deleteJobApplication(
+  id: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    return await apiFetch<{ success: boolean; message?: string }>(
+      `/jobs/applications/${id}`,
+      {
+        method: "DELETE",
+      }
+    );
+  } catch (err: any) {
+    return { success: false, message: err.message };
   }
 }

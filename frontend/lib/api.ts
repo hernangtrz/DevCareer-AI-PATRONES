@@ -1,4 +1,4 @@
-﻿/**
+/**
  * lib/api.ts
  * Funciones HTTP para CLIENT COMPONENTS.
  * No importa "next/headers" — es seguro usarlo en el browser.
@@ -306,9 +306,23 @@ export async function applyToJob(params: {
   userSkills?: string[];
   userExperienceSummary?: string;
   notes?: string;
-}): Promise<{ success: boolean; application?: JobApplicationDto; interviewId?: string; message?: string }> {
+}): Promise<{
+  success: boolean;
+  application?: JobApplicationDto;
+  interviewId?: string;
+  coverLetter?: string;
+  adaptedResumeSummary?: string;
+  message?: string;
+}> {
   try {
-    return await apiFetch<{ success: boolean; application?: JobApplicationDto; interviewId?: string; message?: string }>(
+    return await apiFetch<{
+      success: boolean;
+      application?: JobApplicationDto;
+      interviewId?: string;
+      coverLetter?: string;
+      adaptedResumeSummary?: string;
+      message?: string;
+    }>(
       "/jobs/apply",
       {
         method: "POST",

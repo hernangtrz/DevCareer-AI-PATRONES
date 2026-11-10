@@ -95,8 +95,10 @@ router.post("/apply", flexibleAuth, async (req: AuthRequest, res: Response): Pro
 
   try {
     const result = await applyToJob({
-      userId: req.userId!,
+      userId: req.userId || "anonymous",
       job,
+      userSkills,
+      userExperienceSummary,
       notes,
     });
 
@@ -104,7 +106,9 @@ router.post("/apply", flexibleAuth, async (req: AuthRequest, res: Response): Pro
       success: true,
       application: result.application,
       interviewId: result.interviewId,
-      message: "Postulación procesada y simulacro de entrevista preparado con éxito.",
+      coverLetter: result.coverLetter,
+      adaptedResumeSummary: result.adaptedResumeSummary,
+      message: "Postulación procesada, carta de motivación generada y simulacro preparado con éxito.",
     });
   } catch (error: any) {
     console.error("[JobsRoutes] Error procesando postulación:", error);

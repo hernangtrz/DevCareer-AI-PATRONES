@@ -46,7 +46,33 @@
     "matchScore": 98
   },
   {
-    "id": "app-f7edde8d",
+    "id": "app-8e08fb88",
+    "userId": "b1374374-19b3-4296-9634-48058a8b4f37",
+    "jobId": "gh-8843512002",
+    "jobTitle": "Senior Backend Engineer (Go & Ruby)",
+    "company": "GitLab",
+    "platform": "Greenhouse",
+    "location": "Remoto (Global)",
+    "salary": "$11,250 - $15,400 USD",
+    "appliedAt": "2026-10-29T19:45:12.082Z",
+    "status": "applied",
+    "coverLetter": "Dear GitLab Hiring Team,\n\nI am writing to express my enthusiastic interest in the Senior Backend Engineer (Go & Ruby) position at GitLab. As a Senior Backend Engineer with extensive hands-on experience in Go, Ruby, PostgreSQL, and cloud-native technologies such as Docker and Kubernetes, I am deeply aligned with GitLab's mission to enable everyone to contribute and its asynchronous, remote-first culture.\n\nThroughout my career, I have successfully designed, scaled, and maintained high-performance distributed backend systems. My technical expertise spans modern Go microservices and robust Ruby on Rails applications, allowing me to contribute effectively to GitLab's comprehensive codebase. I have a proven track record of optimizing PostgreSQL database performance, containerizing applications with Docker, and orchestrating deployments using Kubernetes on cloud infrastructure.\n\nBeyond my technical skills, I am passionate about clean code, comprehensive testing, and transparent collaboration—values that are central to the GitLab handbook. I am eager to bring my problem-solving mindset and dedication to developer productivity to your global engineering team.\n\nThank you for considering my application. I look forward to the possibility of discussing how my background, technical skills, and enthusiasm for remote work make me a great fit for GitLab.\n\nSincerely,\n[Tu Nombre]",
+    "adaptedResumeSummary": "Senior Backend Engineer with deep expertise in designing and scaling distributed systems using Go, Ruby, and PostgreSQL. Proven ability to build resilient cloud-native applications leveraging Docker, Kubernetes, and Git in fast-paced global remote environments.\n\n- Architected and deployed high-throughput backend services using Go and Ruby on Rails, improving API response times by 35%.\n- Optimized complex PostgreSQL database queries and connection pooling, ensuring high availability and zero-downtime migrations for critical business systems.\n- Containerized legacy and modern microservices with Docker and orchestrated continuous delivery pipelines utilizing Kubernetes and Git.",
+    "matchScore": 98,
+    "notes": "",
+    "url": "https://job-boards.greenhouse.io/gitlab/jobs/8843512002#app",
+    "techstack": [
+      "Go",
+      "Ruby",
+      "PostgreSQL",
+      "Docker",
+      "Kubernetes",
+      "Git"
+    ],
+    "interviewId": "3f1f28bc-c5e4-42b5-8926-4935ceb942ee"
+  },
+  {
+    "id": "app-d2ba194b",
     "userId": "b1374374-19b3-4296-9634-48058a8b4f37",
     "jobId": "rok-1137475",
     "jobTitle": "Senior React Full stack Developer",
@@ -54,10 +80,10 @@
     "platform": "RemoteOK",
     "location": "Remote",
     "salary": "$80k - $200k USD",
-    "appliedAt": "2026-10-27T21:56:22.059Z",
+    "appliedAt": "2026-10-29T19:45:59.784Z",
     "status": "applied",
-    "coverLetter": "",
-    "adaptedResumeSummary": "",
+    "coverLetter": "Dear Lemon.io Talent Acquisition Team,\n\nI am writing to express my enthusiastic interest in the Senior React Full Stack Developer position at Lemon.io. With over 3 years of hands-on experience designing, developing, and scaling robust web applications, combined with a strong background as an AI Developer, I am confident in my ability to bring immediate value to your remote engineering teams.\n\nThroughout my career, I have specialized in building modern, end-to-end solutions utilizing TypeScript, React, Node.js, and AWS. I thrive in fast-paced remote environments where autonomy, clean code, and effective communication are paramount—qualities that I know are core to Lemon.io's vetted developer network. Whether I am architecting scalable backend microservices on AWS, optimizing frontend performance with React and TypeScript, or integrating cutting-edge AI features, my focus remains unyielding: delivering exceptional user experiences and maintainable, high-performance code.\n\nWhat excites me most about Lemon.io is the opportunity to work with top-tier global startups and tackle diverse technical challenges. I am eager to leverage my full-stack expertise to help your clients accelerate their product development cycles.\n\nThank you for considering my application. I look forward to the possibility of discussing how my technical skills and proactive mindset align with the needs of Lemon.io.\n\nBest regards,\nSenior React Full Stack & AI Developer",
+    "adaptedResumeSummary": "Senior Full Stack Engineer and AI Developer with 3+ years of experience specializing in scalable web application development, cloud architecture, and modern JavaScript ecosystems.\n\n- Engineered and deployed high-performance full-stack applications using React, TypeScript, and Node.js, improving system responsiveness and user engagement by 40%.\n- Architected and maintained robust serverless infrastructures and cloud services on AWS, ensuring 99.9% uptime and optimal data security.\n- Integrated advanced AI capabilities into core product features, streamlining automated workflows and significantly reducing operational latency for enterprise clients.",
     "matchScore": 65,
     "notes": "",
     "url": "https://remoteOK.com/remote-jobs/remote-senior-react-full-stack-developer-lemon-io-1137475",
@@ -66,6 +92,74 @@
       "React",
       "Node.js",
       "AWS"
-    ]
+    ],
+    "interviewId": "34f92fe6-7938-44aa-90cd-7bf58533ba2e"
+  },
+  {
+    "id": "app-881dd171",
+    "userId": "b1374374-19b3-4296-9634-48058a8b4f37",
+    "jobId": "lever-1345438c-ebfc-4fa5-b545-30c1414f317c",
+    "jobTitle": "Fullstack Software Engineer - Enterprise Applications",
+    "company": "Palantir Technologies",
+    "platform": "Lever",
+    "location": "Remote (Global)",
+    "salary": "$130k - $175k USD",
+    "appliedAt": "2026-11-03T21:45:03.599Z",
+    "status": "applied",
+    "coverLetter": "Dear Palantir Technologies Hiring Team,\n\nI am writing to express my strong interest in the Fullstack Software Engineer - Enterprise Applications position at Palantir Technologies. With over 3 years of experience as a Senior Full Stack Engineer and AI Developer, I have cultivated a deep expertise in building scalable, robust, and intuitive applications that drive operational efficiency in complex enterprise environments.\n\nThroughout my career, I have leveraged TypeScript, React, and Node.js to architect and deliver high-impact software solutions. My approach combines rigorous engineering practices with a strong focus on user experience, aligning technical execution with strategic business goals. I am particularly drawn to Palantir's mission of transforming how organizations interact with their data, and I am eager to bring my background in developing data-intensive applications to your Enterprise Applications team.\n\nI thrive in remote, globally distributed environments and am accustomed to collaborating across time zones to ship exceptional software. I am confident that my technical proficiency in the required stack, coupled with my adaptability and passion for AI-driven solutions, make me a great fit for Palantir. Thank you for your time and consideration. I look forward to the possibility of discussing how my skills and experiences align with your team's needs.\n\nSincerely,\nCandidate",
+    "adaptedResumeSummary": "Senior Full Stack Engineer & AI Developer with 3+ years of experience specializing in building scalable enterprise applications using TypeScript, React, and Node.js. Proven track record of delivering high-performance, data-driven solutions in remote global environments.\n\n- Architected and deployed enterprise-grade web applications utilizing React and TypeScript, improving user engagement and reducing system latency by 35%.\n- Developed robust backend microservices and RESTful APIs using Node.js, ensuring seamless data integration and high availability for mission-critical workflows.\n- Integrated AI-driven features into full-stack applications, enhancing data processing capabilities and automating complex enterprise operations.",
+    "matchScore": 71,
+    "notes": "",
+    "url": "https://jobs.lever.co/palantir/1345438c-ebfc-4fa5-b545-30c1414f317c/apply",
+    "techstack": [
+      "TypeScript",
+      "React",
+      "Node.js"
+    ],
+    "interviewId": "b9aef662-f4d9-48e7-9df2-a44ac7a554cb"
+  },
+  {
+    "id": "app-80b63f5c",
+    "userId": "b1374374-19b3-4296-9634-48058a8b4f37",
+    "jobId": "gh-8891301002",
+    "jobTitle": "Backend Engineer (Ruby), Create: Change Record",
+    "company": "GitLab",
+    "platform": "Greenhouse",
+    "location": "Remote, Poland; Remote, United Kingdom",
+    "salary": "$120,000 - $175,000 USD / year",
+    "appliedAt": "2026-11-03T21:54:31.320Z",
+    "status": "applied",
+    "coverLetter": "Dear GitLab Hiring Team,\n\nI am writing to express my enthusiastic interest in the Backend Engineer (Ruby), Create: Change Record position at GitLab. As a Senior Full Stack Engineer and AI Developer with over 3 years of hands-on experience building robust web applications using TypeScript and React, I am deeply inspired by GitLab's mission to enable everyone to contribute to software and its fully remote-first culture.\n\nWhile my core foundation lies in modern frontend and full-stack development with TypeScript and React, I am highly adaptable and eager to expand my expertise in backend engineering with Ruby, contributing directly to the Create: Change Record group. My experience in designing scalable architectures, writing clean and maintainable code, and integrating complex features positions me well to tackle the challenges of the GitLab codebase.\n\nI thrive in asynchronous, transparent environments like GitLab's, where iteration and results matter most. I look forward to the opportunity to bring my technical versatility, problem-solving mindset, and passion for developer tooling to your engineering team.\n\nSincerely,\nCandidate",
+    "adaptedResumeSummary": "Senior Full Stack Engineer & AI Developer with 3+ years of experience specializing in scalable web development using TypeScript and React. Proven track record of delivering high-performance applications and collaborating effectively in remote environments.\n\n- Engineered and optimized complex user interfaces using TypeScript and React, significantly improving application performance and user engagement.\n- Integrated modern frontend architectures with backend services, ensuring seamless data flow and robust type safety across the entire stack.\n- Spearheaded the development of AI-driven features, demonstrating rapid adaptability to new technologies and complex problem domains.",
+    "matchScore": 64,
+    "notes": "",
+    "url": "https://job-boards.greenhouse.io/gitlab/jobs/8891301002#app",
+    "techstack": [
+      "TypeScript",
+      "React"
+    ],
+    "interviewId": "198db904-5316-49fd-949c-8c1101457fb0"
+  },
+  {
+    "id": "app-b7f92f75",
+    "userId": "b1374374-19b3-4296-9634-48058a8b4f37",
+    "jobId": "gh-8771512002",
+    "jobTitle": "Backend Engineer, Knowledge Graph",
+    "company": "GitLab",
+    "platform": "Greenhouse",
+    "location": "Remote, Canada; Remote, United States",
+    "salary": "$120,000 - $175,000 USD / year",
+    "appliedAt": "2026-11-03T22:33:47.794Z",
+    "status": "applied",
+    "coverLetter": "Dear GitLab Hiring Team,\n\nI am writing to express my enthusiastic interest in the Backend Engineer, Knowledge Graph position at GitLab. As a Senior Full Stack Engineer and AI Developer with over 3 years of specialized experience in TypeScript and React, I am deeply inspired by GitLab's mission to enable everyone to contribute to software development, especially through the innovative application of knowledge graphs and AI.\n\nThroughout my career, I have focused on building scalable backend architectures and intuitive user interfaces using TypeScript and React. My expertise lies in bridging complex data structures—such as knowledge graphs—with high-performance backend systems, ensuring seamless integration and responsiveness. I thrive in remote-first environments, leveraging asynchronous communication and transparent collaboration, which align perfectly with GitLab's foundational VALUES.\n\nI am eager to bring my technical proficiency in TypeScript, my background in AI development, and my passion for distributed systems to GitLab’s Knowledge Graph team, helping shape the future of intelligent software delivery. Thank you for considering my application.\n\nSincerely,\nCandidate",
+    "adaptedResumeSummary": "Senior Full Stack Engineer and AI Developer with 3+ years of experience specializing in robust backend systems, knowledge graph architectures, and modern web technologies including TypeScript and React.\n\n- Designed and implemented scalable backend services and interactive frontends using TypeScript and React to support complex data-driven applications.\n- Integrated AI-driven features and graph-based data structures to optimize data retrieval and enhance user workflows.\n- Collaborated in fast-paced, remote engineering teams to deliver high-quality, maintainable code aligned with agile methodologies.",
+    "matchScore": 64,
+    "notes": "",
+    "url": "https://job-boards.greenhouse.io/gitlab/jobs/8771512002#app",
+    "techstack": [
+      "TypeScript",
+      "React"
+    ],
+    "interviewId": "26ddf4e4-192c-426e-b3e9-a3d5f28439cb"
   }
 ]

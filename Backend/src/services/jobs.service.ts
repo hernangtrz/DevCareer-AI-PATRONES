@@ -63,11 +63,15 @@ export async function getJobById(jobId: string): Promise<JobOffer | null> {
 export async function applyToJob(params: {
   userId: string;
   job: JobOffer;
+  userSkills?: string[];
+  userExperienceSummary?: string;
   notes?: string;
 }) {
   return jobFacade.processCompleteApplication({
     userId: params.userId,
     job: params.job,
+    userSkills: params.userSkills,
+    userExperienceSummary: params.userExperienceSummary,
     notes: params.notes,
   });
 }

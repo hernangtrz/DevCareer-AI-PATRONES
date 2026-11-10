@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1150 620" width="100%" height="100%" font-family="Segoe UI, Inter, Arial, sans-serif">
+  <defs>
+    <marker id="seqArrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="#1e293b" />
+    </marker>
+    <marker id="seqReturn" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L9,5 L0,10" fill="none" stroke="#059669" stroke-width="2" />
+    </marker>
+  </defs>
+
+  <rect width="1150" height="620" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" />
+
+  <!-- Título -->
+  <rect x="20" y="15" width="1110" height="44" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5" />
+  <text x="575" y="42" text-anchor="middle" font-size="16" font-weight="700" fill="#1e3a8a">
+    DIAGRAMA DE SECUENCIA UML — COORDINACIÓN MULTIDIRECCIONAL EN CAREERWORKFLOWMEDIATOR
+  </text>
+
+  <!-- Participantes (Lifelines) -->
+  <!-- 1. JobApplicationColleague -->
+  <rect x="45" y="75" width="180" height="42" rx="6" fill="#1e293b" />
+  <text x="135" y="100" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff">JobApplicationColleague</text>
+  <line x1="135" y1="117" x2="135" y2="590" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6,4" />
+
+  <!-- 2. CareerWorkflowMediator -->
+  <rect x="315" y="75" width="200" height="42" rx="6" fill="#059669" />
+  <text x="415" y="100" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff">CareerWorkflowMediator</text>
+  <line x1="415" y1="117" x2="415" y2="590" stroke="#059669" stroke-width="2.5" stroke-dasharray="6,4" />
+
+  <!-- 3. InterviewSessionColleague -->
+  <rect x="595" y="75" width="190" height="42" rx="6" fill="#1e293b" />
+  <text x="690" y="100" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff">InterviewSessionColleague</text>
+  <line x1="690" y1="117" x2="690" y2="590" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6,4" />
+
+  <!-- 4. EvaluationFeedbackColleague -->
+  <rect x="820" y="75" width="145" height="42" rx="6" fill="#1e293b" />
+  <text x="892" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">EvaluationFeedback</text>
+  <text x="892" y="109" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">Colleague</text>
+  <line x1="892" y1="117" x2="892" y2="590" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6,4" />
+
+  <!-- 5. CandidateAnalyticsColleague -->
+  <rect x="985" y="75" width="145" height="42" rx="6" fill="#1e293b" />
+  <text x="1057" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">CandidateAnalytics</text>
+  <text x="1057" y="109" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">Colleague</text>
+  <line x1="1057" y1="117" x2="1057" y2="590" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6,4" />
+
+  <!-- ==================== FLUJO 1: APPLICATION_STATUS_CHANGED ==================== -->
+  <rect x="30" y="132" width="1095" height="24" rx="4" fill="#dbeafe" />
+  <text x="45" y="148" font-size="12" font-weight="700" fill="#1e40af">
+    FASE 1: El candidato cambia su postulación (ej. Stripe) a estado "interviewing"
+  </text>
+
+  <!-- Paso 1 -->
+  <line x1="135" y1="180" x2="408" y2="180" stroke="#1e293b" stroke-width="2" marker-end="url(#seqArrow)" />
+  <text x="275" y="173" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0f172a">1. notify(this, "APPLICATION_STATUS_CHANGED")</text>
+
+  <!-- Paso 2 -->
+  <line x1="415" y1="215" x2="1050" y2="215" stroke="#1e293b" stroke-width="2" marker-end="url(#seqArrow)" />
+  <text x="730" y="208" text-anchor="middle" font-size="11.5" fill="#0f172a">2. recordMilestone("interview_stage", Stripe)</text>
+
+  <!-- Paso 3 -->
+  <line x1="415" y1="255" x2="683" y2="255" stroke="#1e293b" stroke-width="2" marker-end="url(#seqArrow)" />
+  <text x="552" y="248" text-anchor="middle" font-size="11.5" fill="#0f172a">3. prepareInterviewForJobStage(Stripe, stack)</text>
+
+  <!-- Paso 4 (retorno) -->
+  <line x1="690" y1="285" x2="422" y2="285" stroke="#059669" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#seqReturn)" />
+  <text x="552" y="278" text-anchor="middle" font-size="11.5" font-weight="600" fill="#059669">4. retorna interviewId (#int_test_1)</text>
+
+  <!-- Paso 5 -->
+  <line x1="415" y1="320" x2="142" y2="320" stroke="#1e293b" stroke-width="2" marker-end="url(#seqArrow)" />
+  <text x="275" y="313" text-anchor="middle" font-size="11.5" fill="#0f172a">5. attachPreparedInterviewNote(appId, #int_test_1)</text>
+
+  <!-- ==================== FLUJO 2: INTERVIEW_EVALUATED ==================== -->
+  <rect x="30" y="355" width="1095" height="24" rx="4" fill="#d1fae5" />
+  <text x="45" y="371" font-size="12" font-weight="700" fill="#065f46">
+    FASE 2: El candidato completa la entrevista de voz y EvaluationFeedbackColleague emite el resultado
+  </text>
+
+  <!-- Paso 6 -->
+  <line x1="892" y1="408" x2="422" y2="408" stroke="#1e293b" stroke-width="2" marker-end="url(#seqArrow)" />
+  <text x="655" y="401" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0f172a">6. notify(this, "INTERVIEW_EVALUATED", { score: 68, CEFR: "B1" })</text>
+
+  <!-- Paso 7 -->
+  <line x1="415" y1="448" x2="683" y2="448" stroke="#1e293b" stroke-width="2" marker-end="url(#seqArrow)" />
+  <text x="552" y="441" text-anchor="middle" font-size="11.5" fill="#0f172a">7. finalizeAndGetMetadata(interviewId) [finalized=true]</text>
+
+  <!-- Paso 8 -->
+  <line x1="415" y1="490" x2="142" y2="490" stroke="#1e293b" stroke-width="2" marker-end="url(#seqArrow)" />
+  <text x="275" y="483" text-anchor="middle" font-size="11.5" fill="#0f172a">8. syncEvaluationResultWithApplication(68/100, CEFR B1)</text>
+
+  <!-- Paso 9 -->
+  <line x1="415" y1="535" x2="1050" y2="535" stroke="#1e293b" stroke-width="2" marker-end="url(#seqArrow)" />
+  <text x="730" y="528" text-anchor="middle" font-size="11.5" fill="#0f172a">9. recordMilestone() + registerEvaluationInsights(blindspots, CEFR)</text>
+</svg>
+

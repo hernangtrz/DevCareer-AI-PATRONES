@@ -14,6 +14,9 @@
  *    - Adapter          (adapter)
  *    - Bridge           (bridge)
  *    - Facade           (facade)
+ *
+ * 3. PATRONES COMPORTAMENTALES:
+ *    - Mediator         (mediator)
  * ============================================================================
  */
 export * as AbstractFactory from "./abstract-factory";
@@ -26,3 +29,5 @@ export * from "./prototype";
 export * from "./bridge";
 export * from "./adapter";
 export * from "./facade";
+export * as MediatorPattern from "./mediator";
+export * from "./mediator";

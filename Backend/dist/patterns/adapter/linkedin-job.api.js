@@ -15,7 +15,7 @@ class LinkedInJobApi {
                 skillsList: ["React", "TypeScript", "Next.js", "GraphQL", "Jest", "CSS Modules"],
                 seniorityLevel: "Senior",
                 listedAt: Date.now() - 3600000 * 5,
-                applyUrl: "https://www.linkedin.com/jobs/view/senior-frontend-microsoft",
+                applyUrl: "https://www.linkedin.com/jobs/search/?keywords=Senior+Frontend+Engineer+Microsoft",
             },
             {
                 jobId: "li-8002",
@@ -28,7 +28,7 @@ class LinkedInJobApi {
                 skillsList: ["AWS", "Terraform", "Kubernetes", "Node.js", "Python", "Microservicios"],
                 seniorityLevel: "Lead",
                 listedAt: Date.now() - 3600000 * 12,
-                applyUrl: "https://www.linkedin.com/jobs/view/solutions-architect-aws",
+                applyUrl: "https://www.linkedin.com/jobs/search/?keywords=Cloud+Solutions+Architect+AWS",
             },
             {
                 jobId: "li-8003",
@@ -41,7 +41,7 @@ class LinkedInJobApi {
                 skillsList: ["Node.js", "Go", "Kafka", "PostgreSQL", "Docker", "Redis"],
                 seniorityLevel: "Mid-Level",
                 listedAt: Date.now() - 3600000 * 24,
-                applyUrl: "https://www.linkedin.com/jobs/view/backend-developer-uber",
+                applyUrl: "https://www.linkedin.com/jobs/search/?keywords=Backend+Developer+Node+Uber",
             },
         ];
         if (keywords) {

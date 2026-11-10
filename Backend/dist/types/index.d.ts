@@ -4,6 +4,7 @@ export interface User {
     email: string;
 }
 export interface Interview {
+    company?: string;
     id: string;
     role: string;
     level: string;

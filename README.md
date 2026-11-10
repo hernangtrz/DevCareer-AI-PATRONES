@@ -19,13 +19,13 @@
 4. **Arena de Retos de Programación y Patrones GoF:** Editor de código interactivo en el navegador con ejecución de casos de prueba en tiempo real, detección de malos olores y verificación automática de principios SOLID y patrones de diseño.
 5. **Centro de Optimización de CV y Filtros ATS:** Procesamiento y redacción estructurada de hojas de vida, con evaluación de coincidencia de palabras clave y métricas de impacto profesional.
 
-La arquitectura de la aplicación está construida bajo los principios de **Clean Architecture**, **Principios SOLID** y la implementación formal de **8 Patrones de Diseño GoF** (5 Creacionales y 3 Estructurales), garantizando desacoplamiento de infraestructura multi-nube y alta testabilidad.
+La arquitectura de la aplicación está construida bajo los principios de **Clean Architecture**, **Principios SOLID** y la implementación formal de **9 Patrones de Diseño GoF** (5 Creacionales, 3 Estructurales y 1 Comportamental), garantizando desacoplamiento de infraestructura multi-nube y alta testabilidad.
 
 ---
 
 ## 🧩 Catálogo de Patrones de Diseño GoF Implementados
 
-El sistema implementa de manera estricta y desacoplada 8 patrones de diseño del catálogo Gang of Four (GoF):
+El sistema implementa de manera estricta y desacoplada 9 patrones de diseño del catálogo Gang of Four (GoF):
 
 
 ### 1. Patrones Creacionales
@@ -45,6 +45,12 @@ El sistema implementa de manera estricta y desacoplada 8 patrones de diseño del
 | **PE-06** | **Bridge** | `PerformanceReport` o-- `IReportRenderer` | Explosión combinatoria de clases ($M \times N = 12$) al exportar múltiples reportes en múltiples formatos. Desacopla la abstracción del renderizador, soportando Excel con UTF-8 BOM (`\uFEFF`), HTML y Markdown ($M + N = 7$). | [Backend/src/patterns/bridge/performance-report.abstraction.ts](Backend/src/patterns/bridge/performance-report.abstraction.ts) |
 | **PE-07** | **Facade** | `JobApplicationFacade`, `AIServiceFacade` | Antipatrón *Fat Controller* de más de 120 líneas coordinando IA, ATS, Builder y persistencia. Reduce el endpoint de postulación a 6 líneas limpias. | [Backend/src/patterns/facade/job-application.facade.ts](Backend/src/patterns/facade/job-application.facade.ts) |
 | **PE-08** | **Adapter** | `IJobPortalAdapter` (RemoteOK, LinkedIn, Greenhouse) | Esquemas JSON externos heterogéneos e incompatibles. Normaliza cualquier portal hacia la entidad canónica del dominio `JobOffer`. | [Backend/src/patterns/adapter/job-portal-adapter.interface.ts](Backend/src/patterns/adapter/job-portal-adapter.interface.ts) |
+
+### 3. Patrones Comportamentales
+
+| ID | Patrón | Rol en DevCareer AI | Problema Resuelto | Archivo Principal |
+| :--- | :--- | :--- | :--- | :--- |
+| **PE-09** | **Mediator** | `CareerWorkflowMediator` y `BaseColleague` | Dependencias cruzadas muchos-a-muchos ($N \times (N-1)$) entre Postulaciones, Entrevistas, Evaluación y Analítica. Coordina reacciones transversales en topología estrella sin que los colegas se conozcan entre sí. | [Backend/src/patterns/mediator/career-workflow.mediator.ts](Backend/src/patterns/mediator/career-workflow.mediator.ts) |
 
 ---
 
@@ -139,14 +145,15 @@ DevCareer-AI/
 │   └── src/
 │       ├── config/               # Configuración de entornos y clientes de BD
 │       ├── middleware/           # Middlewares (IAuthVerifier, CORS, Rate Limiting)
-│       ├── patterns/             # Implementación formal de los 8 Patrones GoF
+│       ├── patterns/             # Implementación formal de los 9 Patrones GoF
 │       │   ├── abstract-factory/ # PE-01: DataStoreFactory (Supabase, Dynamo, Mock)
 │       │   ├── factory-method/   # PE-02: AIProviderCreator (Gemini, OpenAI, Mock)
 │       │   ├── builder/          # PE-03: InterviewBuilder y InterviewDirector
 │       │   ├── prototype/        # PE-04: InterviewPrototype y Registry (Deep Clone)
 │       │   ├── bridge/           # PE-06: PerformanceReport y Renderers (Excel BOM, HTML)
 │       │   ├── facade/           # PE-07: JobApplicationFacade y AIServiceFacade
-│       │   └── adapter/          # PE-08: IJobPortalAdapter (RemoteOK, LinkedIn, Greenhouse)
+│       │   ├── adapter/          # PE-08: IJobPortalAdapter (RemoteOK, LinkedIn, Greenhouse)
+│       │   └── mediator/         # PE-09: CareerWorkflowMediator y Colleagues GoF
 │       ├── routes/               # Controladores HTTP delgados
 │       │   ├── jobs.routes.ts    # Endpoints de vacantes y postulaciones
 │       │   ├── feedback.routes.ts# Endpoints de analítica y exportación Bridge
@@ -190,6 +197,9 @@ node scripts/test-builder.js
 
 # 4. Probar Prototype y clonación profunda con structuredClone
 node scripts/test-prototype.js
+
+# 5. Probar Mediator y coordinación transversal entre colegas (Postulaciones, Entrevistas, Feedback y Analítica)
+node scripts/test-mediator.js
 ```
 
 ---

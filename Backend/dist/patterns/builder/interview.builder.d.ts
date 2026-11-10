@@ -6,6 +6,7 @@ export interface IInterviewBuilder {
     reset(): this;
     forUser(userId: string): this;
     withRole(role: string): this;
+    withCompany(company?: string): this;
     withLevel(level: string): this;
     ofType(type: string): this;
     withTechStack(techstack: string[]): this;
@@ -33,6 +34,7 @@ export interface IInterviewBuilder {
 export declare class InterviewBuilder implements IInterviewBuilder {
     private userId;
     private role;
+    private company?;
     private level;
     private type;
     private techstack;
@@ -43,6 +45,7 @@ export declare class InterviewBuilder implements IInterviewBuilder {
     constructor();
     reset(): this;
     forUser(userId: string): this;
+    withCompany(company?: string): this;
     withRole(role: string): this;
     withLevel(level: string): this;
     ofType(type: string): this;

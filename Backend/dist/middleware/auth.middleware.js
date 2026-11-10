@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CognitoAuthStrategy = exports.CognitoAuthVerifier = exports.SupabaseAuthStrategy = exports.SupabaseAuthVerifier = void 0;
 exports.requireAuth = requireAuth;
+exports.flexibleAuth = flexibleAuth;
 const cognito_1 = require("../config/cognito");
 const supabase_1 = require("../config/supabase");
 /**
@@ -97,5 +98,32 @@ function requireAuth(reqOrVerifiers, res, next) {
     return async (req, res, next) => {
         return executeAuth(req, res, next, defaultVerifiers);
     };
+}
+async function flexibleAuth(req, res, next) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : null;
+    if (token) {
+        const defaultVerifiers = [
+            new SupabaseAuthVerifier(supabase_1.supabase),
+            new CognitoAuthVerifier(cognito_1.cognitoIdVerifier),
+        ];
+        for (const verifier of defaultVerifiers) {
+            try {
+                const user = await verifier.verifyToken(token);
+                if (user) {
+                    req.userId = user.id;
+                    req.userEmail = user.email;
+                    req.userName = user.name;
+                    return next();
+                }
+            }
+            catch { }
+        }
+    }
+    // Fallback demo user para pruebas locales y descargas directas del navegador
+    req.userId = "3aa77ca5-52cf-4204-8d4a-85c0456e716f";
+    req.userEmail = "hernan@devcareer.ai";
+    req.userName = "Hernán Gutiérrez";
+    next();
 }
 //# sourceMappingURL=auth.middleware.js.map

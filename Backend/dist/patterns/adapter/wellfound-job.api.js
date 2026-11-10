@@ -14,7 +14,7 @@ class WellfoundJobApi {
                 tech_tags: ["Next.js", "React", "TypeScript", "Python", "TailwindCSS", "OpenAI"],
                 pitch: "Únete como primer ingeniero en una startup acelerada por Y-Combinator. Construirás agentes de productividad impulsados por modelos multimodales.",
                 posted_date: new Date(Date.now() - 3600000 * 6).toISOString(),
-                job_url: "https://wellfound.com/jobs/cortex-ai-founding-engineer",
+                job_url: "https://wellfound.com/jobs?query=Full+Stack+Engineer",
             },
             {
                 id: "wf-302",
@@ -26,7 +26,7 @@ class WellfoundJobApi {
                 tech_tags: ["AWS", "Docker", "Kubernetes", "Go", "Terraform", "PostgreSQL"],
                 pitch: "Plataforma de infraestructura edge para bases de datos distribuidas. Escalabilidad extrema y observabilidad en tiempo real.",
                 posted_date: new Date(Date.now() - 3600000 * 30).toISOString(),
-                job_url: "https://wellfound.com/jobs/hyperscale-senior-backend",
+                job_url: "https://wellfound.com/jobs?query=Backend+DevOps+Engineer",
             },
         ];
     }

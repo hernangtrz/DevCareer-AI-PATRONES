@@ -3,9 +3,10 @@ import { LeverJobApi } from "./lever-job.api";
 import { JobOffer } from "../../types/job.types";
 /**
  * ============================================================================
- * PATRÓN ADAPTER — CONCRETE ADAPTER (GoF): LeverJobAdapter
+ * PATRON ADAPTER - CONCRETE ADAPTER (GoF): LeverJobAdapter
  * ============================================================================
- * Adapta el esquema de LeverJobApi al contrato estándar IJobPortalAdapter.
+ * Adapta las vacantes tecnicas de LeverJobApi garantizando que la URL apunte
+ * directamente al formulario de postulacion oficial (/apply).
  */
 export declare class LeverJobAdapter implements IJobPortalAdapter {
     readonly portalName = "Lever";

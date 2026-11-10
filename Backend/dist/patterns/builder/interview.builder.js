@@ -29,6 +29,7 @@ class InterviewBuilder {
     reset() {
         this.userId = "";
         this.role = "";
+        this.company = undefined;
         this.level = "";
         this.type = "";
         this.techstack = [];
@@ -40,6 +41,10 @@ class InterviewBuilder {
     }
     forUser(userId) {
         this.userId = userId ? userId.trim() : "";
+        return this;
+    }
+    withCompany(company) {
+        this.company = company && company.trim() ? company.trim() : undefined;
         return this;
     }
     withRole(role) {
@@ -127,6 +132,7 @@ class InterviewBuilder {
         const builtEntity = {
             userId: this.userId,
             role: this.role,
+            company: this.company,
             level: this.level,
             type: this.type,
             techstack: [...this.techstack],

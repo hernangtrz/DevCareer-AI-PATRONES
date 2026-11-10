@@ -4,9 +4,10 @@ exports.GreenhouseJobAdapter = void 0;
 const greenhouse_job_api_1 = require("./greenhouse-job.api");
 /**
  * ============================================================================
- * PATRÓN ADAPTER — CONCRETE ADAPTER (GoF): GreenhouseJobAdapter
+ * PATRON ADAPTER - CONCRETE ADAPTER (GoF): GreenhouseJobAdapter
  * ============================================================================
- * Adapta el esquema de GreenhouseJobApi al contrato estándar IJobPortalAdapter.
+ * Adapta las vacantes de GreenhouseJobApi enlazando directamente al formulario
+ * de postulacion (#app) donde el aspirante carga su CV y datos de contacto.
  */
 class GreenhouseJobAdapter {
     constructor(adaptee) {
@@ -24,8 +25,8 @@ class GreenhouseJobAdapter {
     }
     mapToDomain(raw) {
         const techMeta = raw.metadata?.find(m => m.name.toLowerCase().includes("tech"))?.value || "";
-        const salaryMeta = raw.metadata?.find(m => m.name.toLowerCase().includes("salary"))?.value || "$90k - $140k USD";
-        const skills = techMeta ? techMeta.split(",").map(s => s.trim()) : ["React", "TypeScript", "Node.js", "Docker"];
+        const salaryMeta = raw.metadata?.find(m => m.name.toLowerCase().includes("salary"))?.value || "$120k - $175k USD";
+        const skills = techMeta ? techMeta.split(",").map(s => s.trim()) : ["Go", "Ruby", "TypeScript", "React", "Docker", "Kubernetes"];
         const titleLower = raw.title.toLowerCase();
         let seniority = "Mid-Level";
         if (titleLower.includes("staff") || titleLower.includes("principal")) {
@@ -37,10 +38,12 @@ class GreenhouseJobAdapter {
         else if (titleLower.includes("junior") || titleLower.includes("jr")) {
             seniority = "Junior";
         }
+        // Formulario directo de Greenhouse (#app)
+        const applyUrl = raw.absolute_url.includes("#") ? raw.absolute_url : (raw.absolute_url + "#app");
         return {
-            id: `gh-${raw.id}`,
+            id: "gh-" + raw.id,
             title: raw.title,
-            company: raw.company_name,
+            company: raw.company_name || "GitLab",
             location: raw.location.name,
             type: "Remote",
             salary: salaryMeta,
@@ -48,7 +51,7 @@ class GreenhouseJobAdapter {
             requiredSkills: skills,
             seniority,
             platform: "Greenhouse",
-            url: raw.absolute_url,
+            url: applyUrl,
             createdAt: raw.updated_at,
         };
     }

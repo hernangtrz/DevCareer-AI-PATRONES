@@ -1,9 +1,8 @@
 /**
  * ============================================================================
- * PATRÓN ADAPTER — ADAPTEE (GoF): RemoteOkJobApi
+ * PATRON ADAPTER - ADAPTEE (GoF): RemoteOkJobApi
  * ============================================================================
- * Representa la interfaz incompatible o externa del proveedor RemoteOK.
- * Expone un formato propio con campos como 'position', 'tags', 'url', 'epoch'.
+ * Consulta ofertas remotas exclusivamente de tecnologia e ingenieria de software.
  */
 export interface RemoteOkRawJob {
     id: string;
@@ -18,13 +17,10 @@ export interface RemoteOkRawJob {
     location: string;
     salary_min?: number;
     salary_max?: number;
+    apply_url?: string;
     url: string;
 }
 export declare class RemoteOkJobApi {
-    /**
-     * Obtiene empleos desde el feed público de RemoteOK con fallback seguro en memoria
-     * para entornos sin conexión o rate-limits.
-     */
     getRemoteJobs(tag?: string, limit?: number): Promise<RemoteOkRawJob[]>;
     private getFallbackRawJobs;
 }

@@ -7,8 +7,10 @@ const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const jobs_service_1 = require("../services/jobs.service");
 const bridge_1 = require("../patterns/bridge");
+const mediator_1 = require("../patterns/mediator");
 const router = (0, express_1.Router)();
-router.use(auth_middleware_1.requireAuth);
+const careerMediator = (0, mediator_1.getDefaultCareerMediator)();
+// router.use(flexibleAuth); -> Aplicado selectivamente a rutas que requieren usuario
 // GET /jobs
 // Lista ofertas de empleo agregadas de los adaptadores con Match Score personalizado
 router.get("/", async (req, res) => {
@@ -28,7 +30,7 @@ router.get("/", async (req, res) => {
 });
 // GET /jobs/applications
 // Historial de postulaciones del usuario
-router.get("/applications", async (req, res) => {
+router.get("/applications", auth_middleware_1.flexibleAuth, async (req, res) => {
     try {
         const applications = await (0, jobs_service_1.getUserJobApplications)(req.userId);
         res.status(200).json({ success: true, applications });
@@ -40,7 +42,7 @@ router.get("/applications", async (req, res) => {
 });
 // GET /jobs/applications/export?format=html|md|txt
 // Patrón Bridge: Exporta el historial de postulaciones, métricas y cartas en el formato deseado
-router.get("/applications/export", async (req, res) => {
+router.get("/applications/export", auth_middleware_1.flexibleAuth, async (req, res) => {
     const format = req.query.format;
     const renderer = (0, bridge_1.resolveReportRenderer)(format);
     if (!renderer) {
@@ -65,7 +67,7 @@ router.get("/applications/export", async (req, res) => {
 });
 // POST /jobs/apply
 // Patrón Facade: Procesa la postulación completa (Cover Letter IA + CV adaptado + Mock Interview)
-router.post("/apply", async (req, res) => {
+router.post("/apply", auth_middleware_1.flexibleAuth, async (req, res) => {
     const { job, userSkills, userExperienceSummary, notes } = req.body;
     if (!job || !job.title || !job.company) {
         res.status(400).json({ success: false, message: "Datos de la vacante requeridos" });
@@ -75,10 +77,15 @@ router.post("/apply", async (req, res) => {
         const result = await (0, jobs_service_1.applyToJob)({
             userId: req.userId,
             job,
-            userSkills,
-            userExperienceSummary,
             notes,
         });
+        // Patrón Mediator (GoF): Notificar que se registró una nueva postulación
+        try {
+            await careerMediator.jobColleague.notifyJobApplied(result.application);
+        }
+        catch (mediatorErr) {
+            console.warn("[JobsRoutes] Aviso en coordinación Mediator (apply):", mediatorErr);
+        }
         res.status(201).json({
             success: true,
             application: result.application,
@@ -108,7 +115,7 @@ router.get("/:id", async (req, res) => {
 // POST /jobs/create-interview
 // Patrón Builder (Director): Crea una entrevista técnica personalizada y adaptada
 // a la descripción, empresa y tecnologías específicas de la vacante de empleo.
-router.post("/create-interview", async (req, res) => {
+router.post("/create-interview", auth_middleware_1.flexibleAuth, async (req, res) => {
     const { jobTitle, company, description, requiredSkills, seniority } = req.body;
     if (!jobTitle || !company) {
         res.status(400).json({ success: false, message: "jobTitle y company son requeridos" });
@@ -154,6 +161,7 @@ Responde ÚNICAMENTE un array JSON con las preguntas en español, sin texto adic
         const interviewData = director.constructTechnicalInterview({
             userId: req.userId,
             role: `${jobTitle} @ ${company}`,
+            company,
             level,
             type: "Technical",
             techstack: skills,
@@ -169,6 +177,51 @@ Responde ÚNICAMENTE un array JSON con las preguntas en español, sin texto adic
     catch (error) {
         console.error("[JobsRoutes] Error creando entrevista personalizada para oferta:", error);
         res.status(500).json({ success: false, message: "Error al crear la entrevista personalizada" });
+    }
+});
+// PATCH /jobs/applications/:id/status
+// Actualiza el estado de la postulación (applied, interviewing, offered, rejected)
+// y coordina con el Patrón Mediator (ej. preparando simulacro si avanza a 'interviewing')
+router.patch("/applications/:id/status", auth_middleware_1.flexibleAuth, async (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!status) {
+            res.status(400).json({ success: false, message: "Status es requerido" });
+            return;
+        }
+        const updatedApp = await careerMediator.jobColleague.changeStatusAndNotify(req.params.id, req.userId || "3aa77ca5-52cf-4204-8d4a-85c0456e716f", status);
+        res.status(200).json({
+            success: true,
+            message: "Estado de postulación actualizado",
+            application: updatedApp,
+            preparedInterviewId: status === "interviewing" ? careerMediator.getLastPreparedInterviewId() : undefined,
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: "Error actualizando estado" });
+    }
+});
+// PATCH /jobs/applications/:id/notes
+// Actualiza notas personales del usuario sobre su proceso
+router.patch("/applications/:id/notes", auth_middleware_1.flexibleAuth, async (req, res) => {
+    try {
+        const { notes } = req.body;
+        await (0, jobs_service_1.updateJobApplicationNotes)(req.params.id, notes || "");
+        res.status(200).json({ success: true, message: "Notas actualizadas" });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: "Error actualizando notas" });
+    }
+});
+// DELETE /jobs/applications/:id
+// Elimina una postulación del historial
+router.delete("/applications/:id", auth_middleware_1.flexibleAuth, async (req, res) => {
+    try {
+        await (0, jobs_service_1.deleteJobApplication)(req.params.id);
+        res.status(200).json({ success: true, message: "Postulación eliminada" });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: "Error eliminando postulación" });
     }
 });
 exports.default = router;

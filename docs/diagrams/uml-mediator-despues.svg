@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 860" width="100%" height="100%" font-family="Segoe UI, Inter, Arial, sans-serif">
+  <defs>
+    <!-- Triángulo hueco UML para Herencia / Realización -->
+    <marker id="umlTriangle" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto">
+      <polygon points="1,1 13,7 1,13" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+    </marker>
+    <!-- Flecha abierta UML para Asociación Dirigida -->
+    <marker id="umlAssoc" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M1,1 L10,6 L1,11" fill="none" stroke="#0284c7" stroke-width="2" />
+    </marker>
+    <marker id="umlCoord" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M1,1 L10,6 L1,11" fill="none" stroke="#059669" stroke-width="2" />
+    </marker>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="108%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.1" />
+    </filter>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="1200" height="860" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" />
+
+  <!-- Encabezado -->
+  <rect x="20" y="16" width="1160" height="52" rx="8" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1.5" />
+  <text x="600" y="38" text-anchor="middle" font-size="17" font-weight="700" fill="#065f46">
+    DIAGRAMA DE CLASES UML — DESPUÉS DE APLICAR EL PATRÓN MEDIATOR (GoF — PE-09)
+  </text>
+  <text x="600" y="57" text-anchor="middle" font-size="12.5" fill="#047857">
+    Topología en Estrella: Los 4 Colegas (Colleagues) solo conocen a ICareerMediator y tienen 0 dependencias entre sí
+  </text>
+
+  <!-- ==================== 1. INTERFAZ ICareerMediator (Arriba Izquierda) ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="70" y="95" width="440" height="145" rx="6" fill="#ffffff" stroke="#0284c7" stroke-width="2" />
+    <rect x="70" y="95" width="440" height="44" rx="6" fill="#0284c7" />
+    <text x="290" y="113" text-anchor="middle" font-size="11" fill="#e0f2fe">«interface»</text>
+    <text x="290" y="131" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">ICareerMediator</text>
+    <line x1="70" y1="162" x2="510" y2="162" stroke="#bae6fd" stroke-width="1.5" />
+    <text x="84" y="184" font-size="12" fill="#0f172a" font-family="Consolas, monospace">+ notify(sender: BaseColleague, event, payload): Promise&lt;void&gt;</text>
+    <text x="84" y="204" font-size="12" fill="#0f172a" font-family="Consolas, monospace">+ getCoordinationLogs(): MediatorActionLog[]</text>
+    <text x="84" y="224" font-size="12" fill="#0f172a" font-family="Consolas, monospace">+ clearLogs(): void</text>
+  </g>
+
+  <!-- ==================== 2. CLASE ABSTRACTA BaseColleague (Arriba Derecha) ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="690" y="95" width="440" height="145" rx="6" fill="#ffffff" stroke="#4f46e5" stroke-width="2" />
+    <rect x="690" y="95" width="440" height="44" rx="6" fill="#4f46e5" />
+    <text x="910" y="113" text-anchor="middle" font-size="11" fill="#e0e7ff">«abstract class»</text>
+    <text x="910" y="131" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff" font-style="italic">BaseColleague</text>
+    <line x1="690" y1="180" x2="1130" y2="180" stroke="#c7d2fe" stroke-width="1.5" />
+    <text x="704" y="158" font-size="12" fill="#334155" font-family="Consolas, monospace"># mediator?: ICareerMediator</text>
+    <text x="704" y="173" font-size="12" fill="#334155" font-family="Consolas, monospace" font-style="italic">+ abstract readonly colleagueName: string</text>
+    <text x="704" y="202" font-size="12" fill="#0f172a" font-family="Consolas, monospace">+ setMediator(mediator: ICareerMediator): void</text>
+    <text x="704" y="222" font-size="12" fill="#0f172a" font-family="Consolas, monospace"># emit(event: CareerDomainEvent, payload): Promise&lt;void&gt;</text>
+  </g>
+
+  <!-- Asociación BaseColleague --> ICareerMediator -->
+  <line x1="690" y1="165" x2="514" y2="165" stroke="#0284c7" stroke-width="2.2" marker-end="url(#umlAssoc)" />
+  <rect x="542" y="138" width="120" height="22" rx="4" fill="#e0f2fe" stroke="#7dd3fc" />
+  <text x="602" y="153" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0369a1">notifies (mediator)</text>
+
+  <!-- ==================== 3. CONCRETE MEDIATOR: CareerWorkflowMediator (Centro Izquierda) ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="55" y="305" width="470" height="225" rx="6" fill="#ffffff" stroke="#059669" stroke-width="2.2" />
+    <rect x="55" y="305" width="470" height="44" rx="6" fill="#059669" />
+    <text x="290" y="323" text-anchor="middle" font-size="11" fill="#d1fae5">«ConcreteMediator»</text>
+    <text x="290" y="341" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">CareerWorkflowMediator</text>
+    <line x1="55" y1="450" x2="525" y2="450" stroke="#a7f3d0" stroke-width="1.5" />
+    <text x="69" y="368" font-size="12" fill="#334155" font-family="Consolas, monospace">- coordinationLogs: MediatorActionLog[]</text>
+    <text x="69" y="385" font-size="12" fill="#334155" font-family="Consolas, monospace">- lastPreparedInterviewId: string | null</text>
+    <text x="69" y="402" font-size="12" fill="#065f46" font-family="Consolas, monospace">+ readonly jobColleague: JobApplicationColleague</text>
+    <text x="69" y="419" font-size="12" fill="#065f46" font-family="Consolas, monospace">+ readonly interviewColleague: InterviewSessionColleague</text>
+    <text x="69" y="436" font-size="12" fill="#065f46" font-family="Consolas, monospace">+ readonly feedbackColleague: EvaluationFeedbackColleague</text>
+    <text x="69" y="447" font-size="12" fill="#065f46" font-family="Consolas, monospace">+ readonly analyticsColleague: CandidateAnalyticsColleague</text>
+    <text x="69" y="472" font-size="12" fill="#0f172a" font-family="Consolas, monospace">+ notify(sender, event, payload): Promise&lt;void&gt;</text>
+    <text x="69" y="492" font-size="12" fill="#0f172a" font-family="Consolas, monospace">+ getLastPreparedInterviewId(): string | null</text>
+    <text x="69" y="512" font-size="12" fill="#0f172a" font-family="Consolas, monospace">+ getCoordinationLogs(): MediatorActionLog[]</text>
+  </g>
+
+  <!-- Realización CareerWorkflowMediator ..|> ICareerMediator -->
+  <line x1="290" y1="305" x2="290" y2="243" stroke="#0f172a" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#umlTriangle)" />
+  <text x="335" y="278" font-size="11.5" font-weight="600" fill="#334155">«implements»</text>
+
+  <!-- Línea troncal de Herencia de los 4 ConcreteColleagues hacia BaseColleague -->
+  <line x1="910" y1="290" x2="910" y2="243" stroke="#0f172a" stroke-width="2" marker-end="url(#umlTriangle)" />
+  <line x1="150" y1="560" x2="1050" y2="560" stroke="#0f172a" stroke-width="2" />
+  <line x1="910" y1="290" x2="910" y2="560" stroke="#0f172a" stroke-width="2" />
+  <rect x="860" y="262" width="95" height="20" rx="4" fill="#eef2ff" stroke="#c7d2fe" />
+  <text x="907" y="276" text-anchor="middle" font-size="11" font-weight="600" fill="#4338ca">«extends»</text>
+
+  <!-- Bajadas verticales a cada uno de los 4 ConcreteColleagues -->
+  <line x1="155" y1="560" x2="155" y2="595" stroke="#0f172a" stroke-width="2" />
+  <line x1="450" y1="560" x2="450" y2="595" stroke="#0f172a" stroke-width="2" />
+  <line x1="745" y1="560" x2="745" y2="595" stroke="#0f172a" stroke-width="2" />
+  <line x1="1040" y1="560" x2="1040" y2="595" stroke="#0f172a" stroke-width="2" />
+
+  <!-- Flechas de coordinación desde CareerWorkflowMediator hacia los 4 Colegas -->
+  <path d="M 155 530 L 155 592" fill="none" stroke="#059669" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#umlCoord)" />
+  <path d="M 380 530 L 430 592" fill="none" stroke="#059669" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#umlCoord)" />
+  <path d="M 525 460 L 725 592" fill="none" stroke="#059669" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#umlCoord)" />
+  <path d="M 525 420 L 1020 592" fill="none" stroke="#059669" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#umlCoord)" />
+
+  <!-- ==================== COLEGA 1: JobApplicationColleague ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="20" y="595" width="275" height="190" rx="6" fill="#ffffff" stroke="#1e293b" stroke-width="2" />
+    <rect x="20" y="595" width="275" height="40" rx="6" fill="#1e293b" />
+    <text x="157" y="611" text-anchor="middle" font-size="10.5" fill="#94a3b8">«ConcreteColleague 1»</text>
+    <text x="157" y="627" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">JobApplicationColleague</text>
+    <line x1="20" y1="675" x2="295" y2="675" stroke="#cbd5e1" stroke-width="1.5" />
+    <text x="30" y="652" font-size="11" fill="#334155" font-family="Consolas, monospace">- appRepo: IJobApplicationRepo</text>
+    <text x="30" y="667" font-size="11" fill="#334155" font-family="Consolas, monospace">+ colleagueName = "JobApplication..."</text>
+    <text x="30" y="694" font-size="11" fill="#0f172a" font-family="Consolas, monospace">+ notifyJobApplied(app): Promise</text>
+    <text x="30" y="714" font-size="11" fill="#0f172a" font-family="Consolas, monospace">+ changeStatusAndNotify(id, status)</text>
+    <text x="30" y="734" font-size="11" fill="#059669" font-family="Consolas, monospace">+ attachPreparedInterviewNote(...)</text>
+    <text x="30" y="754" font-size="11" fill="#059669" font-family="Consolas, monospace">+ syncEvaluationResultWithApp(...)</text>
+  </g>
+
+  <!-- ==================== COLEGA 2: InterviewSessionColleague ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="312" y="595" width="275" height="190" rx="6" fill="#ffffff" stroke="#1e293b" stroke-width="2" />
+    <rect x="312" y="595" width="275" height="40" rx="6" fill="#1e293b" />
+    <text x="449" y="611" text-anchor="middle" font-size="10.5" fill="#94a3b8">«ConcreteColleague 2»</text>
+    <text x="449" y="627" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">InterviewSessionColleague</text>
+    <line x1="312" y1="675" x2="587" y2="675" stroke="#cbd5e1" stroke-width="1.5" />
+    <text x="322" y="652" font-size="11" fill="#334155" font-family="Consolas, monospace">- interviewRepo: IInterviewRepo</text>
+    <text x="322" y="667" font-size="11" fill="#334155" font-family="Consolas, monospace">+ colleagueName = "InterviewSession..."</text>
+    <text x="322" y="694" font-size="11" fill="#059669" font-family="Consolas, monospace">+ prepareInterviewForJobStage(...)</text>
+    <text x="322" y="714" font-size="11" fill="#059669" font-family="Consolas, monospace">+ createTargetedRefresherInterview()</text>
+    <text x="322" y="734" font-size="11" fill="#059669" font-family="Consolas, monospace">+ finalizeAndGetMetadata(id)</text>
+    <text x="322" y="754" font-size="11" fill="#64748b" font-family="Consolas, monospace">- getRepo(): IInterviewRepository</text>
+  </g>
+
+  <!-- ==================== COLEGA 3: EvaluationFeedbackColleague ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="605" y="595" width="275" height="190" rx="6" fill="#ffffff" stroke="#1e293b" stroke-width="2" />
+    <rect x="605" y="595" width="275" height="40" rx="6" fill="#1e293b" />
+    <text x="742" y="611" text-anchor="middle" font-size="10.5" fill="#94a3b8">«ConcreteColleague 3»</text>
+    <text x="742" y="627" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">EvaluationFeedbackColleague</text>
+    <line x1="605" y1="675" x2="880" y2="675" stroke="#cbd5e1" stroke-width="1.5" />
+    <text x="615" y="658" font-size="11" fill="#334155" font-family="Consolas, monospace">+ colleagueName = "EvaluationFeed..."</text>
+    <text x="615" y="698" font-size="11" fill="#0f172a" font-family="Consolas, monospace">+ notifyEvaluationCompleted(params)</text>
+    <text x="615" y="720" font-size="11" fill="#0f172a" font-family="Consolas, monospace">+ notifySkillGapDetected(params)</text>
+    <text x="615" y="750" font-size="10.5" fill="#475569">Emite: INTERVIEW_EVALUATED y</text>
+    <text x="615" y="766" font-size="10.5" fill="#475569">SKILL_GAP_DETECTED al Mediador</text>
+  </g>
+
+  <!-- ==================== COLEGA 4: CandidateAnalyticsColleague ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="898" y="595" width="282" height="190" rx="6" fill="#ffffff" stroke="#1e293b" stroke-width="2" />
+    <rect x="898" y="595" width="282" height="40" rx="6" fill="#1e293b" />
+    <text x="1039" y="611" text-anchor="middle" font-size="10.5" fill="#94a3b8">«ConcreteColleague 4»</text>
+    <text x="1039" y="627" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">CandidateAnalyticsColleague</text>
+    <line x1="898" y1="675" x2="1180" y2="675" stroke="#cbd5e1" stroke-width="1.5" />
+    <text x="908" y="652" font-size="11" fill="#334155" font-family="Consolas, monospace">- alertsByUser: Map&lt;string, Alert[]&gt;</text>
+    <text x="908" y="667" font-size="11" fill="#334155" font-family="Consolas, monospace">- milestonesByUser: Map&lt;string, ...&gt;</text>
+    <text x="908" y="694" font-size="11" fill="#059669" font-family="Consolas, monospace">+ recordMilestone(params): Milestone</text>
+    <text x="908" y="714" font-size="11" fill="#059669" font-family="Consolas, monospace">+ registerEvaluationInsights(params)</text>
+    <text x="908" y="734" font-size="11" fill="#059669" font-family="Consolas, monospace">+ registerSkillGapAlert(params)</text>
+    <text x="908" y="754" font-size="11" fill="#0f172a" font-family="Consolas, monospace">+ getAlertsForUser(userId): Alert[]</text>
+  </g>
+
+  <!-- Leyenda Inferior -->
+  <rect x="20" y="800" width="1160" height="44" rx="8" fill="#f1f5f9" stroke="#cbd5e1" />
+  <text x="45" y="827" font-size="12.5" font-weight="600" fill="#0f172a">
+    ✔ Cero acoplamiento horizontal entre colegas: Ningún ConcreteColleague importa ni referencia a otro ConcreteColleague. Todo fluye por ICareerMediator.
+  </text>
+</svg>
+

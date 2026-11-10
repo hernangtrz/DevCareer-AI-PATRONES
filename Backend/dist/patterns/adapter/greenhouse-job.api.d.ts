@@ -2,7 +2,8 @@
  * ============================================================================
  * PATRÓN ADAPTER — ADAPTEE (GoF): GreenhouseJobApi
  * ============================================================================
- * Representa la interfaz ATS propietaria de Greenhouse Board API.
+ * Consulta en tiempo real las vacantes técnicas oficiales del Board público de Greenhouse
+ * (por ejemplo GitLab / Canonical) sin requerir API keys privadas.
  */
 export interface GreenhouseRawJob {
     id: number;
@@ -23,5 +24,9 @@ export interface GreenhouseRawJob {
     }[];
 }
 export declare class GreenhouseJobApi {
+    /**
+     * Consulta vacantes reales en vivo desde el Board público de Greenhouse
+     */
     getBoardJobs(boardToken?: string): Promise<GreenhouseRawJob[]>;
+    private getFallbackRawJobs;
 }

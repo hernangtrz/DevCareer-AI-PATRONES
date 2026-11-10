@@ -2,34 +2,21 @@ import { JobOffer, JobApplication } from "../../types/job.types";
 import { IJobApplicationRepository } from "../../repositories/job-application.repository";
 /**
  * ============================================================================
- * PATRÓN ESTRUCTURAL FACADE (GoF): JobApplicationFacade
+ * PATRON ESTRUCTURAL FACADE (GoF): JobApplicationFacade
  * ============================================================================
- * Proporciona una interfaz unificada y simple para el flujo complejo de postulación:
- *  1. Genera una Carta de Presentación (Cover Letter) adaptada a la vacante con IA.
- *  2. Sintetiza una Hoja de Vida con palabras clave alineadas al perfil del trabajo.
- *  3. Construye y programa una entrevista técnica a la medida con el patrón Builder.
- *  4. Registra la postulación en la base de datos de manera persistente.
+ * Simplifica la persistencia y administracion del ciclo de vida de postulaciones.
+ * Registra todos los campos clave (oferta, empresa, salario, tecnologias, estado, url, notas)
+ * permitiendo al usuario trackear sus aplicaciones sin friccion.
  */
 export declare class JobApplicationFacade {
     private appRepo;
     constructor(appRepo?: IJobApplicationRepository);
-    /**
-     * Ejecuta el flujo integral de postulación con IA y Builder.
-     */
     processCompleteApplication(params: {
         userId: string;
         job: JobOffer;
-        userSkills?: string[];
-        userExperienceSummary?: string;
-        createMockInterview?: boolean;
         notes?: string;
     }): Promise<{
         application: JobApplication;
         interviewId?: string;
     }>;
-    /**
-     * Genera una carta de presentación formal y persuasiva con el motor de IA.
-     */
-    generateTailoredCoverLetter(job: JobOffer, userSkills: string[], experience: string): Promise<string>;
-    private generateAdaptedResumeSummary;
 }

@@ -19,8 +19,10 @@ import {
   JobApplicationsReport,
   SUPPORTED_REPORT_FORMATS,
 } from "../patterns/bridge";
+import { getDefaultCareerMediator } from "../patterns/mediator";
 
 const router = Router();
+const careerMediator = getDefaultCareerMediator();
 
 
 // router.use(flexibleAuth); -> Aplicado selectivamente a rutas que requieren usuario
@@ -99,6 +101,13 @@ router.post("/apply", flexibleAuth, async (req: AuthRequest, res: Response): Pro
       job,
       notes,
     });
+
+    // Patrón Mediator (GoF): Notificar que se registró una nueva postulación
+    try {
+      await careerMediator.jobColleague.notifyJobApplied(result.application);
+    } catch (mediatorErr) {
+      console.warn("[JobsRoutes] Aviso en coordinación Mediator (apply):", mediatorErr);
+    }
 
     res.status(201).json({
       success: true,
@@ -205,6 +214,7 @@ Responde ÚNICAMENTE un array JSON con las preguntas en español, sin texto adic
 
 // PATCH /jobs/applications/:id/status
 // Actualiza el estado de la postulación (applied, interviewing, offered, rejected)
+// y coordina con el Patrón Mediator (ej. preparando simulacro si avanza a 'interviewing')
 router.patch("/applications/:id/status", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { status } = req.body;
@@ -212,8 +222,20 @@ router.patch("/applications/:id/status", flexibleAuth, async (req: AuthRequest, 
       res.status(400).json({ success: false, message: "Status es requerido" });
       return;
     }
-    await updateJobApplicationStatus(req.params.id, status);
-    res.status(200).json({ success: true, message: "Estado de postulación actualizado" });
+
+    const updatedApp = await careerMediator.jobColleague.changeStatusAndNotify(
+      req.params.id,
+      req.userId || "3aa77ca5-52cf-4204-8d4a-85c0456e716f",
+      status
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Estado de postulación actualizado",
+      application: updatedApp,
+      preparedInterviewId:
+        status === "interviewing" ? careerMediator.getLastPreparedInterviewId() : undefined,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: "Error actualizando estado" });
   }

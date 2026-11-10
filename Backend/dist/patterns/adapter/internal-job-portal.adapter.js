@@ -24,6 +24,7 @@ class InternalJobPortalAdapter {
                 requiredSkills: ["Node.js", "Go", "AWS", "DynamoDB", "Kafka", "Docker"],
                 seniority: "Mid-Level",
                 platform: "Internal",
+                url: "https://careers-meli.mercadolibre.com/",
                 createdAt: new Date().toISOString(),
             },
             {
@@ -38,6 +39,7 @@ class InternalJobPortalAdapter {
                 requiredSkills: ["React", "TypeScript", "Next.js", "Node.js", "PostgreSQL"],
                 seniority: "Senior",
                 platform: "Internal",
+                url: "https://www.rappi.com/careers",
                 createdAt: new Date().toISOString(),
             },
             {
@@ -52,6 +54,7 @@ class InternalJobPortalAdapter {
                 requiredSkills: ["JavaScript", "TypeScript", "REST APIs", "Git", "SQL"],
                 seniority: "Junior",
                 platform: "Internal",
+                url: "https://career.globant.com/",
                 createdAt: new Date().toISOString(),
             },
         ];

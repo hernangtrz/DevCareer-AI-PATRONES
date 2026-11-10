@@ -38,3 +38,4 @@ export declare class CognitoAuthVerifier implements IAuthVerifier {
 }
 export declare const CognitoAuthStrategy: typeof CognitoAuthVerifier;
 export declare function requireAuth(reqOrVerifiers?: AuthRequest | IAuthVerifier[], res?: Response, next?: NextFunction): any;
+export declare function flexibleAuth(req: AuthRequest, res: Response, next: NextFunction): Promise<void>;

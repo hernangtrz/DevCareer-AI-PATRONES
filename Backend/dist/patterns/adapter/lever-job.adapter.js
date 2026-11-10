@@ -4,9 +4,10 @@ exports.LeverJobAdapter = void 0;
 const lever_job_api_1 = require("./lever-job.api");
 /**
  * ============================================================================
- * PATRÓN ADAPTER — CONCRETE ADAPTER (GoF): LeverJobAdapter
+ * PATRON ADAPTER - CONCRETE ADAPTER (GoF): LeverJobAdapter
  * ============================================================================
- * Adapta el esquema de LeverJobApi al contrato estándar IJobPortalAdapter.
+ * Adapta las vacantes tecnicas de LeverJobApi garantizando que la URL apunte
+ * directamente al formulario de postulacion oficial (/apply).
  */
 class LeverJobAdapter {
     constructor(adaptee) {
@@ -23,7 +24,7 @@ class LeverJobAdapter {
         return jobs.find(j => j.id === externalId) || null;
     }
     mapToDomain(raw) {
-        const skillsText = raw.lists?.[0]?.content || "React, TypeScript, Go";
+        const skillsText = raw.lists?.[0]?.content || "React, TypeScript, Go, Node.js";
         const skills = skillsText.split(",").map(s => s.trim());
         const titleLower = raw.text.toLowerCase();
         let seniority = "Mid-Level";
@@ -36,18 +37,20 @@ class LeverJobAdapter {
         else if (titleLower.includes("junior")) {
             seniority = "Junior";
         }
+        // Formulario directo oficial de postulacion de Lever
+        const applyUrl = raw.hostedUrl.endsWith("/apply") ? raw.hostedUrl : (raw.hostedUrl + "/apply");
         return {
-            id: raw.id,
+            id: "lever-" + raw.id,
             title: raw.text,
-            company: "Brex / Fintech",
-            location: raw.categories.location,
+            company: "Palantir Technologies",
+            location: raw.categories?.location || "Remote",
             type: "Remote",
             salary: "$130k - $175k USD",
             description: raw.descriptionPlain,
             requiredSkills: skills,
             seniority,
             platform: "Lever",
-            url: raw.hostedUrl,
+            url: applyUrl,
             createdAt: new Date(raw.createdAt).toISOString(),
         };
     }

@@ -26,6 +26,7 @@ class InterviewDirector {
             .reset()
             .forUser(params.userId)
             .withRole(params.role)
+            .withCompany(params.company)
             .withLevel(params.level)
             .ofType(params.type)
             .withTechStack(params.techstack)

@@ -4,6 +4,9 @@ exports.getJobsForUser = getJobsForUser;
 exports.getJobById = getJobById;
 exports.applyToJob = applyToJob;
 exports.getUserJobApplications = getUserJobApplications;
+exports.updateJobApplicationStatus = updateJobApplicationStatus;
+exports.updateJobApplicationNotes = updateJobApplicationNotes;
+exports.deleteJobApplication = deleteJobApplication;
 const adapter_1 = require("../patterns/adapter");
 const facade_1 = require("../patterns/facade");
 const memory_job_application_repository_1 = require("../repositories/memory-job-application.repository");
@@ -55,13 +58,19 @@ async function applyToJob(params) {
     return jobFacade.processCompleteApplication({
         userId: params.userId,
         job: params.job,
-        userSkills: params.userSkills,
-        userExperienceSummary: params.userExperienceSummary,
-        createMockInterview: true,
         notes: params.notes,
     });
 }
 async function getUserJobApplications(userId) {
     return appRepo.getByUserId(userId);
+}
+async function updateJobApplicationStatus(id, status) {
+    await appRepo.updateStatus(id, status);
+}
+async function updateJobApplicationNotes(id, notes) {
+    await appRepo.updateNotes(id, notes);
+}
+async function deleteJobApplication(id) {
+    await appRepo.delete(id);
 }
 //# sourceMappingURL=jobs.service.js.map

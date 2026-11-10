@@ -2,7 +2,8 @@
  * ============================================================================
  * PATRÓN ADAPTER — ADAPTEE (GoF): LeverJobApi
  * ============================================================================
- * Representa la interfaz ATS propietaria de Lever Postings API.
+ * Consulta en tiempo real las vacantes técnicas oficiales del Board público de Lever
+ * (por ejemplo Palantir Technologies) con enlaces activos a su portal de postulación.
  */
 export interface LeverRawPosting {
     id: string;
@@ -21,5 +22,9 @@ export interface LeverRawPosting {
     createdAt: number;
 }
 export declare class LeverJobApi {
+    /**
+     * Consulta vacantes reales en vivo desde el API público de Lever
+     */
     getPostings(site?: string): Promise<LeverRawPosting[]>;
+    private getFallbackPostings;
 }

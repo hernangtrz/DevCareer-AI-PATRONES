@@ -3,12 +3,14 @@ import { Interview } from "../../types";
 import { InterviewPrototype } from "../prototype/interview.prototype";
 export interface ConstructDraftParams {
     userId: string;
+    company?: string;
     role: string;
     level: string;
     type: string;
     techstack: string[];
 }
 export interface ConstructFullParams extends ConstructDraftParams {
+    company?: string;
     questions: string[];
     coverImage?: string;
 }

@@ -14,9 +14,11 @@ import {
   resolveReportRenderer,
   SUPPORTED_REPORT_FORMATS,
 } from "../patterns/bridge";
+import { getDefaultCareerMediator } from "../patterns/mediator";
 
 const router = Router();
 const interviewEvaluationFacade = new InterviewEvaluationFacade();
+const careerMediator = getDefaultCareerMediator();
 
 /**
  * Middleware de autenticación flexible:
@@ -87,6 +89,19 @@ router.get("/user/analytics-export", flexibleAuth, async (req: AuthRequest, res:
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
+// GET /feedback/mediator/logs - Trazabilidad del Patrón Mediator (GoF)
+// ──────────────────────────────────────────────────────────────────────────────
+router.get("/mediator/logs", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = req.userId || "3aa77ca5-52cf-4204-8d4a-85c0456e716f";
+  res.status(200).json({
+    success: true,
+    logs: careerMediator.getCoordinationLogs(),
+    alerts: careerMediator.analyticsColleague.getAlertsForUser(userId),
+    milestones: careerMediator.analyticsColleague.getMilestonesForUser(userId),
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // POST /feedback - Generar y persistir feedback de entrevista
 // ──────────────────────────────────────────────────────────────────────────────
 router.post(
@@ -101,6 +116,17 @@ router.post(
         transcript: req.body.transcript,
         language: req.body.language,
       });
+
+      // Patrón Mediator (GoF): Notificar que la evaluación concluyó para sincronizar
+      // entrevista (finalized), notas de postulación asociada y alertas de analítica
+      try {
+        await careerMediator.feedbackColleague.notifyEvaluationCompleted({
+          feedbackId: result.feedbackId,
+          feedback: result.feedback,
+        });
+      } catch (mediatorErr) {
+        console.warn("[FeedbackRoutes] Aviso en coordinación Mediator:", mediatorErr);
+      }
 
       res.status(201).json({
         success: true,

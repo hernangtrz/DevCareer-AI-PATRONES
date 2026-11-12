@@ -1,0 +1,409 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "DevCareer AI — Arquitectura del Patrón Mediator (PE-09)",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/hernangtrz/DevCareer-AI-PATRONES.git",
+      "revision": "cf911ac382c583f428a568b029216bb28b094395"
+    },
+    "views": [
+      {
+        "id": "flujo-postulacion",
+        "label": "1. JOB_APPLIED",
+        "focus": [
+          "jobs_routes",
+          "job_colleague",
+          "mediator",
+          "analytics_colleague",
+          "analytics_service"
+        ],
+        "note": "POST /jobs/apply emite JOB_APPLIED vía JobApplicationColleague y el Mediador registra el hito en Analítica."
+      },
+      {
+        "id": "flujo-entrevista",
+        "label": "2. STATUS_CHANGED",
+        "focus": [
+          "jobs_routes",
+          "job_colleague",
+          "mediator",
+          "interview_colleague",
+          "interview_builder"
+        ],
+        "note": "Al cambiar a 'interviewing', el Mediador ordena construir un simulacro con Builder y anota el ID en la postulación."
+      },
+      {
+        "id": "flujo-brechas",
+        "label": "3. SKILL_GAP",
+        "focus": [
+          "cv_code_routes",
+          "feedback_colleague",
+          "mediator",
+          "interview_colleague",
+          "analytics_colleague"
+        ],
+        "note": "Las rutas /api/cv/analyze y /code/feedback emiten SKILL_GAP_DETECTED para crear simulacro de refuerzo y alerta."
+      },
+      {
+        "id": "flujo-evaluacion",
+        "label": "4. EVALUATED",
+        "focus": [
+          "feedback_routes",
+          "feedback_colleague",
+          "mediator",
+          "interview_colleague",
+          "job_colleague",
+          "analytics_colleague"
+        ],
+        "note": "POST /feedback emite INTERVIEW_EVALUATED: finaliza la sesión, sincroniza Score/CEFR en notas y crea alertas."
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      48,
+      72
+    ],
+    "cols": 4,
+    "gapX": 155,
+    "gapY": 110,
+    "cellW": 200,
+    "cellH": 68
+  },
+  "components": [
+    {
+      "id": "jobs_routes",
+      "type": "backend",
+      "label": "jobs.routes.ts",
+      "sublabel": "POST /apply · PATCH /status",
+      "tag": "Express Route",
+      "row": 0,
+      "col": 0,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/routes/jobs.routes.ts",
+          "line": 105,
+          "end_line": 238,
+          "label": "Job Routes"
+        }
+      ]
+    },
+    {
+      "id": "cv_code_routes",
+      "type": "backend",
+      "label": "cv & code.routes.ts",
+      "sublabel": "/api/cv/analyze · /code/feedback",
+      "tag": "Express Routes",
+      "row": 1,
+      "col": 0,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/routes/cv.routes.ts",
+          "line": 62,
+          "end_line": 90,
+          "label": "CV ATS Route"
+        },
+        {
+          "path": "Backend/src/routes/code.routes.ts",
+          "line": 44,
+          "end_line": 82,
+          "label": "Code Route"
+        }
+      ]
+    },
+    {
+      "id": "feedback_routes",
+      "type": "backend",
+      "label": "feedback.routes.ts",
+      "sublabel": "POST /feedback · GET /logs",
+      "tag": "Express Route",
+      "row": 2,
+      "col": 0,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/routes/feedback.routes.ts",
+          "line": 91,
+          "end_line": 132,
+          "label": "Feedback & Logs"
+        }
+      ]
+    },
+    {
+      "id": "job_colleague",
+      "type": "backend",
+      "label": "JobApplicationColleague",
+      "sublabel": "Emite eventos y sync notas",
+      "tag": "Colleague 1",
+      "row": 0,
+      "col": 1,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/patterns/mediator/colleagues/job-application.colleague.ts",
+          "line": 15,
+          "end_line": 129,
+          "label": "Job Colleague"
+        }
+      ]
+    },
+    {
+      "id": "feedback_colleague",
+      "type": "backend",
+      "label": "EvaluationFeedbackColleague",
+      "sublabel": "Emite EVALUATED y SKILL_GAP",
+      "tag": "Colleague 3",
+      "row": 1,
+      "col": 1,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/patterns/mediator/colleagues/evaluation-feedback.colleague.ts",
+          "line": 13,
+          "end_line": 56,
+          "label": "Feedback Colleague"
+        }
+      ]
+    },
+    {
+      "id": "interview_colleague",
+      "type": "backend",
+      "label": "InterviewSessionColleague",
+      "sublabel": "Simulacros + finalized=true",
+      "tag": "Colleague 2",
+      "row": 0,
+      "col": 2,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/patterns/mediator/colleagues/interview-session.colleague.ts",
+          "line": 15,
+          "end_line": 138,
+          "label": "Interview Colleague"
+        }
+      ]
+    },
+    {
+      "id": "mediator",
+      "type": "messagebus",
+      "label": "CareerWorkflowMediator",
+      "sublabel": "ICareerMediator.notify()",
+      "tag": "PE-09 GoF",
+      "row": 1,
+      "col": 2,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/patterns/mediator/career-workflow.mediator.ts",
+          "line": 29,
+          "end_line": 238,
+          "label": "Mediator Core"
+        }
+      ]
+    },
+    {
+      "id": "analytics_colleague",
+      "type": "backend",
+      "label": "CandidateAnalyticsColleague",
+      "sublabel": "Hitos + Alertas Blindspots",
+      "tag": "Colleague 4",
+      "row": 2,
+      "col": 2,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/patterns/mediator/colleagues/candidate-analytics.colleague.ts",
+          "line": 28,
+          "end_line": 148,
+          "label": "Analytics Colleague"
+        }
+      ]
+    },
+    {
+      "id": "interview_builder",
+      "type": "cloud",
+      "label": "InterviewDirector & Repo",
+      "sublabel": "Builder (PE-03) + Abstract Factory",
+      "tag": "Reused GoF",
+      "row": 0,
+      "col": 3,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/patterns/builder/interview.director.ts",
+          "line": 1,
+          "end_line": 60,
+          "label": "Builder Director"
+        }
+      ]
+    },
+    {
+      "id": "analytics_service",
+      "type": "database",
+      "label": "analytics.service.ts",
+      "sublabel": "GET /user/analytics-summary",
+      "tag": "Analytics API",
+      "row": 2,
+      "col": 3,
+      "size": [
+        200,
+        68
+      ],
+      "sources": [
+        {
+          "path": "Backend/src/services/analytics.service.ts",
+          "line": 248,
+          "end_line": 363,
+          "label": "Live Analytics"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Patrón Mediator GoF (Topología Estrella · 0 acoplamiento entre colegas)",
+      "wraps": [
+        "job_colleague",
+        "feedback_colleague",
+        "interview_colleague",
+        "mediator",
+        "analytics_colleague"
+      ],
+      "pad": 22
+    }
+  ],
+  "connections": [
+    {
+      "id": "jobs-to-colleague",
+      "from": "jobs_routes",
+      "to": "job_colleague",
+      "label": "apply / status"
+    },
+    {
+      "id": "cv-code-to-colleague",
+      "from": "cv_code_routes",
+      "to": "feedback_colleague",
+      "label": "brechas ATS/SOLID"
+    },
+    {
+      "id": "feedback-to-colleague",
+      "from": "feedback_routes",
+      "to": "feedback_colleague",
+      "label": "evaluación IA"
+    },
+    {
+      "id": "job-mediator-bus",
+      "from": "job_colleague",
+      "to": "mediator",
+      "label": "notify / sync notas",
+      "variant": "emphasis"
+    },
+    {
+      "id": "feedback-to-mediator",
+      "from": "feedback_colleague",
+      "to": "mediator",
+      "label": "EVALUATED / SKILL_GAP",
+      "labelDy": 20,
+      "variant": "emphasis"
+    },
+    {
+      "id": "mediator-to-interview",
+      "from": "mediator",
+      "to": "interview_colleague",
+      "label": "prepara / finaliza",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        858,
+        195
+      ],
+      "variant": "emphasis"
+    },
+    {
+      "id": "mediator-to-analytics",
+      "from": "mediator",
+      "to": "analytics_colleague",
+      "label": "hitos + alertas",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        858,
+        373
+      ],
+      "variant": "emphasis"
+    },
+    {
+      "id": "interview-to-builder",
+      "from": "interview_colleague",
+      "to": "interview_builder",
+      "label": "construct()",
+      "variant": "dashed"
+    },
+    {
+      "id": "analytics-to-service",
+      "from": "analytics_colleague",
+      "to": "analytics_service",
+      "label": "blindspots en vivo",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Topología en Estrella (PE-09)",
+      "items": [
+        "Los 4 colegas heredan de BaseColleague y solo conocen ICareerMediator",
+        "Cero importaciones cruzadas entre Postulaciones, Entrevistas, Feedback y Analítica"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "4 Eventos Coordinados",
+      "items": [
+        "JOB_APPLIED y APPLICATION_STATUS_CHANGED desde jobs.routes.ts",
+        "SKILL_GAP_DETECTED desde cv.routes.ts y code.routes.ts",
+        "INTERVIEW_EVALUATED desde feedback.routes.ts"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Sinergia sin Interferencia",
+      "items": [
+        "Reutiliza Builder (PE-03), Facade (PE-07) y Abstract Factory (PE-01) sin modificarlos",
+        "Auditoría en vivo expuesta en GET /feedback/mediator/logs"
+      ]
+    }
+  ]
+}

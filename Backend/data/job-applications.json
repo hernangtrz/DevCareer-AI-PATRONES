@@ -59,13 +59,59 @@
     "coverLetter": "",
     "adaptedResumeSummary": "",
     "matchScore": 65,
-    "notes": "",
+    "notes": "[Simulacro IA Preparado: #6acf5a5b-1cb8-4eb1-b0cc-e9f504cfe76a] Entrevista técnica lista para practicar el rol de Senior React Full stack Developer. | [Simulacro IA Preparado: #08d4000f-cd4e-4630-a8ea-b428e301fd02] Entrevista técnica lista para practicar el rol de Senior React Full stack Developer.",
     "url": "https://remoteOK.com/remote-jobs/remote-senior-react-full-stack-developer-lemon-io-1137475",
     "techstack": [
       "TypeScript",
       "React",
       "Node.js",
       "AWS"
+    ]
+  },
+  {
+    "id": "app-ddb9d975",
+    "userId": "b1374374-19b3-4296-9634-48058a8b4f37",
+    "jobId": "gh-8843512002",
+    "jobTitle": "Senior Backend Engineer (Go & Ruby)",
+    "company": "GitLab",
+    "platform": "Greenhouse",
+    "location": "Remoto (Global)",
+    "salary": "$11,250 - $15,400 USD",
+    "appliedAt": "2026-11-12T19:57:46.935Z",
+    "status": "interviewing",
+    "coverLetter": "",
+    "adaptedResumeSummary": "",
+    "matchScore": 98,
+    "notes": "[Simulacro IA Preparado: #daeb0837-82f0-4096-a0f3-9105058fd5c5] Entrevista técnica lista para practicar el rol de Senior Backend Engineer (Go & Ruby).",
+    "url": "https://job-boards.greenhouse.io/gitlab/jobs/8843512002#app",
+    "techstack": [
+      "Go",
+      "Ruby",
+      "PostgreSQL",
+      "Docker",
+      "Kubernetes",
+      "Git"
+    ]
+  },
+  {
+    "id": "app-c39569db",
+    "userId": "b1374374-19b3-4296-9634-48058a8b4f37",
+    "jobId": "gh-8771512002",
+    "jobTitle": "Backend Engineer, GitLab Orbit",
+    "company": "GitLab",
+    "platform": "Greenhouse",
+    "location": "Remote, Canada; Remote, United States",
+    "salary": "$120,000 - $175,000 USD / year",
+    "appliedAt": "2026-11-12T19:58:17.942Z",
+    "status": "applied",
+    "coverLetter": "",
+    "adaptedResumeSummary": "",
+    "matchScore": 64,
+    "notes": "[Simulacro IA Preparado: #6533244b-8b69-4e59-bed9-ca6c56143e0e] Entrevista técnica lista para practicar el rol de Backend Engineer, GitLab Orbit.",
+    "url": "https://job-boards.greenhouse.io/gitlab/jobs/8771512002#app",
+    "techstack": [
+      "TypeScript",
+      "React"
     ]
   }
 ]

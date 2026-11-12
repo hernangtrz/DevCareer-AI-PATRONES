@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -69,6 +69,21 @@ interface JobOffer {
   missingSkills: string[];
   externalUrl: string;
   requiredFields: string[];
+}
+
+function dedupeSkills(skills?: string[]): string[] {
+  if (!skills || skills.length === 0) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of skills) {
+    const clean = (raw || "").trim();
+    if (!clean) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(clean);
+  }
+  return result;
 }
 
 const CONNECTED_PLATFORMS = [
@@ -165,6 +180,8 @@ export default function JobsPage() {
   const [editingNotes, setEditingNotes] = useState<{ [appId: string]: string }>({});
   const [savingNotesId, setSavingNotesId] = useState<string | null>(null);
   const [savedNotesSuccess, setSavedNotesSuccess] = useState<{ [appId: string]: boolean }>({});
+  const [preparedByApp, setPreparedByApp] = useState<{ [appId: string]: string }>({});
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Custom offer modal
   const [showCustomOfferModal, setShowCustomOfferModal] = useState(false);
@@ -182,9 +199,12 @@ export default function JobsPage() {
     portfolioUrl: "https://hernangtrz.dev",
   };
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, durationMs = 4500) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), durationMs);
   };
 
   // Carga inicial de datos
@@ -271,6 +291,16 @@ export default function JobsPage() {
             const matchLevel: "Excelente" | "Alto" | "Bueno" =
               score >= 90 ? "Excelente" : score >= 75 ? "Alto" : "Bueno";
 
+            const matchedSkills = dedupeSkills(
+              j.matchedSkills && j.matchedSkills.length > 0
+                ? j.matchedSkills
+                : (j.requiredSkills || []).slice(0, 3)
+            );
+            const matchedSet = new Set(matchedSkills.map((s) => s.toLowerCase()));
+            const missingSkills = dedupeSkills(j.missingSkills).filter(
+              (s) => !matchedSet.has(s.toLowerCase())
+            );
+
             return {
               id: j.id,
               title: j.title,
@@ -286,11 +316,8 @@ export default function JobsPage() {
               postedAgo: "En vivo",
               matchScore: score,
               matchLevel,
-              matchedSkills:
-                j.matchedSkills && j.matchedSkills.length > 0
-                  ? j.matchedSkills
-                  : (j.requiredSkills || []).slice(0, 3),
-              missingSkills: j.missingSkills || [],
+              matchedSkills,
+              missingSkills,
               externalUrl:
                 j.url ||
                 `https://www.google.com/search?q=${encodeURIComponent(j.title + " " + j.company + " jobs")}`,
@@ -406,8 +433,46 @@ export default function JobsPage() {
     });
 
     try {
-      await updateJobApplicationStatus(appId, newStatus);
-      showToast("Estado actualizado con éxito");
+      const res = await updateJobApplicationStatus(appId, newStatus);
+      if (!res.success) {
+        showToast(res.message || "Error actualizando estado en el servidor");
+        return;
+      }
+
+      if (res.application) {
+        const serverApp = res.application;
+        setLiveApplications((prev) => {
+          const updated = prev.map((a) =>
+            a.id === appId
+              ? { ...a, ...serverApp, status: serverApp.status || newStatus }
+              : a
+          );
+          if (typeof window !== "undefined") {
+            localStorage.setItem("devcareer_applications", JSON.stringify(updated));
+          }
+          return updated;
+        });
+
+        if (typeof serverApp.notes === "string") {
+          setEditingNotes((prev) => ({
+            ...prev,
+            [appId]: serverApp.notes!,
+          }));
+        }
+      }
+
+      if (newStatus === "interviewing" && res.preparedInterviewId) {
+        setPreparedByApp((prev) => ({
+          ...prev,
+          [appId]: res.preparedInterviewId!,
+        }));
+        showToast(
+          `Estado actualizado a "En entrevista". El Mediador preparó el simulacro #${res.preparedInterviewId.slice(0, 8)} y actualizó tus notas.`,
+          6500
+        );
+      } else {
+        showToast("Estado actualizado con éxito");
+      }
     } catch (e: any) {
       console.error("Error actualizando estado:", e);
       showToast("Error actualizando estado en el servidor");
@@ -825,17 +890,17 @@ export default function JobsPage() {
                         {/* Tecnologías / Stack Requerido */}
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[10px] text-zinc-500 uppercase font-bold mr-1">Tecnologías:</span>
-                          {job.matchedSkills.map((sk) => (
+                          {job.matchedSkills.map((sk, idx) => (
                             <span
-                              key={sk}
+                              key={`matched-${sk}-${idx}`}
                               className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 text-[11px] font-medium border border-emerald-500/20"
                             >
                               ✓ {sk}
                             </span>
                           ))}
-                          {job.missingSkills.map((sk) => (
+                          {job.missingSkills.map((sk, idx) => (
                             <span
-                              key={sk}
+                              key={`missing-${sk}-${idx}`}
                               className="px-2 py-0.5 rounded-md bg-zinc-800/60 text-zinc-400 text-[11px] font-medium border border-zinc-700"
                             >
                               + {sk}
@@ -1177,6 +1242,12 @@ export default function JobsPage() {
                 const currentNotes = editingNotes[app.id] ?? app.notes ?? "";
                 const isSavingNotes = savingNotesId === app.id;
                 const isNotesSaved = savedNotesSuccess[app.id];
+                const noteMatches = Array.from(
+                  currentNotes.matchAll(/\[Simulacro IA Preparado:\s*#([a-zA-Z0-9-]+)\]/g)
+                );
+                const preparedInterviewId =
+                  preparedByApp[app.id] ||
+                  (noteMatches.length > 0 ? noteMatches[noteMatches.length - 1][1] : null);
 
                 // Formato de fecha limpio
                 const dateObj = app.appliedAt ? new Date(app.appliedAt) : new Date();
@@ -1285,14 +1356,39 @@ export default function JobsPage() {
                         <span className="text-[11px] font-bold text-zinc-400 mr-1 flex items-center gap-1">
                           <Code2 className="w-3.5 h-3.5 text-indigo-400" /> Stack Requerido:
                         </span>
-                        {app.techstack.map((tech) => (
+                        {app.techstack.map((tech, idx) => (
                           <span
-                            key={tech}
+                            key={`tech-${tech}-${idx}`}
                             className="px-2.5 py-0.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs font-mono font-medium"
                           >
                             {tech}
                           </span>
                         ))}
+                      </div>
+                    )}
+
+                    {/* Confirmación Mediator al avanzar a En entrevista */}
+                    {app.status === "interviewing" && preparedInterviewId && (
+                      <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-bold text-emerald-300">
+                              Simulacro IA Preparado Automáticamente (Patrón Mediator)
+                            </span>
+                            <span className="text-[11px] text-emerald-100/80">
+                              El Mediador interceptó el cambio a &quot;En entrevista&quot;, creó la sesión #{preparedInterviewId.slice(0, 8)} y actualizó tus notas.
+                            </span>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/interview/${preparedInterviewId}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shrink-0 w-fit"
+                        >
+                          <Mic className="w-3.5 h-3.5" />
+                          <span>Practicar simulacro</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
                       </div>
                     )}
 

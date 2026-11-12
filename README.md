@@ -200,6 +200,9 @@ node scripts/test-prototype.js
 
 # 5. Probar Mediator y coordinación transversal entre colegas (Postulaciones, Entrevistas, Feedback y Analítica)
 node scripts/test-mediator.js
+
+# 6. Probar integración E2E HTTP del Patrón Mediator sobre las rutas Express
+node scripts/test-mediator-integration.js
 ```
 
 ---

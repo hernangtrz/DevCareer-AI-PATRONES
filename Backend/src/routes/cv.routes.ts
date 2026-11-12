@@ -1,10 +1,13 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { aiRateLimiter } from "../middleware/rate-limit.middleware";
+import { flexibleAuth, AuthRequest } from "../middleware/auth.middleware";
 import { AIServiceFacade } from "../patterns/facade";
+import { getDefaultCareerMediator } from "../patterns/mediator";
 
 const router = Router();
 const aiFacade = new AIServiceFacade();
+const careerMediator = getDefaultCareerMediator();
 
 // Configure multer for in-memory PDF uploads (max 8MB)
 const upload = multer({
@@ -16,13 +19,14 @@ const upload = multer({
 router.use(aiRateLimiter);
 
 // ──────────────────────────────────────────────────────────────────────────────
-// POST /api/cv/analyze (Patrón Facade: consume aiFacade.analyzeCvAts)
+// POST /api/cv/analyze (Patrón Facade + Patrón Mediator)
 // Soporta tanto subida de archivo PDF (multipart/form-data) como texto pegado (JSON)
 // ──────────────────────────────────────────────────────────────────────────────
 router.post(
   "/analyze",
+  flexibleAuth,
   upload.single("cvFile"),
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const jobDescription = req.body.jobDescription || "";
       const cvText = req.body.cvText || "";
@@ -55,9 +59,39 @@ router.post(
         pdfBase64,
       });
 
+      // Patrón Mediator (GoF): Si hay brechas de keywords o compatibilidad baja (< 75),
+      // notificar SKILL_GAP_DETECTED para preparar entrevista de refuerzo y alerta en analítica.
+      const missingKeywords = Array.isArray(analysis.missingKeywords)
+        ? analysis.missingKeywords.filter((k) => typeof k === "string" && k.trim().length > 0)
+        : [];
+      const hasSkillGaps = Number(analysis.score) < 75 || missingKeywords.length > 0;
+      let refresherInterviewId: string | null = null;
+
+      if (hasSkillGaps) {
+        try {
+          const targetRole =
+            (req.body.targetRole as string)?.trim() ||
+            jobDescription.split("\n")[0].slice(0, 60).trim() ||
+            "Software Developer";
+
+          await careerMediator.feedbackColleague.notifySkillGapDetected({
+            userId: req.userId || req.body.userId || "3aa77ca5-52cf-4204-8d4a-85c0456e716f",
+            source: "cv-ats",
+            targetRole,
+            missingSkills:
+              missingKeywords.length > 0 ? missingKeywords.slice(0, 5) : ["Optimización ATS"],
+            score: Number(analysis.score) || 0,
+          });
+          refresherInterviewId = careerMediator.getLastPreparedInterviewId();
+        } catch (mediatorErr) {
+          console.warn("[CvRoutes] Aviso en coordinación Mediator (analyze):", mediatorErr);
+        }
+      }
+
       res.status(200).json({
         success: true,
         data: analysis,
+        ...(refresherInterviewId ? { refresherInterviewId } : {}),
       });
     } catch (error: any) {
       console.error("[CvRoutes] Error en /api/cv/analyze:", error?.message || error);

@@ -368,9 +368,19 @@ export async function createJobInterview(params: {
 export async function updateJobApplicationStatus(
   id: string,
   status: "applied" | "interviewing" | "offered" | "rejected"
-): Promise<{ success: boolean; message?: string }> {
+): Promise<{
+  success: boolean;
+  message?: string;
+  application?: JobApplicationDto;
+  preparedInterviewId?: string;
+}> {
   try {
-    return await apiFetch<{ success: boolean; message?: string }>(
+    return await apiFetch<{
+      success: boolean;
+      message?: string;
+      application?: JobApplicationDto;
+      preparedInterviewId?: string;
+    }>(
       `/jobs/applications/${id}/status`,
       {
         method: "PATCH",

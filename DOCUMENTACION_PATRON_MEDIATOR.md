@@ -100,25 +100,32 @@ En el flujo real de un candidato dentro de **DevCareer AI**, una acción en un m
 | [`Backend/src/patterns/mediator/career-workflow.mediator.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/patterns/mediator/career-workflow.mediator.ts) | **Nuevo** | Mediador concreto `CareerWorkflowMediator` y proveedor singleton/default `getDefaultCareerMediator()`. |
 | [`Backend/src/patterns/mediator/index.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/patterns/mediator/index.ts) | **Nuevo** | Barrel file de exportación del módulo `mediator`. |
 | [`Backend/src/patterns/index.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/patterns/index.ts) | **Modificado** | Registra la categoría `3. PATRONES COMPORTAMENTALES: Mediator` en el catálogo central. |
-| [`Backend/src/routes/jobs.routes.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/routes/jobs.routes.ts) | **Modificado** | Integra `jobColleague` en `POST /jobs/apply` y `PATCH /jobs/applications/:id/status`. |
-| [`Backend/src/routes/feedback.routes.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/routes/feedback.routes.ts) | **Modificado** | Notifica `INTERVIEW_EVALUATED` tras guardar feedback y expone `GET /feedback/mediator/logs`. |
-| [`scripts/test-mediator.js`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/scripts/test-mediator.js) | **Nuevo** | Suite de pruebas automatizadas que verifica los 4 flujos del Mediador en memoria. |
+| [`Backend/src/routes/jobs.routes.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/routes/jobs.routes.ts) | **Modificado** | Integra `jobColleague` en `POST /jobs/apply` (`JOB_APPLIED`) y `PATCH /jobs/applications/:id/status` (`APPLICATION_STATUS_CHANGED`). |
+| [`Backend/src/routes/feedback.routes.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/routes/feedback.routes.ts) | **Modificado** | Notifica `INTERVIEW_EVALUATED` tras guardar feedback (`POST /feedback`) y expone `GET /feedback/mediator/logs`. |
+| [`Backend/src/routes/cv.routes.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/routes/cv.routes.ts) | **Modificado** | Invoca `notifySkillGapDetected` (`source: "cv-ats"`) en `POST /api/cv/analyze` cuando `score < 75` o hay `missingKeywords`. |
+| [`Backend/src/routes/code.routes.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/routes/code.routes.ts) | **Modificado** | Invoca `notifySkillGapDetected` (`source: "code-challenge"`) en `POST /code/feedback` cuando `score < 75`, fallan tests o falta patrón SOLID. |
+| [`Backend/src/services/analytics.service.ts`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/Backend/src/services/analytics.service.ts) | **Modificado** | Incorpora alertas de brechas e hitos transversales de `CandidateAnalyticsColleague` en `GET /feedback/user/analytics-summary`. |
+| [`scripts/test-mediator.js`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/scripts/test-mediator.js) | **Nuevo** | Suite de pruebas unitarias/aisladas que verifica los 4 flujos del Mediador en memoria. |
+| [`scripts/test-mediator-integration.js`](file:///c:/Users/JhonM/OneDrive/Documentos/patrones%20de%20dise%C3%B1o%20de%20software/1er%20corte/parcial/DevCareer-AI-PATRONES/scripts/test-mediator-integration.js) | **Nuevo** | Suite de pruebas de integración E2E HTTP sobre Express validando todas las rutas conectadas al Mediador. |
 
 ---
 
 ## 🧪 6. Verificación y Ejecución de Pruebas
 
-Para compilar y ejecutar las pruebas aisladas del patrón **Mediator**:
+Para compilar y ejecutar tanto las pruebas unitarias como las pruebas de integración E2E HTTP del patrón **Mediator**:
 
 ```bash
 # 1. Compilar el Backend en TypeScript
 npm --prefix Backend run build
 
-# 2. Ejecutar la suite de pruebas del Patrón Mediator
+# 2. Ejecutar la suite unitaria aislada del Patrón Mediator
 node scripts/test-mediator.js
+
+# 3. Ejecutar la suite de integración E2E HTTP sobre el servidor Express
+node scripts/test-mediator-integration.js
 ```
 
-**Salida verificada:**
+**Salida verificada (`test-mediator.js`):**
 ```text
 ===================================================
 PRUEBA DE PATRÓN COMPORTAMENTAL: MEDIATOR (GoF)
@@ -143,5 +150,45 @@ PRUEBA DE PATRÓN COMPORTAMENTAL: MEDIATOR (GoF)
    ✅ El Mediador registró las 4 transacciones coordinadas (4 logs)
 
 🎉 Todas las pruebas del patrón Mediator pasaron correctamente.
+```
+
+**Salida verificada (`test-mediator-integration.js`):**
+```text
+=========================================================================
+PRUEBA DE INTEGRACIÓN E2E DE LA APP: PATRÓN MEDIATOR COMPLETO (GoF PE-09)
+=========================================================================
+
+✅ Backend DevCareer corriendo en http://localhost:3098
+   Entorno: test
+1. Verificando Health Check del Backend...
+   ✅ Backend en línea y respondiendo en puerto 3098
+
+2. Probando flujo JOB_APPLIED vía POST /jobs/apply...
+   ✅ POST /jobs/apply respondió 201 Created
+
+3. Probando flujo APPLICATION_STATUS_CHANGED ('interviewing') vía PATCH /jobs/applications/:id/status...
+   ✅ PATCH status respondió 200 OK
+   ✅ Simulacro creado automáticamente: mock_interview_id
+   ✅ Notas de postulación actualizadas con el ID del simulacro
+
+4. Probando flujo SKILL_GAP_DETECTED (CV ATS) vía POST /api/cv/analyze...
+   ✅ POST /api/cv/analyze respondió 200 OK
+   ✅ El Mediador creó entrevista de refuerzo ATS automáticamente: mock_interview_id
+
+5. Probando flujo SKILL_GAP_DETECTED (Reto de Código) vía POST /code/feedback...
+   ✅ POST /code/feedback respondió 200 OK
+   ✅ El Mediador creó entrevista de refuerzo SOLID automáticamente: mock_interview_id
+
+6. Probando flujo INTERVIEW_EVALUATED (sincronización de entrevista + postulación + analítica)...
+   ✅ Postulación sincronizada con calificación (72/100) y nivel CEFR (B2)
+
+7. Verificando auditoría del Mediador y propagación a Analítica...
+   ✅ Se registraron las 5 transacciones en Mediator (5 logs)
+   ✅ Se generaron 3 alertas (Evaluación + CV ATS + Reto Código)
+   ✅ GET /feedback/user/analytics-summary refleja en tiempo real las alertas generadas por el Mediador
+
+=========================================================================
+🎉 ¡TODAS LAS PRUEBAS E2E DEL PATRÓN MEDIATOR PASARON AL 100%!
+=========================================================================
 ```
 

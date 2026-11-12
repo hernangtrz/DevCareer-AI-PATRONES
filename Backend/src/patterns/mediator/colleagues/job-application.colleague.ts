@@ -47,18 +47,19 @@ export class JobApplicationColleague extends BaseColleague {
     newStatus: JobApplication["status"]
   ): Promise<JobApplication | null> {
     await this.appRepo.updateStatus(applicationId, newStatus);
-    const updated = await this.appRepo.getById(applicationId);
+    const current = await this.appRepo.getById(applicationId);
 
     await this.emit("APPLICATION_STATUS_CHANGED", {
-      userId: updated?.userId || userId,
+      userId: current?.userId || userId,
       applicationId,
       newStatus,
-      jobTitle: updated?.jobTitle,
-      company: updated?.company,
-      techstack: updated?.techstack || [],
+      jobTitle: current?.jobTitle,
+      company: current?.company,
+      techstack: current?.techstack || [],
     });
 
-    return updated;
+    // Releer tras la emisión porque el Mediador pudo anexar el simulacro preparado a las notas
+    return this.appRepo.getById(applicationId);
   }
 
   /**

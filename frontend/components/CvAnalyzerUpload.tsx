@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
   Upload,
@@ -14,6 +15,9 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  CheckCircle2,
+  Mic,
+  ArrowRight,
 } from "lucide-react";
 import AtsScoreCard from "./AtsScoreCard";
 import KeywordsPanel from "./KeywordsPanel";
@@ -95,6 +99,7 @@ const CvAnalyzerUpload = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [results, setResults] = useState<AnalysisResult | null>(null);
+  const [refresherInterviewId, setRefresherInterviewId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [analyzedFileName, setAnalyzedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -166,6 +171,10 @@ const CvAnalyzerUpload = () => {
     try {
       const formData = new FormData();
       formData.append("jobDescription", jobText);
+      const matchedPreset = JOB_PRESETS.find((p) => p.description === jobText);
+      if (matchedPreset) {
+        formData.append("targetRole", matchedPreset.title);
+      }
 
       if (cvInputMode === "file" && fileObj) {
         formData.append("cvFile", fileObj);
@@ -186,6 +195,7 @@ const CvAnalyzerUpload = () => {
       }
 
       setResults(json.data as AnalysisResult);
+      setRefresherInterviewId(json.refresherInterviewId || null);
       setAnalyzedFileName(
         cvInputMode === "file" ? fileName : "Texto pegado"
       );
@@ -199,6 +209,7 @@ const CvAnalyzerUpload = () => {
 
   const resetAnalysis = () => {
     setResults(null);
+    setRefresherInterviewId(null);
     setFileName(null);
     setFileObj(null);
     setCvPastedText("");
@@ -468,6 +479,36 @@ const CvAnalyzerUpload = () => {
               Analizar otro CV
             </button>
           </div>
+
+          {/* Mediator Refresher Interview Banner */}
+          {refresherInterviewId && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-emerald-950/20">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-emerald-300 font-bold text-sm">
+                    Simulacro de Refuerzo Técnico Preparado (Patrón Mediator)
+                  </span>
+                  <p className="text-emerald-100/80 text-xs leading-relaxed">
+                    {results.missingKeywords.length > 0
+                      ? `Se detectaron brechas técnicas (${results.missingKeywords.slice(0, 4).join(", ")}). `
+                      : `Tu compatibilidad ATS fue de ${results.score}%. `}
+                    El Mediador coordinó automáticamente un simulacro personalizado para practicar tus debilidades (#{refresherInterviewId.slice(0, 8)}).
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/interview/${refresherInterviewId}`}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex-shrink-0 cursor-pointer"
+              >
+                <Mic className="h-3.5 w-3.5" />
+                <span>Practicar debilidad detectada</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          )}
 
           {/* AI Summary card */}
           {results.summary && (

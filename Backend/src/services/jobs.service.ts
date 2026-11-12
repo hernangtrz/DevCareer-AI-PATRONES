@@ -31,19 +31,29 @@ export async function getJobsForUser(
 
   // Calcular Match Score inteligente contra el perfil del usuario
   return allJobs.map((job) => {
-    const requiredLower = job.requiredSkills.map((s) => s.toLowerCase());
-    const matched = userSkills.filter((skill) =>
+    const uniqueRequired = Array.from(
+      new Map(
+        (job.requiredSkills || [])
+          .map((s) => (s || "").trim())
+          .filter(Boolean)
+          .map((s) => [s.toLowerCase(), s] as const)
+      ).values()
+    );
+    const requiredLower = uniqueRequired.map((s) => s.toLowerCase());
+    const matched = Array.from(new Set(userSkills)).filter((skill) =>
       requiredLower.some((req) => req.includes(skill.toLowerCase()) || skill.toLowerCase().includes(req))
     );
-    const missing = job.requiredSkills.filter(
-      (req) => !userSkills.some((s) => s.toLowerCase().includes(req.toLowerCase()))
+    const matchedLower = matched.map((s) => s.toLowerCase());
+    const missing = uniqueRequired.filter(
+      (req) => !matchedLower.some((s) => s.includes(req.toLowerCase()) || req.toLowerCase().includes(s))
     );
 
-    const matchRatio = job.requiredSkills.length > 0 ? matched.length / job.requiredSkills.length : 0.7;
+    const matchRatio = uniqueRequired.length > 0 ? matched.length / uniqueRequired.length : 0.7;
     const matchScore = Math.min(100, Math.max(50, Math.round(matchRatio * 50 + 50)));
 
     return {
       ...job,
+      requiredSkills: uniqueRequired,
       matchScore,
       matchedSkills: matched,
       missingSkills: missing,

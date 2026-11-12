@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.calculateRealUserAnalytics = calculateRealUserAnalytics;
 const supabase_1 = require("../config/supabase");
 const jobs_service_1 = require("./jobs.service");
+const mediator_1 = require("../patterns/mediator");
 /**
  * Servicio de Analíticas Reales del Candidato (Single Responsibility & Open/Closed).
  * Consolida datos de la base de datos de Supabase (interviews, feedback)
@@ -171,7 +172,7 @@ async function calculateRealUserAnalytics(userId) {
         "Ajuste al Puesto",
     ];
     const severities = ["high", "medium", "low", "medium", "low"];
-    const blindspots = (distinctAreas.length > 0
+    const dbBlindspots = (distinctAreas.length > 0
         ? distinctAreas.slice(0, 5)
         : [
             "Ampliar las respuestas con mayor detalle y profesionalismo en lugar de usar monosílabos o frases excesivamente cortas.",
@@ -185,6 +186,22 @@ async function calculateRealUserAnalytics(userId) {
         action: "Estructurar la intervención técnica con contexto, arquitectura, decisión de diseño y resultado medible.",
         category: categories[idx % categories.length],
     }));
+    // Incorporar alertas proactivas registradas por el Patrón Mediator (CandidateAnalyticsColleague)
+    const mediator = (0, mediator_1.getDefaultCareerMediator)();
+    const mediatorAlerts = mediator.analyticsColleague.getAlertsForUser(userId);
+    const mediatorBlindspots = mediatorAlerts.map((alert) => ({
+        id: alert.id,
+        severity: alert.severity,
+        title: alert.message.length > 60 ? alert.message.slice(0, 57) + "..." : alert.message,
+        detail: alert.message,
+        action: alert.recommendedAction,
+        category: alert.category,
+    }));
+    const seenDetails = new Set(mediatorBlindspots.map((b) => b.detail));
+    const blindspots = [
+        ...mediatorBlindspots,
+        ...dbBlindspots.filter((b) => !seenDetails.has(b.detail)),
+    ].slice(0, 6);
     // 6. Progreso Semanal Real (últimos 7 registros de sesiones o por fecha)
     const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const recent7 = validFeedbacks.slice(0, 7).reverse();
@@ -254,6 +271,26 @@ async function calculateRealUserAnalytics(userId) {
                 : "Reciente",
             score: Number(f.total_score || 0),
             status: Number(f.total_score || 0) >= 70 ? "Sobresaliente" : "Completada",
+        });
+    });
+    // Hitos transversales generados en tiempo real por el Patrón Mediator
+    const mediatorMilestones = mediator.analyticsColleague
+        .getMilestonesForUser(userId)
+        .filter((m) => m.type === "skill_gap" || m.type === "interview_stage");
+    mediatorMilestones.slice(0, 4).forEach((ms) => {
+        recentActivity.unshift({
+            id: ms.id,
+            type: ms.type === "skill_gap" ? "challenge" : "interview",
+            title: ms.summary,
+            company: "CareerWorkflowMediator",
+            timestamp: new Date(ms.timestamp).toLocaleDateString("es-ES", {
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+            }),
+            score: ms.score,
+            status: ms.type === "skill_gap" ? "Refuerzo Generado" : "Simulacro Preparado",
         });
     });
     return {

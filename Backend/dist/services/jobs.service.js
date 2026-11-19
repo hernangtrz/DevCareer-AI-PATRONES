@@ -64,6 +64,8 @@ async function applyToJob(params) {
     return jobFacade.processCompleteApplication({
         userId: params.userId,
         job: params.job,
+        userSkills: params.userSkills,
+        userExperienceSummary: params.userExperienceSummary,
         notes: params.notes,
     });
 }

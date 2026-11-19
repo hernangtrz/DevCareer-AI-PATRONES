@@ -75,8 +75,10 @@ router.post("/apply", auth_middleware_1.flexibleAuth, async (req, res) => {
     }
     try {
         const result = await (0, jobs_service_1.applyToJob)({
-            userId: req.userId,
+            userId: req.userId || "anonymous",
             job,
+            userSkills,
+            userExperienceSummary,
             notes,
         });
         // Patrón Mediator (GoF): Notificar que se registró una nueva postulación
@@ -90,7 +92,9 @@ router.post("/apply", auth_middleware_1.flexibleAuth, async (req, res) => {
             success: true,
             application: result.application,
             interviewId: result.interviewId,
-            message: "Postulación procesada y simulacro de entrevista preparado con éxito.",
+            coverLetter: result.coverLetter,
+            adaptedResumeSummary: result.adaptedResumeSummary,
+            message: "Postulación procesada, carta de motivación generada y simulacro preparado con éxito.",
         });
     }
     catch (error) {

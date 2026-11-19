@@ -15,6 +15,16 @@ import {
   SUPPORTED_REPORT_FORMATS,
 } from "../patterns/bridge";
 import { getDefaultCareerMediator } from "../patterns/mediator";
+import {
+  CandidatePortfolio,
+  InterviewSessionElement,
+  CodeChallengeElement,
+  JobApplicationElement,
+  CvAtsAnalysisElement,
+  SeniorityReadinessVisitor,
+  BlindspotDetectionVisitor,
+  ExecutivePortfolioVisitor,
+} from "../patterns/visitor";
 
 const router = Router();
 const interviewEvaluationFacade = new InterviewEvaluationFacade();
@@ -99,6 +109,126 @@ router.get("/mediator/logs", flexibleAuth, async (req: AuthRequest, res: Respons
     alerts: careerMediator.analyticsColleague.getAlertsForUser(userId),
     milestones: careerMediator.analyticsColleague.getMilestonesForUser(userId),
   });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// GET /feedback/user/portfolio-audit - Patrón Comportamental Visitor (GoF)
+// ──────────────────────────────────────────────────────────────────────────────
+router.get("/user/portfolio-audit", flexibleAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId || "3aa77ca5-52cf-4204-8d4a-85c0456e716f";
+    const summary = await calculateRealUserAnalytics(userId);
+    const applications = await getUserJobApplications(userId);
+
+    // 1. Construir la estructura de elementos heterogéneos (Object Structure)
+    const portfolio = new CandidatePortfolio(userId);
+
+    // a. Entrevistas simuladas
+    const interviewScore =
+      summary.pillars.find((p) => p.name.includes("Técnic"))?.score ||
+      summary.readinessScore ||
+      85;
+    const commScore =
+      summary.pillars.find((p) => p.name.includes("Comunic"))?.score || 80;
+
+    portfolio.addElement(
+      new InterviewSessionElement({
+        id: `int-${Date.now()}-1`,
+        role: "Full Stack Engineer",
+        company: "GitLab",
+        technicalScore: interviewScore,
+        communicationScore: commScore,
+        cefrLevel: interviewScore >= 75 ? "B2" : "B1",
+        techStack: ["TypeScript", "React", "Node.js", "Docker"],
+        finalized: true,
+      })
+    );
+
+    // b. Retos de código y algoritmia
+    portfolio.addElement(
+      new CodeChallengeElement({
+        id: `code-${Date.now()}-1`,
+        challengeTitle: "LRU Cache & Concurrency Control",
+        language: "TypeScript",
+        difficulty: "Medium",
+        testsPassed: 10,
+        totalTests: 10,
+        cyclomaticComplexity: 7,
+        executionTimeMs: 42,
+        cleanCodeScore: 90,
+        passed: true,
+      })
+    );
+
+    // c. Postulaciones activas
+    if (applications && applications.length > 0) {
+      applications.slice(0, 3).forEach((app) => {
+        portfolio.addElement(
+          new JobApplicationElement({
+            id: app.id,
+            jobTitle: app.jobTitle,
+            company: app.company,
+            status: app.status,
+            matchScore: app.matchScore || 88,
+            seniority: "Mid-Level",
+            salaryUSD: app.salary || "$7,500 USD",
+            platform: app.platform,
+            notes: app.notes,
+            techStack: app.techstack || ["TypeScript"],
+          })
+        );
+      });
+    } else {
+      portfolio.addElement(
+        new JobApplicationElement({
+          id: `app-demo-1`,
+          jobTitle: "Senior Backend Engineer",
+          company: "GitLab",
+          status: "interviewing",
+          matchScore: 92,
+          seniority: "Senior",
+          salaryUSD: "$12,000 USD",
+          platform: "Greenhouse",
+        })
+      );
+    }
+
+    // d. Diagnóstico de hoja de vida (ATS)
+    portfolio.addElement(
+      new CvAtsAnalysisElement({
+        id: `ats-${Date.now()}-1`,
+        targetRole: "Senior Software Engineer",
+        atsScore: 88,
+        matchedKeywords: ["TypeScript", "React", "Node.js", "Go", "Docker", "PostgreSQL"],
+        missingKeywords: ["Kubernetes", "GraphQL"],
+        formattingIssues: [],
+        hasClearSenioritySummary: true,
+      })
+    );
+
+    // 2. Instanciar Visitantes Concretos
+    const readinessVisitor = new SeniorityReadinessVisitor();
+    const blindspotVisitor = new BlindspotDetectionVisitor();
+    const executiveVisitor = new ExecutivePortfolioVisitor();
+
+    // 3. Ejecutar Doble Despacho (Double Dispatch)
+    portfolio.accept(readinessVisitor);
+    portfolio.accept(blindspotVisitor);
+    portfolio.accept(executiveVisitor);
+
+    res.status(200).json({
+      success: true,
+      pattern: "Visitor (GoF)",
+      candidateId: userId,
+      visitedElementsCount: portfolio.size,
+      seniorityReadiness: readinessVisitor.getReport(),
+      blindspots: blindspotVisitor.getReport(),
+      executivePortfolio: executiveVisitor.getSummary(),
+    });
+  } catch (error: any) {
+    console.error("[FeedbackRoutes] Error en auditoría con Visitor:", error);
+    res.status(500).json({ success: false, message: "Error al auditar portafolio con patrón Visitor" });
+  }
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

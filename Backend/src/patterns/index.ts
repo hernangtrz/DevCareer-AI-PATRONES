@@ -38,3 +38,5 @@ export * from "./facade";
 // Comportamentales
 export * as MediatorPattern from "./mediator";
 export * from "./mediator";
+export * as VisitorPattern from "./visitor";
+export * from "./visitor";

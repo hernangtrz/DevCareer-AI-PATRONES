@@ -57,7 +57,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MediatorPattern = exports.SingletonPattern = exports.PrototypePattern = exports.BuilderPattern = exports.FactoryMethod = exports.AbstractFactory = void 0;
+exports.VisitorPattern = exports.MediatorPattern = exports.SingletonPattern = exports.PrototypePattern = exports.BuilderPattern = exports.FactoryMethod = exports.AbstractFactory = void 0;
 // Creacionales
 exports.AbstractFactory = __importStar(require("./abstract-factory"));
 exports.FactoryMethod = __importStar(require("./factory-method"));
@@ -73,4 +73,6 @@ __exportStar(require("./facade"), exports);
 // Comportamentales
 exports.MediatorPattern = __importStar(require("./mediator"));
 __exportStar(require("./mediator"), exports);
+exports.VisitorPattern = __importStar(require("./visitor"));
+__exportStar(require("./visitor"), exports);
 //# sourceMappingURL=index.js.map

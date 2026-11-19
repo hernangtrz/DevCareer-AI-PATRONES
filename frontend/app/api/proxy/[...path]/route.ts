@@ -53,8 +53,11 @@ async function handler(req: NextRequest) {
       status: res.status,
       headers: resHeaders,
     });
-  } catch (error: any) {
-    console.error("[ProxyRoute] Error proxying to backend:", error?.message || error);
+  } catch (error: unknown) {
+    console.error(
+      "[ProxyRoute] Error proxying to backend:",
+      error instanceof Error ? error.message : error
+    );
     return NextResponse.json(
       { success: false, message: "Error al comunicar con el backend." },
       { status: 502 }

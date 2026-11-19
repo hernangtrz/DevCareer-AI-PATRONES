@@ -2,14 +2,14 @@
 
 import InterviewForm from "@/components/InterviewForm";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Sparkles, Mic } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 interface InterviewPageProps {
-  userName: string;
+  userName?: string;
   userId: string;
 }
 
-const InterviewPage = ({ userName, userId }: InterviewPageProps) => {
+const InterviewPage = ({ userId }: InterviewPageProps) => {
   const { t } = useLanguage();
 
   return (

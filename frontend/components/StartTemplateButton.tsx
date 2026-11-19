@@ -8,10 +8,10 @@ import { getCognitoIdToken } from "@/lib/cognito";
 
 interface StartTemplateButtonProps {
   templateId: string;
-  userId: string;
+  userId?: string;
 }
 
-const StartTemplateButton = ({ templateId, userId }: StartTemplateButtonProps) => {
+const StartTemplateButton = ({ templateId }: StartTemplateButtonProps) => {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 

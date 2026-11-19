@@ -9,7 +9,6 @@ import {
   ArrowRight,
   Clock,
   ChevronLeft,
-  Sparkles,
   Layers,
 } from "lucide-react";
 import {

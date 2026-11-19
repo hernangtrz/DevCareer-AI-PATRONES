@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
@@ -56,7 +56,6 @@ function runTestCases(
 
   for (const tc of testCases) {
     try {
-      // eslint-disable-next-line no-new-func
       const fn = new Function(`return (${code})`)();
       if (typeof fn !== "function") throw new Error("La función no fue retornada correctamente.");
 
@@ -133,10 +132,9 @@ async function fetchAIFeedback(
 // ──────────────────────────────────────────────
 export default function ProblemPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const problem = getProblemById(id);
 
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(() => problem?.starterCode ?? "");
   const [testOutput, setTestOutput] = useState<ReturnType<typeof runTestCases> | null>(null);
   const [aiFeedback, setAIFeedback] = useState<AIFeedback | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -152,27 +150,32 @@ export default function ProblemPage() {
   const [timerStarted, setTimerStarted] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleEditorDidMount = useCallback((editor: any, monaco: any) => {
-    monaco.editor.defineTheme("devcareer-dark", {
-      base: "vs-dark",
-      inherit: true,
-      rules: [],
-      colors: {
-        "editor.background": "#141619",
-        "editor.lineHighlightBackground": "#1d2025",
-        "editorCursor.foreground": "#22d3ee",
-        "editorLineNumber.foreground": "#4b5563",
-        "editorLineNumber.activeForeground": "#22d3ee",
-      },
-    });
-    monaco.editor.setTheme("devcareer-dark");
-  }, []);
-
-  useEffect(() => {
-    if (problem) {
-      setCode(problem.starterCode);
-    }
-  }, [problem]);
+  const handleEditorDidMount = useCallback(
+    (
+      _editor: unknown,
+      monaco: {
+        editor: {
+          defineTheme: (name: string, theme: Record<string, unknown>) => void;
+          setTheme: (name: string) => void;
+        };
+      }
+    ) => {
+      monaco.editor.defineTheme("devcareer-dark", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [],
+        colors: {
+          "editor.background": "#141619",
+          "editor.lineHighlightBackground": "#1d2025",
+          "editorCursor.foreground": "#22d3ee",
+          "editorLineNumber.foreground": "#4b5563",
+          "editorLineNumber.activeForeground": "#22d3ee",
+        },
+      });
+      monaco.editor.setTheme("devcareer-dark");
+    },
+    []
+  );
 
   useEffect(() => {
     return () => {

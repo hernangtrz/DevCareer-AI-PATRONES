@@ -15,6 +15,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { CircleAlert } from "lucide-react";
 
 const Form = FormProvider;
 
@@ -105,19 +106,15 @@ function FormLabel({
 }
 
 function FormControl({ ...props }: React.ComponentProps<typeof Slot>) {
-  const { error, formItemId, formDescriptionId, formMessageId } =
+  const { error, formItemId, formMessageId } =
     useFormField();
 
   return (
     <Slot
       data-slot="form-control"
       id={formItemId}
-      aria-describedby={
-        !error
-          ? `${formDescriptionId}`
-          : `${formDescriptionId} ${formMessageId}`
-      }
-      aria-invalid={!!error}
+      aria-describedby={error ? formMessageId : undefined}
+      aria-invalid={error ? "true" : "false"}
       {...props}
     />
   );
@@ -148,10 +145,14 @@ function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
     <p
       data-slot="form-message"
       id={formMessageId}
-      className={cn("text-destructive text-sm", className)}
+      className={cn(
+        "text-destructive-100 text-xs font-medium flex items-center gap-1.5 mt-1 animate-fadeIn",
+        className
+      )}
       {...props}
     >
-      {body}
+      <CircleAlert className="h-3.5 w-3.5 shrink-0 text-destructive-100" aria-hidden="true" />
+      <span>{body}</span>
     </p>
   );
 }

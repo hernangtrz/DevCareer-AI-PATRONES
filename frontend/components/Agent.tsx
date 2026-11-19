@@ -1,29 +1,23 @@
 "use client";
 
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFeedback } from "@/lib/api";
 import { getCognitoIdToken } from "@/lib/cognito";
 import {
   Phone,
   PhoneOff,
-  Volume2,
-  User,
   Sparkles,
   Loader2,
   Globe,
   Headphones,
-  Activity,
   Mic,
   MicOff,
   Clock,
   ShieldCheck,
-  Layers,
   Briefcase,
   Code2,
-  CheckCircle2,
 } from "lucide-react";
 import {
   Room,
@@ -75,7 +69,10 @@ const Agent = ({
   const [messages, setMessages] = useState<SavedMessage[]>([]);
   const [latestSpeaker, setLatestSpeaker] = useState<"agent" | "user">("agent");
   const messagesRef = useRef<SavedMessage[]>([]);
-  messagesRef.current = messages;
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const [selectedVoice, setSelectedVoice] = useState("jeronimo-es");
   const [lkRoom, setLkRoom] = useState<Room | null>(null);
@@ -84,16 +81,12 @@ const Agent = ({
 
   // Active call duration timer
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (callStatus === CallStatus.ACTIVE) {
-      interval = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
-    } else {
-      setElapsedSeconds(0);
-    }
+    if (callStatus !== CallStatus.ACTIVE) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
     return () => {
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
   }, [callStatus]);
 
@@ -114,35 +107,38 @@ const Agent = ({
     }
   };
 
-  const handleGenerateFeedback = async (msgs: SavedMessage[]) => {
-    console.log("[Agent] Generando reporte y feedback de entrevista...");
-    setCallStatus(CallStatus.GENERATING_FEEDBACK);
+  const handleGenerateFeedback = useCallback(
+    async (msgs: SavedMessage[]) => {
+      console.log("[Agent] Generando reporte y feedback de entrevista...");
+      setCallStatus(CallStatus.GENERATING_FEEDBACK);
 
-    try {
-      const idToken = getCognitoIdToken();
-      const cleanMsgs = msgs.map(({ role, content }) => ({ role, content }));
-      const voiceOpt = VOICE_OPTIONS.find((opt) => opt.key === selectedVoice);
-      const language = voiceOpt ? voiceOpt.lang : "es";
+      try {
+        const idToken = getCognitoIdToken();
+        const cleanMsgs = msgs.map(({ role, content }) => ({ role, content }));
+        const voiceOpt = VOICE_OPTIONS.find((opt) => opt.key === selectedVoice);
+        const language = voiceOpt ? voiceOpt.lang : "es";
 
-      const res = await createFeedback(
-        {
-          interviewId: interviewId!,
-          transcript: cleanMsgs,
-          language,
-        },
-        idToken
-      );
+        const res = await createFeedback(
+          {
+            interviewId: interviewId!,
+            transcript: cleanMsgs,
+            language,
+          },
+          idToken
+        );
 
-      if (res && res.success) {
-        router.push(`/interview/${interviewId}/feedback`);
-      } else {
+        if (res && res.success) {
+          router.push(`/interview/${interviewId}/feedback`);
+        } else {
+          router.push("/dashboard");
+        }
+      } catch (e) {
+        console.error(e);
         router.push("/dashboard");
       }
-    } catch (e) {
-      console.error(e);
-      router.push("/dashboard");
-    }
-  };
+    },
+    [interviewId, router, selectedVoice]
+  );
 
   useEffect(() => {
     if (callStatus === CallStatus.FINISHED) {
@@ -152,10 +148,11 @@ const Agent = ({
         handleGenerateFeedback(messagesRef.current);
       }
     }
-  }, [callStatus]);
+  }, [callStatus, handleGenerateFeedback, router, type]);
 
   const handleCall = async () => {
     setCallStatus(CallStatus.CONNECTING);
+    setElapsedSeconds(0);
     setIsMicMuted(false);
 
     try {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Sparkles, FileText, Search, ShieldCheck } from "lucide-react";
@@ -9,15 +9,17 @@ import CvAnalyzerUpload from "@/components/CvAnalyzerUpload";
 
 function CvHubContent() {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "analyzer" ? "analyzer" : "creator";
-  const [activeTab, setActiveTab] = useState<"creator" | "analyzer">(initialTab);
+  const tabParam = searchParams.get("tab");
+  const urlTab: "creator" | "analyzer" = tabParam === "analyzer" ? "analyzer" : "creator";
+  const [manualTab, setManualTab] = useState<{
+    param: string | null;
+    tab: "creator" | "analyzer";
+  } | null>(null);
 
-  useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam === "analyzer" || tabParam === "creator") {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams]);
+  const activeTab = manualTab && manualTab.param === tabParam ? manualTab.tab : urlTab;
+  const setActiveTab = (tab: "creator" | "analyzer") => {
+    setManualTab({ param: tabParam, tab });
+  };
 
   return (
     <div className="flex flex-col gap-6 min-h-screen pb-16">

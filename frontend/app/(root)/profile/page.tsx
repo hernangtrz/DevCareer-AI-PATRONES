@@ -4,32 +4,22 @@ import React, { useState } from "react";
 import Link from "next/link";
 import {
   User,
-  Mail,
-  Phone,
-  MapPin,
-  Globe,
-  DollarSign,
   FileText,
   Code2,
   Building2,
   GraduationCap,
   Sparkles,
   UploadCloud,
-  CheckCircle2,
   Save,
   Plus,
   X,
-  ArrowRight,
-  ExternalLink,
   Check,
   Briefcase,
-  AlertCircle,
 } from "lucide-react";
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<"personal" | "summary" | "skills" | "experience" | "education" | "resume">("personal");
   const [uploadingResume, setUploadingResume] = useState(false);
-  const [resumeParsed, setResumeParsed] = useState(false);
 
   // Profile data
   const [profileData, setProfileData] = useState({
@@ -82,7 +72,6 @@ export default function ProfilePage() {
     setUploadingResume(true);
     setTimeout(() => {
       setUploadingResume(false);
-      setResumeParsed(true);
       alert(`¡Hoja de vida "${file.name}" analizada con éxito por IA! Todos los campos del perfil han sido auto-completados.`);
     }, 1500);
   };
@@ -177,16 +166,18 @@ export default function ProfilePage() {
 
             {/* Navigation Tabs */}
             <div className="flex flex-col gap-1 text-xs">
-              {[
-                { id: "personal", label: "Información Básica & Contacto", icon: <User className="w-4 h-4" /> },
-                { id: "summary", label: "Resumen Profesional", icon: <FileText className="w-4 h-4" /> },
-                { id: "skills", label: "Habilidades & Stack Tecnológico", icon: <Code2 className="w-4 h-4" /> },
-                { id: "experience", label: "Experiencia Laboral", icon: <Building2 className="w-4 h-4" /> },
-                { id: "education", label: "Educación & Títulos", icon: <GraduationCap className="w-4 h-4" /> },
-              ].map((item) => (
+              {(
+                [
+                  { id: "personal", label: "Información Básica & Contacto", icon: <User className="w-4 h-4" /> },
+                  { id: "summary", label: "Resumen Profesional", icon: <FileText className="w-4 h-4" /> },
+                  { id: "skills", label: "Habilidades & Stack Tecnológico", icon: <Code2 className="w-4 h-4" /> },
+                  { id: "experience", label: "Experiencia Laboral", icon: <Building2 className="w-4 h-4" /> },
+                  { id: "education", label: "Educación & Títulos", icon: <GraduationCap className="w-4 h-4" /> },
+                ] as const
+              ).map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id as any)}
+                  onClick={() => setActiveTab(item.id)}
                   className={`flex items-center justify-between p-3 rounded-xl transition-all text-left cursor-pointer ${
                     activeTab === item.id
                       ? "bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/20"

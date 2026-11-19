@@ -30,8 +30,8 @@ export default function InterviewCardActions({ interviewId, initialRole, initial
       } else {
         alert(res.message || "Error al eliminar");
       }
-    } catch (e: any) {
-      alert(e.message || "Error eliminando entrevista");
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Error eliminando entrevista");
     } finally {
       setIsDeleting(false);
     }
@@ -57,8 +57,8 @@ export default function InterviewCardActions({ interviewId, initialRole, initial
       } else {
         alert(res.message || "Error al guardar");
       }
-    } catch (e: any) {
-      alert(e.message || "Error actualizando entrevista");
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Error actualizando entrevista");
     } finally {
       setIsSaving(false);
     }

@@ -39,6 +39,15 @@ async function apiFetch<T>(
   return res.json() as Promise<T>;
 }
 
+function getErrorMessage(err: unknown, fallback = "Error de conexión"): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === "string" && msg) return msg;
+  }
+  return fallback;
+}
+
 // ─────────────────────────────────────────────
 // AUTH (client-safe)
 // ─────────────────────────────────────────────
@@ -53,8 +62,8 @@ export async function signUp(params: {
       method: "POST",
       body: JSON.stringify(params),
     });
-  } catch (e: any) {
-    return { success: false, message: e.message || "Error al crear la cuenta" };
+  } catch (e: unknown) {
+    return { success: false, message: getErrorMessage(e, "Error al crear la cuenta") };
   }
 }
 
@@ -66,8 +75,8 @@ export async function signIn(params: {
       method: "POST",
       body: JSON.stringify(params),
     });
-  } catch (e: any) {
-    return { success: false, message: e.message || "Error al iniciar sesión" };
+  } catch (e: unknown) {
+    return { success: false, message: getErrorMessage(e, "Error al iniciar sesión") };
   }
 }
 
@@ -174,7 +183,7 @@ export async function createFeedback(
     language?: string;
   },
   bearerToken: string,
-): Promise<{ success: boolean; feedbackId?: string; feedback?: any }> {
+): Promise<{ success: boolean; feedbackId?: string; feedback?: { id: string } }> {
   try {
     const res = await apiFetch<{ success: boolean; feedbackId?: string; feedback?: { id: string } }>(
       "/feedback",
@@ -224,8 +233,8 @@ export async function updateInterview(
         body: JSON.stringify(data),
       }
     );
-  } catch (err: any) {
-    return { success: false, message: err.message || "Error al actualizar entrevista" };
+  } catch (err: unknown) {
+    return { success: false, message: getErrorMessage(err, "Error al actualizar entrevista") };
   }
 }
 
@@ -239,8 +248,8 @@ export async function deleteInterview(
         method: "DELETE",
       }
     );
-  } catch (err: any) {
-    return { success: false, message: err.message || "Error al eliminar entrevista" };
+  } catch (err: unknown) {
+    return { success: false, message: getErrorMessage(err, "Error al eliminar entrevista") };
   }
 }
 
@@ -329,8 +338,8 @@ export async function applyToJob(params: {
         body: JSON.stringify(params),
       }
     );
-  } catch (err: any) {
-    return { success: false, message: err.message || "Error al procesar postulación" };
+  } catch (err: unknown) {
+    return { success: false, message: getErrorMessage(err, "Error al procesar postulación") };
   }
 }
 
@@ -360,8 +369,8 @@ export async function createJobInterview(params: {
         body: JSON.stringify(params),
       }
     );
-  } catch (err: any) {
-    return { success: false, message: err.message || "Error al crear entrevista para el empleo" };
+  } catch (err: unknown) {
+    return { success: false, message: getErrorMessage(err, "Error al crear entrevista para el empleo") };
   }
 }
 
@@ -387,8 +396,8 @@ export async function updateJobApplicationStatus(
         body: JSON.stringify({ status }),
       }
     );
-  } catch (err: any) {
-    return { success: false, message: err.message };
+  } catch (err: unknown) {
+    return { success: false, message: getErrorMessage(err) };
   }
 }
 
@@ -404,8 +413,8 @@ export async function updateJobApplicationNotes(
         body: JSON.stringify({ notes }),
       }
     );
-  } catch (err: any) {
-    return { success: false, message: err.message };
+  } catch (err: unknown) {
+    return { success: false, message: getErrorMessage(err) };
   }
 }
 
@@ -419,7 +428,7 @@ export async function deleteJobApplication(
         method: "DELETE",
       }
     );
-  } catch (err: any) {
-    return { success: false, message: err.message };
+  } catch (err: unknown) {
+    return { success: false, message: getErrorMessage(err) };
   }
 }

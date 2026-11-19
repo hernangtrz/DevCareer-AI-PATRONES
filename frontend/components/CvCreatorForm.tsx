@@ -401,6 +401,7 @@ const CvCreatorForm = () => {
               <div className="relative w-20 h-20 rounded-full overflow-hidden bg-dark-200 border border-white/10 flex items-center justify-center group flex-shrink-0">
                 {photoUrl ? (
                   <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={photoUrl} alt="Foto cargada" className="w-full h-full object-cover" />
                     <button
                       type="button"

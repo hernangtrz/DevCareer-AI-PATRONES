@@ -12,8 +12,6 @@ import {
   Sparkles,
   FileCheck2,
   AlignLeft,
-  ChevronDown,
-  ChevronUp,
   Info,
   CheckCircle2,
   Mic,
@@ -199,8 +197,12 @@ const CvAnalyzerUpload = () => {
       setAnalyzedFileName(
         cvInputMode === "file" ? fileName : "Texto pegado"
       );
-    } catch (err: any) {
-      setError(err.message || "Ocurrió un error inesperado. Inténtalo de nuevo.");
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Ocurrió un error inesperado. Inténtalo de nuevo."
+      );
     } finally {
       setIsAnalyzing(false);
     }
@@ -258,13 +260,14 @@ const CvAnalyzerUpload = () => {
                       key={p.id}
                       onClick={() => handleSelectPreset(p.id)}
                       className={cn(
-                        "px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer",
+                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer",
                         jobText === p.description
                           ? "bg-indigo-600/20 border-indigo-500/50 text-indigo-300"
                           : "bg-dark-200 border-white/5 text-white/60 hover:border-indigo-400 hover:text-white"
                       )}
                     >
-                      💡 {p.title}
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-400 shrink-0" aria-hidden="true" />
+                      <span>{p.title}</span>
                     </button>
                   ))}
                 </div>

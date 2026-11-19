@@ -11,7 +11,6 @@ import {
   Sparkles, 
   GraduationCap, 
   Layers, 
-  Hammer,
   HelpCircle,
   Loader2
 } from "lucide-react";
@@ -91,7 +90,7 @@ const InterviewForm = ({ userId }: InterviewFormProps) => {
 
       if (!res.ok) throw new Error("Error al generar la entrevista.");
       router.push("/dashboard");
-    } catch (e) {
+    } catch {
       setError(t("form_error_generic"));
     } finally {
       setLoading(false);

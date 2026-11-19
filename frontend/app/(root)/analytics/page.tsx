@@ -7,29 +7,17 @@ import {
   TrendingUp,
   Target,
   Flame,
-  Trophy,
-  Zap,
   CheckCircle2,
   Layers,
   Mic,
   Code2,
-  Globe,
-  FileText,
   AlertCircle,
-  ArrowRight,
-  ChevronRight,
   Activity,
-  Calendar,
   Clock,
   Briefcase,
   ArrowUpRight,
   ShieldCheck,
-  Filter,
   RefreshCw,
-  Download,
-  ExternalLink,
-  PieChart,
-  Sparkles,
 } from "lucide-react";
 import DashboardExportActions from "@/components/DashboardExportActions";
 
@@ -205,7 +193,6 @@ function getRadarCoord(angleDeg: number, score: number, cx: number, cy: number, 
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData>(DEFAULT_ANALYTICS);
-  const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"overview" | "blindspots" | "activity">("overview");
   const [blindspotFilter, setBlindspotFilter] = useState<string>("all");
@@ -227,7 +214,6 @@ export default function AnalyticsPage() {
     } catch (err) {
       console.warn("Could not load dynamic analytics, using persistent fallback", err);
     } finally {
-      setLoading(false);
       setIsRefreshing(false);
       const now = new Date();
       setLastUpdated(
@@ -243,13 +229,39 @@ export default function AnalyticsPage() {
   };
 
   useEffect(() => {
-    fetchAnalytics();
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/proxy/feedback/user/analytics-summary", {
+          cache: "no-store",
+        });
+        if (active && res.ok) {
+          const json = await res.json();
+          if (json.success && json.summary) {
+            setData(json.summary);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load dynamic analytics, using persistent fallback", err);
+      } finally {
+        if (active) {
+          const now = new Date();
+          setLastUpdated(
+            now.toLocaleDateString("es-ES", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          );
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
-
-  const handleExport = (format: "csv" | "html" | "markdown") => {
-    const url = `/api/proxy/feedback/user/analytics-export?format=${format}`;
-    window.open(url, "_blank");
-  };
 
   // Radar Polygon Points Calculation
   const cx = 175;

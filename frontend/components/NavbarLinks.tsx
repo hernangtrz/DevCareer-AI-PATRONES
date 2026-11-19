@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Mic, FileText, Code2, Cpu, Briefcase } from "lucide-react";
+import { Mic, FileText, Code2, Briefcase } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import UserMenu from "@/components/UserMenu";
 

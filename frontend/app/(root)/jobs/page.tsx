@@ -18,17 +18,13 @@ import {
   Briefcase,
   Search,
   Sparkles,
-  Target,
   Zap,
   Mic,
   MapPin,
   DollarSign,
   Clock,
   CheckCircle2,
-  AlertCircle,
   ExternalLink,
-  Filter,
-  Layers,
   FileText,
   Send,
   ArrowRight,
@@ -39,15 +35,12 @@ import {
   Globe,
   Code2,
   Building2,
-  Plus,
   Trash2,
   Save,
   Check,
   Calendar,
   MessageSquare,
-  HelpCircle,
   X,
-  ChevronRight,
   Copy,
 } from "lucide-react";
 
@@ -87,10 +80,14 @@ function dedupeSkills(skills?: string[]): string[] {
   return result;
 }
 
+function makeClientAppId(): string {
+  return `app-${Date.now()}`;
+}
+
 const CONNECTED_PLATFORMS = [
-  { id: "greenhouse", name: "Greenhouse ATS", type: "Postulación Directa", icon: "🟢", count: 15, active: true },
-  { id: "lever", name: "Lever ATS", type: "Formulario Oficial", icon: "⚡", count: 15, active: true },
-  { id: "remoteok", name: "RemoteOK", type: "Remoto Tech", icon: "🌍", count: 20, active: true },
+  { id: "greenhouse", name: "Greenhouse ATS", type: "Postulación Directa", icon: "greenhouse", count: 15, active: true },
+  { id: "lever", name: "Lever ATS", type: "Formulario Oficial", icon: "lever", count: 15, active: true },
+  { id: "remoteok", name: "RemoteOK", type: "Remoto Tech", icon: "remoteok", count: 20, active: true },
 ];
 
 const MOCK_JOBS: JobOffer[] = [
@@ -163,7 +160,6 @@ export default function JobsPage() {
   const [activeMainTab, setActiveMainTab] = useState<"feed" | "saved" | "applications">("feed");
   const [liveApplications, setLiveApplications] = useState<JobApplicationDto[]>([]);
   const [liveJobs, setLiveJobs] = useState<JobOffer[]>([]);
-  const [isLoadingLiveJobs, setIsLoadingLiveJobs] = useState(false);
   const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
   const [simulatingJobId, setSimulatingJobId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -236,37 +232,38 @@ export default function JobsPage() {
   useEffect(() => {
     let isMounted = true;
 
-    // Restaurar postulaciones y guardados de localStorage si existen
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("tab") === "applications") {
-        setActiveMainTab("applications");
-      }
-      try {
-        const savedApplied = localStorage.getItem("devcareer_applied_jobs");
-        if (savedApplied) setAppliedJobIds(JSON.parse(savedApplied));
-
-        const savedBookmarks = localStorage.getItem("devcareer_saved_jobs");
-        if (savedBookmarks) setSavedJobs(JSON.parse(savedBookmarks));
-
-        const savedApps = localStorage.getItem("devcareer_applications");
-        if (savedApps) {
-          const parsed = JSON.parse(savedApps);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setLiveApplications(parsed);
-            const notesMap: { [id: string]: string } = {};
-            parsed.forEach((a: any) => {
-              if (a.notes) notesMap[a.id] = a.notes;
-            });
-            setEditingNotes((prev) => ({ ...notesMap, ...prev }));
-          }
-        }
-      } catch (e) {
-        console.error("Error leyendo de localStorage:", e);
-      }
-    }
-
     async function loadData() {
+      // Restaurar postulaciones y guardados de localStorage si existen
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("tab") === "applications") {
+          setActiveMainTab("applications");
+        }
+        try {
+          const savedApplied = localStorage.getItem("devcareer_applied_jobs");
+          if (savedApplied) setAppliedJobIds(JSON.parse(savedApplied));
+
+          const savedBookmarks = localStorage.getItem("devcareer_saved_jobs");
+          if (savedBookmarks) setSavedJobs(JSON.parse(savedBookmarks));
+
+          const savedApps = localStorage.getItem("devcareer_applications");
+          if (savedApps) {
+            const parsed: unknown = JSON.parse(savedApps);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const typedApps = parsed as JobApplicationDto[];
+              setLiveApplications(typedApps);
+              const notesMap: { [id: string]: string } = {};
+              typedApps.forEach((a) => {
+                if (a.notes) notesMap[a.id] = a.notes;
+              });
+              setEditingNotes((prev) => ({ ...notesMap, ...prev }));
+            }
+          }
+        } catch (e) {
+          console.error("Error leyendo de localStorage:", e);
+        }
+      }
+
       // 1. Cargar postulaciones del usuario desde Backend
       try {
         const apps = await getUserJobApplications();
@@ -288,7 +285,6 @@ export default function JobsPage() {
 
       // 2. Cargar ofertas en vivo
       try {
-        setIsLoadingLiveJobs(true);
         const backendJobs = await getJobs();
         if (isMounted && backendJobs && backendJobs.length > 0) {
           const mapped: JobOffer[] = backendJobs.map((j) => {
@@ -326,6 +322,13 @@ export default function JobsPage() {
               (s) => !matchedSet.has(s.toLowerCase())
             );
 
+            const validSeniorities: JobOffer["seniority"][] = ["Junior", "Mid-Level", "Senior", "Staff"];
+            const resolvedSeniority: JobOffer["seniority"] = validSeniorities.includes(
+              j.seniority as JobOffer["seniority"]
+            )
+              ? (j.seniority as JobOffer["seniority"])
+              : "Mid-Level";
+
             return {
               id: j.id,
               title: j.title,
@@ -336,7 +339,7 @@ export default function JobsPage() {
               platformBg,
               location: j.location || "Remoto (LatAm / Global)",
               remote: true,
-              seniority: (j.seniority as any) || "Mid-Level",
+              seniority: resolvedSeniority,
               salaryMonthlyUSD: j.salary || "$5,000 - $7,500 USD",
               postedAgo: "En vivo",
               matchScore: score,
@@ -354,8 +357,6 @@ export default function JobsPage() {
         }
       } catch (e) {
         console.error("Error cargando empleos en vivo:", e);
-      } finally {
-        if (isMounted) setIsLoadingLiveJobs(false);
       }
     }
 
@@ -407,7 +408,7 @@ export default function JobsPage() {
       const adaptedResumeSummary = res.adaptedResumeSummary || res.application?.adaptedResumeSummary || "";
 
       const newApp: JobApplicationDto = {
-        id: res.application?.id || `app-${Date.now()}`,
+        id: res.application?.id || makeClientAppId(),
         userId: res.application?.userId || "3aa77ca5-52cf-4204-8d4a-85c0456e716f",
         jobId: job.id,
         jobTitle: job.title,
@@ -449,9 +450,9 @@ export default function JobsPage() {
       });
 
       showToast(`¡Materiales preparados para ${job.company}! Carta de presentación y CV adaptado listos.`);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error al registrar postulación:", e);
-      showToast("Error registrando postulación: " + e.message);
+      showToast("Error registrando postulación: " + (e instanceof Error ? e.message : "Error desconocido"));
     } finally {
       setApplyingJobId(null);
     }
@@ -460,7 +461,7 @@ export default function JobsPage() {
 
   // ABRIR O GENERAR MATERIALES DE POSTULACIÓN (FACADE)
   const handleOpenMaterials = async (job: JobOffer) => {
-    let existing = liveApplications.find((a) => a.jobId === job.id);
+    const existing = liveApplications.find((a) => a.jobId === job.id);
 
     // Si ya tiene carta y CV adaptado generados, abrir directamente
     if (existing && existing.coverLetter && existing.adaptedResumeSummary) {
@@ -514,7 +515,7 @@ export default function JobsPage() {
       // Si no estaba en liveApplications, agregarlo
       if (!existing) {
         const newApp: JobApplicationDto = {
-          id: res.application?.id || `app-${Date.now()}`,
+          id: res.application?.id || makeClientAppId(),
           userId: res.application?.userId || "3aa77ca5-52cf-4204-8d4a-85c0456e716f",
           jobId: job.id,
           jobTitle: job.title,
@@ -549,7 +550,7 @@ export default function JobsPage() {
         adaptedResumeSummary,
         interviewId: res.interviewId || existing?.interviewId,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error al obtener materiales:", err);
       showToast("Error al obtener materiales de la vacante");
     } finally {
@@ -611,7 +612,7 @@ export default function JobsPage() {
       } else {
         showToast("Estado actualizado con éxito");
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error actualizando estado:", e);
       showToast("Error actualizando estado en el servidor");
     }
@@ -635,9 +636,9 @@ export default function JobsPage() {
         setSavedNotesSuccess((prev) => ({ ...prev, [appId]: false }));
       }, 2000);
       showToast("Notas de la postulación guardadas");
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error guardando notas:", e);
-      showToast("Error guardando notas: " + e.message);
+      showToast("Error guardando notas: " + (e instanceof Error ? e.message : "Error desconocido"));
     } finally {
       setSavingNotesId(null);
     }
@@ -665,7 +666,7 @@ export default function JobsPage() {
         });
       }
       showToast("Postulación eliminada del seguimiento");
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error eliminando postulación:", e);
       showToast("Error eliminando postulación");
     }
@@ -696,8 +697,11 @@ export default function JobsPage() {
       } else {
         alert(res.message || "No se pudo iniciar el simulacro de entrevista");
       }
-    } catch (e: any) {
-      alert("Error iniciando entrevista personalizada: " + e.message);
+    } catch (e: unknown) {
+      alert(
+        "Error iniciando entrevista personalizada: " +
+          (e instanceof Error ? e.message : "Error desconocido")
+      );
     } finally {
       setSimulatingJobId(null);
     }
@@ -759,8 +763,9 @@ export default function JobsPage() {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>PORTAL DE EMPLEO & SEGUIMIENTO</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-              ¡Bienvenido de vuelta, {profileData.fullName.split(" ")[0]}! 👋
+            <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <span>¡Bienvenido de vuelta, {profileData.fullName.split(" ")[0]}!</span>
+              <Sparkles className="w-6 h-6 text-indigo-400 shrink-0" aria-hidden="true" />
             </h1>
             <p className="text-zinc-400 text-xs md:text-sm max-w-xl">
               Explora vacantes verificadas en tiempo real de Greenhouse, Lever y RemoteOK, postúlate directamente y gestiona cada proceso de selección en tu espacio de seguimiento.
@@ -864,13 +869,19 @@ export default function JobsPage() {
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center text-lg shadow-inner">
-                          {platform.icon}
+                          {platform.id === "greenhouse" ? (
+                            <Building2 className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                          ) : platform.id === "lever" ? (
+                            <Zap className="w-4 h-4 text-amber-400" aria-hidden="true" />
+                          ) : (
+                            <Globe className="w-4 h-4 text-sky-400" aria-hidden="true" />
+                          )}
                         </div>
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
                             {platform.name}
                           </span>
-                          <span className="text-[10px] text-zinc-500 font-medium">
+                          <span className="text-[10px] text-zinc-500 font-medium font-mono tabular-nums">
                             {count} ofertas activas
                           </span>
                         </div>
@@ -881,7 +892,7 @@ export default function JobsPage() {
                           isSelected ? "bg-emerald-500 text-zinc-950" : "bg-zinc-800 text-zinc-400"
                         }`}
                       >
-                        ✓
+                        <Check className="w-3 h-3" aria-hidden="true" />
                       </div>
                     </button>
                   );
@@ -895,12 +906,16 @@ export default function JobsPage() {
             {/* Columna Izquierda: Feed de Vacantes */}
             <div className="lg:col-span-8 flex flex-col gap-5">
               {/* Barra de Búsqueda y Filtros */}
-              <div className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex flex-col gap-3 shadow-xl">
+              <search className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex flex-col gap-3 shadow-xl">
                 <div className="flex items-center gap-3">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" aria-hidden="true" />
                     <input
-                      type="text"
+                      type="search"
+                      aria-label="Buscar vacante por rol, tecnología o empresa"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       placeholder="Buscar vacante por rol, tecnología o empresa (ej. React, Python, GitLab)..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -912,6 +927,7 @@ export default function JobsPage() {
                     {["all", "Junior", "Mid-Level", "Senior"].map((lvl) => (
                       <button
                         key={lvl}
+                        type="button"
                         onClick={() => setSelectedSeniority(lvl)}
                         className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                           selectedSeniority === lvl ? "bg-indigo-600 text-white" : "text-zinc-400 hover:text-zinc-200"
@@ -922,7 +938,7 @@ export default function JobsPage() {
                     ))}
                   </div>
                 </div>
-              </div>
+              </search>
 
               {/* Feed Header */}
               <div className="flex items-center justify-between px-1">
@@ -1228,7 +1244,7 @@ export default function JobsPage() {
                   </span>
                 </div>
                 <p className="text-zinc-400 text-xs leading-relaxed">
-                  Al hacer clic en "Postularme", la vacante se guarda automáticamente en tu tablero de seguimiento para que actualices sus estados y practiques entrevistas simuladas.
+                  Al hacer clic en &ldquo;Postularme&rdquo;, la vacante se guarda automáticamente en tu tablero de seguimiento para que actualices sus estados y practiques entrevistas simuladas.
                 </p>
               </div>
             </div>
@@ -1378,7 +1394,7 @@ export default function JobsPage() {
               <Send className="w-12 h-12 text-zinc-600" />
               <h3 className="text-base font-bold text-white">No hay postulaciones en este filtro</h3>
               <p className="text-xs text-zinc-400 max-w-md">
-                Explora las vacantes disponibles y presiona "Postularme a esta vacante" para abrir el formulario y registrar tu postulación automáticamente.
+                Explora las vacantes disponibles y presiona &ldquo;Postularme a esta vacante&rdquo; para abrir el formulario y registrar tu postulación automáticamente.
               </p>
               <button
                 onClick={() => {
@@ -1436,7 +1452,7 @@ export default function JobsPage() {
                         <div className="flex items-center gap-3 text-xs text-zinc-400 flex-wrap mt-0.5">
                           {currentNotes.trim() && (
                             <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold flex items-center gap-1">
-                              📝 Notas activas
+                              <FileText className="w-3 h-3" aria-hidden="true" /> Notas activas
                             </span>
                           )}
                           <span className="flex items-center gap-1 text-zinc-300">
@@ -1481,16 +1497,16 @@ export default function JobsPage() {
                             }`}
                           >
                             <option value="applied" className="bg-zinc-900 text-blue-300">
-                              🔵 Postulado / En Espera
+                              Postulado / En Espera
                             </option>
                             <option value="interviewing" className="bg-zinc-900 text-amber-300">
-                              🟡 En Proceso de Entrevista
+                              En Proceso de Entrevista
                             </option>
                             <option value="offered" className="bg-zinc-900 text-emerald-300">
-                              🟢 ¡Oferta Recibida!
+                              ¡Oferta Recibida!
                             </option>
                             <option value="rejected" className="bg-zinc-900 text-rose-300">
-                              🔴 No Seleccionado
+                              No Seleccionado
                             </option>
                           </select>
                         </div>

@@ -1,7 +1,6 @@
 "use client";
 
-import { CheckCircle, AlertCircle, PlusCircle, Bookmark } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { CheckCircle, AlertCircle, PlusCircle } from "lucide-react";
 
 interface KeywordsPanelProps {
   matchedKeywords: string[];

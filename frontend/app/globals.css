@@ -22,7 +22,9 @@
   --color-dark-200: #27282f;
   --color-dark-300: #242633;
 
-  --font-mona-sans: "Mona Sans", sans-serif;
+  --font-mona-sans: "Mona Sans", system-ui, sans-serif;
+  --font-sans: var(--font-mona-sans), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
 
   --bg-pattern: url("/pattern.png");
 }
@@ -140,15 +142,19 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
   p {
-    @apply text-light-100;
+    @apply text-light-100 leading-relaxed;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
   }
   h2 {
-    @apply text-3xl font-semibold;
+    @apply text-3xl font-semibold tracking-tight;
   }
   h3 {
-    @apply text-2xl font-semibold;
+    @apply text-2xl font-semibold tracking-tight;
   }
   ul {
     @apply list-disc list-inside;
@@ -201,7 +207,7 @@
     }
 
     .input {
-      @apply !bg-dark-200 !rounded-full !min-h-12 !px-5 placeholder:!text-light-100;
+      @apply !bg-dark-200 !rounded-full !min-h-12 px-5 placeholder:!text-light-100/45;
     }
 
     .btn {
@@ -282,7 +288,7 @@
   }
 
   .tech-tooltip {
-    @apply absolute bottom-full mb-1 hidden group-hover:flex px-2 py-1 text-xs text-white bg-gray-700 rounded-md shadow-md;
+    @apply pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden whitespace-nowrap z-30 px-2.5 py-1 text-[11px] font-medium text-white bg-zinc-900/95 border border-white/15 rounded-lg shadow-xl backdrop-blur-sm;
   }
 
   .card-interview {
@@ -319,7 +325,9 @@
 }
 
 @utility animate-fadeIn {
-  animation: fadeIn 0.3s ease-in-out;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
 }
 
 @keyframes fadeIn {

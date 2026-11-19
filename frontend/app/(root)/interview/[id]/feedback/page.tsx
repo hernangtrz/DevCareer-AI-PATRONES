@@ -7,7 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
-import { getCurrentUser, getSessionCookie, getLanguageCookie } from "@/lib/api.server";
+import { getSessionCookie, getLanguageCookie } from "@/lib/api.server";
 import { getFeedbackByInterviewId, getInterviewById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { translations } from "@/lib/translations";
@@ -16,7 +16,6 @@ import FeedbackExportButtons from "@/components/FeedbackExportButtons";
 const Page = async ({ params }: RouteParams) => {
   const { id } = await params;
   const sessionCookie = await getSessionCookie();
-  const user = await getCurrentUser();
   const lang = await getLanguageCookie();
   dayjs.locale(lang);
   const t = translations[lang];
@@ -88,7 +87,7 @@ const Page = async ({ params }: RouteParams) => {
           </div>
 
           <p className="text-light-100 italic">
-            "{feedback.englishFeedback.overallComment}"
+            &ldquo;{feedback.englishFeedback.overallComment}&rdquo;
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">

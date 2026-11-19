@@ -60,9 +60,13 @@ export default function FeedbackExportButtons({
       window.URL.revokeObjectURL(url);
 
       toast.success(`Reporte descargado: ${filename}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ExportBridge] Error:", err);
-      toast.error(err?.message || "No se pudo descargar el reporte.");
+      toast.error(
+        err instanceof Error && err.message
+          ? err.message
+          : "No se pudo descargar el reporte."
+      );
     } finally {
       setDownloading(null);
     }

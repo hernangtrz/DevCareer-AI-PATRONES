@@ -7,7 +7,6 @@
 import { supabase } from "./supabase";
 
 const REGION       = process.env.NEXT_PUBLIC_AWS_REGION       || "us-east-1";
-const USER_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || "";
 const CLIENT_ID    = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || "";
 
 const COGNITO_URL = `https://cognito-idp.${REGION}.amazonaws.com/`;
@@ -38,7 +37,7 @@ export async function signUpCognito(
   email: string,
   password: string,
   name: string
-): Promise<{ userSub: string; session?: any }> {
+): Promise<{ userSub: string; session?: { access_token: string } | null }> {
   if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
     const { data, error } = await supabase.auth.signUp({
       email,

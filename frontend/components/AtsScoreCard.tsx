@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Award, CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { Award } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AtsScoreCardProps {

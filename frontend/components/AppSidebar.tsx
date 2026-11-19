@@ -7,7 +7,6 @@ import {
   Mic,
   FileText,
   Code2,
-  Cpu,
   Briefcase,
   BarChart3,
   Sparkles,

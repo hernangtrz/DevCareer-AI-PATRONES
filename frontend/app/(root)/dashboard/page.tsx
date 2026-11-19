@@ -135,14 +135,14 @@ const Page = async () => {
             <div className="flex items-start gap-2 text-xs">
               <span className="font-bold text-indigo-400">IA:</span>
               <p className="text-zinc-300 text-xs leading-relaxed">
-                "¿Cuál es la diferencia entre Server Components y Client Components en Next.js?"
+                &ldquo;¿Cuál es la diferencia entre Server Components y Client Components en Next.js?&rdquo;
               </p>
             </div>
             <div className="h-px bg-zinc-800/50" />
             <div className="flex items-start gap-2 text-xs">
               <span className="font-bold text-emerald-400">TÚ:</span>
               <p className="text-zinc-400 text-xs leading-relaxed italic truncate">
-                "Los Server Components se ejecutan en el servidor y reducen el JavaScript enviado..."
+                &ldquo;Los Server Components se ejecutan en el servidor y reducen el JavaScript enviado...&rdquo;
               </p>
             </div>
           </div>

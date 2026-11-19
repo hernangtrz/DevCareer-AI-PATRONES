@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { Mail, Phone, MapPin } from "lucide-react";
 
 const Linkedin = ({ width, height, className }: { width?: number; height?: number; className?: string }) => (
@@ -76,6 +75,7 @@ const TemplateProfesional = ({ personalInfo, experiences, skills, education, isP
       <div style={{ borderBottom: `3px solid ${accentColor}`, paddingBottom: isPrint ? "14px" : "6px", marginBottom: isPrint ? "14px" : "6px", display: "flex", gap: isPrint ? "16px" : "8px", alignItems: "flex-start" }}>
         {photoUrl && (
           <div style={{ width: isPrint ? "80px" : "40px", height: isPrint ? "96px" : "48px", flexShrink: 0, overflow: "hidden", borderRadius: "4px", border: "1px solid #ddd" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photoUrl} alt="Foto" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
         )}
@@ -157,6 +157,7 @@ const TemplateEjecutivo = ({ personalInfo, experiences, skills, education, isPri
       <div style={{ background: darkBg, padding: isPrint ? "24px 36px" : "10px 14px", display: "flex", alignItems: "center", gap: isPrint ? "20px" : "8px" }}>
         {photoUrl && (
           <div style={{ width: isPrint ? "80px" : "36px", height: isPrint ? "80px" : "36px", flexShrink: 0, overflow: "hidden", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photoUrl} alt="Foto" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
         )}
@@ -241,6 +242,7 @@ const TemplateModerno = ({ personalInfo, experiences, skills, education, isPrint
       <div style={{ width: "36%", background: accentColor, color: "#fff", padding: isPrint ? "28px 18px" : "10px 8px", display: "flex", flexDirection: "column", gap: isPrint ? "16px" : "7px" }}>
         {photoUrl ? (
           <div style={{ width: isPrint ? "90px" : "42px", height: isPrint ? "90px" : "42px", borderRadius: "50%", overflow: "hidden", border: "3px solid rgba(255,255,255,0.4)", alignSelf: "center" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photoUrl} alt="Foto" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
         ) : (

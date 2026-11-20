@@ -12,6 +12,7 @@ import { getFeedbackByInterviewId, getInterviewById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { translations } from "@/lib/translations";
 import FeedbackExportButtons from "@/components/FeedbackExportButtons";
+import { FacialBehaviorFeedbackCard } from "@/components/FacialBehaviorFeedbackCard";
 
 const Page = async ({ params }: RouteParams) => {
   const { id } = await params;
@@ -164,10 +165,16 @@ const Page = async ({ params }: RouteParams) => {
         </div>
       )}
 
+      {/* Evaluación de Lenguaje No Verbal y Presencia (Edge AI) */}
+      {feedback?.facialFeedback && (
+        <FacialBehaviorFeedbackCard facialFeedback={feedback.facialFeedback} />
+      )}
+
       {/* Patrón Bridge: Exportación Multiformato de Reportes */}
       <FeedbackExportButtons
         interviewId={id}
         hasEnglishFeedback={!!feedback?.englishFeedback}
+        hasFacialFeedback={!!feedback?.facialFeedback}
       />
 
       <div className="buttons">

@@ -37,9 +37,10 @@ class InterviewEvaluationFacade {
         // 2. Formatear y sanear el historial de conversación (transcript)
         const formattedTranscript = this.formatTranscript(transcript, isEnglish);
         // 3. Ejecutar evaluaciones de IA en paralelo con fallbacks resilientes
-        const [feedbackData, englishData] = await Promise.all([
+        const [feedbackData, englishData, facialData] = await Promise.all([
             this.executeTechnicalEvaluation(formattedTranscript, isEnglish),
             this.executeEnglishEvaluation(formattedTranscript, isEnglish),
+            this.executeFacialEvaluation(input.facialMetrics, isEnglish),
         ]);
         // 4. Construir el payload del dominio para persistencia
         const feedbackPayload = {
@@ -51,6 +52,7 @@ class InterviewEvaluationFacade {
             areasForImprovement: feedbackData.areasForImprovement,
             finalAssessment: feedbackData.finalAssessment,
             englishFeedback: englishData || undefined,
+            facialFeedback: facialData || undefined,
             createdAt: new Date().toISOString(),
         };
         // 5. Persistir mediante el repositorio correspondiente
@@ -165,6 +167,24 @@ class InterviewEvaluationFacade {
         }
         catch (err) {
             console.warn("[InterviewEvaluationFacade] Error en evaluación lingüística CEFR (ignorado para no bloquear):", err?.message);
+            return null;
+        }
+    }
+    /**
+     * Ejecuta la evaluación de presencia y lenguaje no verbal (Edge AI + FACS) si se proporcionó telemetría.
+     */
+    async executeFacialEvaluation(facialMetrics, isEnglish = false) {
+        if (!facialMetrics || !facialMetrics.enabled) {
+            return null;
+        }
+        try {
+            return await this.aiFacade.evaluateFacialBehavior({
+                facialMetrics,
+                isEnglish,
+            });
+        }
+        catch (err) {
+            console.warn("[InterviewEvaluationFacade] Error en evaluación no verbal (ignorado para no bloquear):", err?.message);
             return null;
         }
     }

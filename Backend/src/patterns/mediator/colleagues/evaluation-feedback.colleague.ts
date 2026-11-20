@@ -36,6 +36,7 @@ export class EvaluationFeedbackColleague extends BaseColleague {
       userId: feedback.userId,
       totalScore: feedback.totalScore,
       cefrLevel: feedback.englishFeedback?.overallLevel,
+      facialFeedback: feedback.facialFeedback,
       strengths: feedback.strengths || [],
       areasForImprovement: feedback.areasForImprovement || [],
       role,

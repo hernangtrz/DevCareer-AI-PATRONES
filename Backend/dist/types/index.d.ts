@@ -39,6 +39,73 @@ export interface Feedback {
         vocabularySuggestions: string[];
         overallComment: string;
     };
+    facialFeedback?: FacialBehaviorFeedback;
+}
+export interface FacialTimelineBucket {
+    second: number;
+    tension: number;
+    eyeContact: number;
+    gestureIntensity: number;
+    warmth: number;
+    speaker: "user" | "agent";
+}
+export interface FacialPeakEvent {
+    timestampSec: number;
+    type: "high_tension" | "over_gesturing" | "low_eye_contact" | "rigid_posture" | "rapid_blinking";
+    severity: "moderate" | "high";
+    durationSec: number;
+    contextSnippet?: string;
+}
+export interface FacialTelemetrySummary {
+    enabled: boolean;
+    durationSeconds: number;
+    sampledFrames: number;
+    validFaceFrames: number;
+    facePresenceRatio: number;
+    calibrated: boolean;
+    scores: {
+        overallPresence: number;
+        eyeContact: number;
+        composure: number;
+        gestureBalance: number;
+        postureStability: number;
+        warmth: number;
+    };
+    indicators: {
+        avgTensionIndex: number;
+        gestureProfile: "natural" | "over_expressive" | "rigid";
+        blinkRatePerMin: number;
+        headMovementVolatility: number;
+        speakingVsListening: {
+            speakingTensionAvg: number;
+            listeningEyeContactAvg: number;
+        };
+    };
+    timeline: FacialTimelineBucket[];
+    peakEvents: FacialPeakEvent[];
+}
+export interface FacialBehaviorFeedback {
+    overallScore: number;
+    expressiveProfile: string;
+    summaryComment: string;
+    metrics: {
+        eyeContact: number;
+        composure: number;
+        gestureBalance: number;
+        postureStability: number;
+        warmth: number;
+        blinkRatePerMin: number;
+        facePresencePercent: number;
+    };
+    strengths: string[];
+    habitsToImprove: string[];
+    coachingTips: string[];
+    keyMoments: Array<{
+        timestampSec: number;
+        label: string;
+        observation: string;
+    }>;
+    timeline: FacialTimelineBucket[];
 }
 export interface CreateFeedbackParams {
     interviewId: string;
@@ -47,6 +114,7 @@ export interface CreateFeedbackParams {
         role: string;
         content: string;
     }[];
+    facialMetrics?: FacialTelemetrySummary;
 }
 export interface GetLatestInterviewsParams {
     userId: string;

@@ -181,6 +181,7 @@ export async function createFeedback(
     interviewId: string;
     transcript: { role: string; content: string }[];
     language?: string;
+    facialMetrics?: import("./facial/types").FacialTelemetrySummary;
   },
   bearerToken: string,
 ): Promise<{ success: boolean; feedbackId?: string; feedback?: { id: string } }> {

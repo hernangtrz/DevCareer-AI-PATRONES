@@ -23,4 +23,5 @@ __exportStar(require("./interview-evaluation.service"), exports);
 __exportStar(require("./english-proficiency.service"), exports);
 __exportStar(require("./cv-analysis.service"), exports);
 __exportStar(require("./code-challenge.service"), exports);
+__exportStar(require("./facial-behavior-evaluation.service"), exports);
 //# sourceMappingURL=index.js.map

@@ -1,4 +1,5 @@
-import { InterviewFeedbackResult, EnglishProficiencyFeedback, CvAtsAnalysisResult, CodeEvaluationResult, AnalyzeCvAtsParams, EvaluateCodeChallengeParams } from "../../services/ai";
+import { InterviewFeedbackResult, EnglishProficiencyFeedback, CvAtsAnalysisResult, CodeEvaluationResult, AnalyzeCvAtsParams, EvaluateCodeChallengeParams, EvaluateFacialBehaviorParams } from "../../services/ai";
+import { FacialBehaviorFeedback } from "../../types";
 import { ImproveCvInput, ImprovedCvResult, ImproveProfileInput, ImprovedProfileResult } from "../../services/cv-optimization.service";
 import { IAIProvider } from "../../services/ai/ai-provider.interface";
 /**
@@ -24,6 +25,7 @@ export declare class AIServiceFacade {
     private cvAnalysisService;
     private codeChallengeService;
     private cvOptimizationService;
+    private facialBehaviorEvaluationService;
     constructor(aiProvider?: IAIProvider);
     /**
      * Evalúa multidimensionalmente el desempeño técnico y blando en una entrevista de voz.
@@ -49,4 +51,8 @@ export declare class AIServiceFacade {
      * Optimiza el resumen ejecutivo del perfil profesional para aumentar impacto.
      */
     optimizeProfile(input: ImproveProfileInput): Promise<ImprovedProfileResult>;
+    /**
+     * Evalúa la presencia ejecutiva y el lenguaje no verbal (FACS, postura, tensión y contacto visual).
+     */
+    evaluateFacialBehavior(params: EvaluateFacialBehaviorParams): Promise<FacialBehaviorFeedback>;
 }

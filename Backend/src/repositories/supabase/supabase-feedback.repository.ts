@@ -14,6 +14,7 @@ function mapFeedbackFromDb(row: any): Feedback {
     finalAssessment: row.final_assessment,
     createdAt: row.created_at || new Date().toISOString(),
     englishFeedback: row.english_feedback,
+    facialFeedback: row.facial_feedback,
   };
 }
 
@@ -29,6 +30,7 @@ function mapFeedbackToDb(feedback: Partial<Feedback>): any {
   if (feedback.finalAssessment !== undefined) row.final_assessment = feedback.finalAssessment;
   if (feedback.createdAt !== undefined) row.created_at = feedback.createdAt;
   if (feedback.englishFeedback !== undefined) row.english_feedback = feedback.englishFeedback;
+  if (feedback.facialFeedback !== undefined) row.facial_feedback = feedback.facialFeedback;
   return row;
 }
 
@@ -46,6 +48,15 @@ export class SupabaseFeedbackRepository implements IFeedbackRepository {
 
     const { error } = await this.supabase.from("feedback").insert(row);
     if (error) {
+      // Fallback resiliente si la columna facial_feedback aún no existe en la base de datos
+      if (row.facial_feedback && (error.message?.includes("facial_feedback") || error.code === "PGRST204" || error.code === "42703")) {
+        console.warn("[SupabaseFeedbackRepository] Columna 'facial_feedback' no encontrada en Supabase, reintentando sin telemetría...");
+        delete row.facial_feedback;
+        const retryResult = await this.supabase.from("feedback").insert(row);
+        if (!retryResult.error) {
+          return id;
+        }
+      }
       console.error("[SupabaseFeedbackRepository] create error:", error);
       throw error;
     }

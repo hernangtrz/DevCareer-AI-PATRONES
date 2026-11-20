@@ -7,14 +7,16 @@ import { getCognitoIdToken } from "@/lib/cognito";
 interface FeedbackExportButtonsProps {
   interviewId: string;
   hasEnglishFeedback?: boolean;
+  hasFacialFeedback?: boolean;
 }
 
-type ReportType = "interview" | "english";
+type ReportType = "interview" | "english" | "nonverbal";
 type FormatType = "html" | "md" | "txt";
 
 export default function FeedbackExportButtons({
   interviewId,
   hasEnglishFeedback = false,
+  hasFacialFeedback = false,
 }: FeedbackExportButtonsProps) {
   const [downloading, setDownloading] = useState<string | null>(null);
 
@@ -266,6 +268,58 @@ export default function FeedbackExportButtons({
               )}
               {renderDownloadButton(
                 "english",
+                "txt",
+                "Texto Plano",
+                ".txt sin formato",
+                "emerald",
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                </svg>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Reporte de Lenguaje No Verbal & Presencia (si aplica) */}
+        {hasFacialFeedback && (
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-xl bg-dark-100/60 border border-light-800/80 backdrop-blur-sm transition-colors hover:border-light-700/80">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center justify-center h-9 w-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold text-sm flex-shrink-0">
+                🎭
+              </span>
+              <div className="flex flex-col">
+                <span className="font-semibold text-sm text-light-100 flex items-center gap-2">
+                  Reporte de Lenguaje No Verbal
+                </span>
+                <span className="text-xs text-light-400">
+                  Micro-expresiones FACS, serenidad, contacto visual y cinemática 3D
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {renderDownloadButton(
+                "nonverbal",
+                "html",
+                "Web & PDF",
+                ".html estilizado",
+                "indigo",
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+              )}
+              {renderDownloadButton(
+                "nonverbal",
+                "md",
+                "Markdown",
+                ".md para GitHub",
+                "cyan",
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )}
+              {renderDownloadButton(
+                "nonverbal",
                 "txt",
                 "Texto Plano",
                 ".txt sin formato",

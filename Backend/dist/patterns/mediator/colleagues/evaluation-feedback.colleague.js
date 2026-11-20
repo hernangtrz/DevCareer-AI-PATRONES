@@ -28,6 +28,7 @@ class EvaluationFeedbackColleague extends base_colleague_1.BaseColleague {
             userId: feedback.userId,
             totalScore: feedback.totalScore,
             cefrLevel: feedback.englishFeedback?.overallLevel,
+            facialFeedback: feedback.facialFeedback,
             strengths: feedback.strengths || [],
             areasForImprovement: feedback.areasForImprovement || [],
             role,

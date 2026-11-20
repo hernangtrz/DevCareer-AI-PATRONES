@@ -20,6 +20,36 @@ interface Feedback {
     vocabularySuggestions: string[]; // palabras/frases que podría mejorar
     overallComment: string;    // resumen del nivel de inglés
   };
+  facialFeedback?: {
+    overallScore: number;
+    expressiveProfile: string;
+    summaryComment: string;
+    metrics: {
+      eyeContact: number;
+      composure: number;
+      gestureBalance: number;
+      postureStability: number;
+      warmth: number;
+      blinkRatePerMin: number;
+      facePresencePercent: number;
+    };
+    strengths: string[];
+    habitsToImprove: string[];
+    coachingTips: string[];
+    keyMoments: Array<{
+      timestampSec: number;
+      label: string;
+      observation: string;
+    }>;
+    timeline: Array<{
+      second: number;
+      tension: number;
+      eyeContact: number;
+      gestureIntensity: number;
+      warmth: number;
+      speaker: "user" | "agent";
+    }>;
+  };
 }
 
 interface Interview {
@@ -40,6 +70,8 @@ interface CreateFeedbackParams {
   userId: string;
   transcript: { role: string; content: string }[];
   feedbackId?: string;
+  language?: string;
+  facialMetrics?: import("@/lib/facial/types").FacialTelemetrySummary;
 }
 
 interface User {

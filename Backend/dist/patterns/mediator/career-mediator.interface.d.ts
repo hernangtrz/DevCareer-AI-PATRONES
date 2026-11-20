@@ -30,6 +30,7 @@ export interface CareerEventPayloadMap {
         userId: string;
         totalScore: number;
         cefrLevel?: string;
+        facialFeedback?: import("../../types").FacialBehaviorFeedback;
         strengths: string[];
         areasForImprovement: string[];
         role?: string;

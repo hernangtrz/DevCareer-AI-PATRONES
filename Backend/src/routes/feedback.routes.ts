@@ -11,6 +11,7 @@ import {
   InterviewFeedbackReport,
   EnglishProficiencyReport,
   UserDashboardReport,
+  NonVerbalBehaviorReport,
   resolveReportRenderer,
   SUPPORTED_REPORT_FORMATS,
 } from "../patterns/bridge";
@@ -245,6 +246,7 @@ router.post(
         userId: req.userId || "anonymous",
         transcript: req.body.transcript,
         language: req.body.language,
+        facialMetrics: req.body.facialMetrics,
       });
 
       // Patrón Mediator (GoF): Notificar que la evaluación concluyó para sincronizar
@@ -325,10 +327,16 @@ router.get("/:interviewId/export", flexibleAuth, async (req: AuthRequest, res: R
         return;
       }
       report = new EnglishProficiencyReport(interviewId, feedback.englishFeedback, renderer);
+    } else if (reportType === "nonverbal" || reportType === "facial") {
+      if (!feedback.facialFeedback) {
+        res.status(404).json({ success: false, message: "Esta entrevista no tiene evaluación no verbal registrada" });
+        return;
+      }
+      report = new NonVerbalBehaviorReport(interviewId, feedback.facialFeedback, renderer);
     } else if (reportType === "interview") {
       report = new InterviewFeedbackReport(feedback, renderer);
     } else {
-      res.status(400).json({ success: false, message: "Tipo de reporte no soportado. Usa: interview, english" });
+      res.status(400).json({ success: false, message: "Tipo de reporte no soportado. Usa: interview, english, nonverbal" });
       return;
     }
 

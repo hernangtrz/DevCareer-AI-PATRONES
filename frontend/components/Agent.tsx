@@ -18,7 +18,11 @@ import {
   ShieldCheck,
   Briefcase,
   Code2,
+  Camera,
+  CameraOff,
 } from "lucide-react";
+import { FacialMonitorPanel } from "./FacialMonitorPanel";
+import { useFacialBehaviorAnalyzer } from "@/lib/facial/useFacialBehaviorAnalyzer";
 import {
   Room,
   RoomEvent,
@@ -79,6 +83,19 @@ const Agent = ({
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // Estado de análisis facial (Edge AI)
+  const [isCameraActive, setIsCameraActive] = useState(true);
+  const [showMeshOverlay, setShowMeshOverlay] = useState(false);
+
+  const facial = useFacialBehaviorAnalyzer({
+    isEnabled: isCameraActive,
+    isCallActive: callStatus === CallStatus.ACTIVE,
+    isSpeaking: latestSpeaker === "user",
+    elapsedSeconds,
+    currentTranscriptSnippet: messages[messages.length - 1]?.content || "",
+    showMeshOverlay,
+  });
+
   // Active call duration timer
   useEffect(() => {
     if (callStatus !== CallStatus.ACTIVE) return;
@@ -118,11 +135,16 @@ const Agent = ({
         const voiceOpt = VOICE_OPTIONS.find((opt) => opt.key === selectedVoice);
         const language = voiceOpt ? voiceOpt.lang : "es";
 
+        const facialSummary = facial.finalizeSummary();
         const res = await createFeedback(
           {
             interviewId: interviewId!,
             transcript: cleanMsgs,
             language,
+            facialMetrics:
+              facialSummary.enabled && facialSummary.validFaceFrames > 0
+                ? facialSummary
+                : undefined,
           },
           idToken
         );
@@ -137,7 +159,7 @@ const Agent = ({
         router.push("/dashboard");
       }
     },
-    [interviewId, router, selectedVoice]
+    [interviewId, router, selectedVoice, facial]
   );
 
   useEffect(() => {
@@ -427,102 +449,219 @@ const Agent = ({
           </div>
         </div>
 
-        {/* Center Visualizer: Dynamic Audio Orb & Frequency Spectrum */}
-        <div className="relative flex flex-col items-center justify-center my-auto py-8 z-10 select-none">
-          <div className="relative flex items-center justify-center">
-            {/* Concentric sound halos */}
-            <div
-              className={cn(
-                "absolute rounded-full border border-indigo-500/20 pointer-events-none transition-all duration-700",
-                callStatus === CallStatus.ACTIVE && isSpeaking
-                  ? "w-52 h-52 opacity-100 animate-pulse"
-                  : "w-36 h-36 opacity-20"
-              )}
-            />
-            <div
-              className={cn(
-                "absolute rounded-full border border-indigo-500/10 pointer-events-none transition-all duration-700",
-                callStatus === CallStatus.ACTIVE && isSpeaking
-                  ? "w-64 h-64 opacity-100 animate-ping [animation-duration:2.5s]"
-                  : "w-44 h-44 opacity-0"
-              )}
-            />
+        {/* Center Visualizer: Dynamic Audio Orb & Facial Monitor Panel */}
+        <div className="relative w-full my-auto py-4 z-10 select-none">
+          {isCameraActive ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-center">
+              {/* Columna Izquierda: Orbe del Evaluador IA */}
+              <div className="flex flex-col items-center justify-center p-3">
+                <div className="relative flex items-center justify-center">
+                  <div
+                    className={cn(
+                      "absolute rounded-full border border-indigo-500/20 pointer-events-none transition-all duration-700",
+                      callStatus === CallStatus.ACTIVE && isSpeaking
+                        ? "w-44 h-44 opacity-100 animate-pulse"
+                        : "w-32 h-32 opacity-20"
+                    )}
+                  />
+                  <div
+                    className={cn(
+                      "absolute rounded-full border border-indigo-500/10 pointer-events-none transition-all duration-700",
+                      callStatus === CallStatus.ACTIVE && isSpeaking
+                        ? "w-52 h-52 opacity-100 animate-ping [animation-duration:2.5s]"
+                        : "w-36 h-36 opacity-0"
+                    )}
+                  />
 
-            {/* Main Center Audio Orb */}
-            <div
-              className={cn(
-                "z-10 flex items-center justify-center rounded-full transition-all duration-500 shadow-2xl relative overflow-hidden",
-                callStatus === CallStatus.ACTIVE && isSpeaking
-                  ? "w-32 h-32 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 scale-105 shadow-indigo-500/30 ring-4 ring-indigo-500/20"
-                  : "",
-                callStatus === CallStatus.ACTIVE && !isSpeaking
-                  ? "w-28 h-28 bg-gradient-to-tr from-zinc-900 to-indigo-950/80 scale-100 shadow-indigo-500/10 border border-indigo-500/30"
-                  : "",
-                callStatus === CallStatus.CONNECTING
-                  ? "w-28 h-28 bg-zinc-900 border border-amber-500/50 scale-100 shadow-amber-500/10 animate-pulse"
-                  : "",
-                isCallInactiveOrFinished
-                  ? "w-28 h-28 bg-zinc-900/90 border border-zinc-800 scale-100 shadow-black/60"
-                  : ""
-              )}
-            >
-              {callStatus === CallStatus.CONNECTING && (
-                <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
-              )}
+                  <div
+                    className={cn(
+                      "z-10 flex items-center justify-center rounded-full transition-all duration-500 shadow-2xl relative overflow-hidden",
+                      callStatus === CallStatus.ACTIVE && isSpeaking
+                        ? "w-28 h-28 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 scale-105 shadow-indigo-500/30 ring-4 ring-indigo-500/20"
+                        : "",
+                      callStatus === CallStatus.ACTIVE && !isSpeaking
+                        ? "w-24 h-24 bg-gradient-to-tr from-zinc-900 to-indigo-950/80 scale-100 shadow-indigo-500/10 border border-indigo-500/30"
+                        : "",
+                      callStatus === CallStatus.CONNECTING
+                        ? "w-24 h-24 bg-zinc-900 border border-amber-500/50 scale-100 shadow-amber-500/10 animate-pulse"
+                        : "",
+                      isCallInactiveOrFinished
+                        ? "w-24 h-24 bg-zinc-900/90 border border-zinc-800 scale-100 shadow-black/60"
+                        : ""
+                    )}
+                  >
+                    {callStatus === CallStatus.CONNECTING && (
+                      <Loader2 className="w-7 h-7 text-amber-400 animate-spin" />
+                    )}
 
-              {callStatus === CallStatus.ACTIVE && (
-                <div className="flex items-center gap-1.5">
-                  {isSpeaking ? (
-                    <>
-                      <div className="w-1 bg-white rounded-full animate-vocalBar1 h-8" />
-                      <div className="w-1 bg-white rounded-full animate-vocalBar2 h-12" />
-                      <div className="w-1 bg-white rounded-full animate-vocalBar3 h-6" />
-                      <div className="w-1 bg-white rounded-full animate-vocalBar2 h-10" />
-                      <div className="w-1 bg-white rounded-full animate-vocalBar1 h-8" />
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:200ms]" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:400ms]" />
+                    {callStatus === CallStatus.ACTIVE && (
+                      <div className="flex items-center gap-1.5">
+                        {isSpeaking ? (
+                          <>
+                            <div className="w-1 bg-white rounded-full animate-vocalBar1 h-7" />
+                            <div className="w-1 bg-white rounded-full animate-vocalBar2 h-10" />
+                            <div className="w-1 bg-white rounded-full animate-vocalBar3 h-5" />
+                            <div className="w-1 bg-white rounded-full animate-vocalBar2 h-9" />
+                            <div className="w-1 bg-white rounded-full animate-vocalBar1 h-7" />
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:200ms]" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:400ms]" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {isCallInactiveOrFinished && (
+                      <Headphones className="w-7 h-7 text-zinc-500" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col items-center gap-1 text-center">
+                  <h4 className="text-white font-bold text-sm tracking-wide">
+                    {callStatus === CallStatus.ACTIVE
+                      ? isSpeaking
+                        ? `${currentVoiceObj.name} hablando...`
+                        : isEs
+                        ? "Escuchándote activamente..."
+                        : "Listening to your response..."
+                      : callStatus === CallStatus.CONNECTING
+                      ? isEs
+                        ? "Estableciendo enlace de audio..."
+                        : "Establishing secure audio link..."
+                      : isEs
+                      ? "Listo para comenzar la entrevista"
+                      : "Ready to begin technical interview"}
+                  </h4>
+                  <p className="text-[11px] text-zinc-400 font-mono">
+                    {callStatus === CallStatus.ACTIVE
+                      ? isSpeaking
+                        ? "Puedes hablar en cualquier momento para intervenir"
+                        : "Habla con claridad, tu micrófono está activo"
+                      : isEs
+                      ? "Haz clic en 'Iniciar Entrevista' para conectar"
+                      : "Click 'Start Interview' below to connect"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Columna Derecha: Tarjeta de Cámara del Candidato con Edge AI */}
+              <div className="w-full">
+                <FacialMonitorPanel
+                  videoRef={facial.videoRef}
+                  canvasRef={facial.canvasRef}
+                  isEnabled={isCameraActive}
+                  onToggleEnabled={() => setIsCameraActive((prev) => !prev)}
+                  hasPermission={facial.hasPermission}
+                  isCalibrated={facial.isCalibrated}
+                  faceDetected={facial.faceDetected}
+                  cameraError={facial.cameraError}
+                  liveCue={facial.liveCue}
+                  liveScores={facial.liveScores}
+                  showMeshOverlay={showMeshOverlay}
+                  onToggleMeshOverlay={() => setShowMeshOverlay((prev) => !prev)}
+                />
+              </div>
+            </div>
+          ) : (
+            /* Modo Solo Audio Centrado */
+            <div className="relative flex flex-col items-center justify-center my-auto py-8">
+              <div className="relative flex items-center justify-center">
+                <div
+                  className={cn(
+                    "absolute rounded-full border border-indigo-500/20 pointer-events-none transition-all duration-700",
+                    callStatus === CallStatus.ACTIVE && isSpeaking
+                      ? "w-52 h-52 opacity-100 animate-pulse"
+                      : "w-36 h-36 opacity-20"
+                  )}
+                />
+                <div
+                  className={cn(
+                    "absolute rounded-full border border-indigo-500/10 pointer-events-none transition-all duration-700",
+                    callStatus === CallStatus.ACTIVE && isSpeaking
+                      ? "w-64 h-64 opacity-100 animate-ping [animation-duration:2.5s]"
+                      : "w-44 h-44 opacity-0"
+                  )}
+                />
+
+                <div
+                  className={cn(
+                    "z-10 flex items-center justify-center rounded-full transition-all duration-500 shadow-2xl relative overflow-hidden",
+                    callStatus === CallStatus.ACTIVE && isSpeaking
+                      ? "w-32 h-32 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 scale-105 shadow-indigo-500/30 ring-4 ring-indigo-500/20"
+                      : "",
+                    callStatus === CallStatus.ACTIVE && !isSpeaking
+                      ? "w-28 h-28 bg-gradient-to-tr from-zinc-900 to-indigo-950/80 scale-100 shadow-indigo-500/10 border border-indigo-500/30"
+                      : "",
+                    callStatus === CallStatus.CONNECTING
+                      ? "w-28 h-28 bg-zinc-900 border border-amber-500/50 scale-100 shadow-amber-500/10 animate-pulse"
+                      : "",
+                    isCallInactiveOrFinished
+                      ? "w-28 h-28 bg-zinc-900/90 border border-zinc-800 scale-100 shadow-black/60"
+                      : ""
+                  )}
+                >
+                  {callStatus === CallStatus.CONNECTING && (
+                    <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+                  )}
+
+                  {callStatus === CallStatus.ACTIVE && (
+                    <div className="flex items-center gap-1.5">
+                      {isSpeaking ? (
+                        <>
+                          <div className="w-1 bg-white rounded-full animate-vocalBar1 h-8" />
+                          <div className="w-1 bg-white rounded-full animate-vocalBar2 h-12" />
+                          <div className="w-1 bg-white rounded-full animate-vocalBar3 h-6" />
+                          <div className="w-1 bg-white rounded-full animate-vocalBar2 h-10" />
+                          <div className="w-1 bg-white rounded-full animate-vocalBar1 h-8" />
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:200ms]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:400ms]" />
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  {isCallInactiveOrFinished && (
+                    <Headphones className="w-8 h-8 text-zinc-500" />
+                  )}
                 </div>
-              )}
+              </div>
 
-              {isCallInactiveOrFinished && (
-                <Headphones className="w-8 h-8 text-zinc-500" />
-              )}
+              <div className="mt-5 flex flex-col items-center gap-1 text-center">
+                <h4 className="text-white font-bold text-sm tracking-wide">
+                  {callStatus === CallStatus.ACTIVE
+                    ? isSpeaking
+                      ? `${currentVoiceObj.name} hablando...`
+                      : isEs
+                      ? "Escuchándote activamente..."
+                      : "Listening to your response..."
+                    : callStatus === CallStatus.CONNECTING
+                    ? isEs
+                      ? "Estableciendo enlace de audio..."
+                      : "Establishing secure audio link..."
+                    : isEs
+                    ? "Listo para comenzar la entrevista"
+                    : "Ready to begin technical interview"}
+                </h4>
+                <p className="text-[11px] text-zinc-400 font-mono">
+                  {callStatus === CallStatus.ACTIVE
+                    ? isSpeaking
+                      ? "Puedes hablar en cualquier momento para intervenir"
+                      : "Habla con claridad, tu micrófono está activo"
+                    : isEs
+                    ? "Haz clic en 'Iniciar Entrevista' para conectar"
+                    : "Click 'Start Interview' below to connect"}
+                </p>
+              </div>
             </div>
-          </div>
-
-          {/* Conversational Status readout */}
-          <div className="mt-5 flex flex-col items-center gap-1 text-center">
-            <h4 className="text-white font-bold text-sm tracking-wide">
-              {callStatus === CallStatus.ACTIVE
-                ? isSpeaking
-                  ? `${currentVoiceObj.name} hablando...`
-                  : isEs
-                  ? "Escuchándote activamente..."
-                  : "Listening to your response..."
-                : callStatus === CallStatus.CONNECTING
-                ? isEs
-                  ? "Estableciendo enlace de audio..."
-                  : "Establishing secure audio link..."
-                : isEs
-                ? "Listo para comenzar la entrevista"
-                : "Ready to begin technical interview"}
-            </h4>
-            <p className="text-[11px] text-zinc-400 font-mono">
-              {callStatus === CallStatus.ACTIVE
-                ? isSpeaking
-                  ? "Puedes hablar en cualquier momento para intervenir"
-                  : "Habla con claridad, tu micrófono está activo"
-                : isEs
-                ? "Haz clic en 'Iniciar Entrevista' para conectar"
-                : "Click 'Start Interview' below to connect"}
-            </p>
-          </div>
+          )}
         </div>
 
         {/* Closed Captions HUD / Live Subtitle Box */}
@@ -551,23 +690,42 @@ const Agent = ({
 
         {/* Meeting Controls Bar / Floating Dock */}
         <div className="relative w-full flex items-center justify-between gap-3 pt-3 border-t border-zinc-800/70 z-10">
-          {/* Candidate Mic Toggle Button */}
-          <button
-            onClick={toggleMic}
-            disabled={callStatus !== CallStatus.ACTIVE}
-            className={cn(
-              "px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer border",
-              isMicMuted
-                ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
-                : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 disabled:opacity-40"
-            )}
-            title={isMicMuted ? "Activar micrófono" : "Silenciar micrófono"}
-          >
-            {isMicMuted ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4 text-emerald-400" />}
-            <span className="hidden sm:inline">
-              {isMicMuted ? "Micrófono Silenciado" : "Micrófono Activo"}
-            </span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Candidate Mic Toggle Button */}
+            <button
+              onClick={toggleMic}
+              disabled={callStatus !== CallStatus.ACTIVE}
+              className={cn(
+                "px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer border",
+                isMicMuted
+                  ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                  : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 disabled:opacity-40"
+              )}
+              title={isMicMuted ? "Activar micrófono" : "Silenciar micrófono"}
+            >
+              {isMicMuted ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4 text-emerald-400" />}
+              <span className="hidden sm:inline">
+                {isMicMuted ? "Micrófono Silenciado" : "Micrófono Activo"}
+              </span>
+            </button>
+
+            {/* Candidate Camera Toggle Button */}
+            <button
+              onClick={() => setIsCameraActive((prev) => !prev)}
+              className={cn(
+                "px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer border",
+                isCameraActive
+                  ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40"
+                  : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800"
+              )}
+              title={isCameraActive ? "Desactivar cámara" : "Activar cámara"}
+            >
+              {isCameraActive ? <Camera className="w-4 h-4 text-indigo-400" /> : <CameraOff className="w-4 h-4 text-zinc-500" />}
+              <span className="hidden sm:inline">
+                {isCameraActive ? "Cámara Activa" : "Cámara Desactivada"}
+              </span>
+            </button>
+          </div>
 
           {/* Main Action Button: Start or End Meeting */}
           {callStatus !== CallStatus.ACTIVE ? (

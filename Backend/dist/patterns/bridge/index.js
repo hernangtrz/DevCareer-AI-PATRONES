@@ -25,4 +25,5 @@ __exportStar(require("./reports/english-proficiency.report"), exports);
 __exportStar(require("./report-renderer.registry"), exports);
 __exportStar(require("./reports/job-applications.report"), exports);
 __exportStar(require("./reports/user-dashboard.report"), exports);
+__exportStar(require("./reports/non-verbal-behavior.report"), exports);
 //# sourceMappingURL=index.js.map

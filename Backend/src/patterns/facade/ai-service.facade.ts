@@ -9,7 +9,10 @@ import {
   CodeEvaluationResult,
   AnalyzeCvAtsParams,
   EvaluateCodeChallengeParams,
+  FacialBehaviorEvaluationService,
+  EvaluateFacialBehaviorParams,
 } from "../../services/ai";
+import { FacialBehaviorFeedback } from "../../types";
 import {
   CvOptimizationService,
   ImproveCvInput,
@@ -43,6 +46,7 @@ export class AIServiceFacade {
   private cvAnalysisService: CvAnalysisService;
   private codeChallengeService: CodeChallengeService;
   private cvOptimizationService: CvOptimizationService;
+  private facialBehaviorEvaluationService: FacialBehaviorEvaluationService;
 
   constructor(aiProvider?: IAIProvider) {
     const provider = aiProvider || AIProviderFactory.getProvider();
@@ -51,6 +55,7 @@ export class AIServiceFacade {
     this.cvAnalysisService = new CvAnalysisService(provider);
     this.codeChallengeService = new CodeChallengeService(provider);
     this.cvOptimizationService = new CvOptimizationService(provider);
+    this.facialBehaviorEvaluationService = new FacialBehaviorEvaluationService(provider);
   }
 
   /**
@@ -100,6 +105,15 @@ export class AIServiceFacade {
    */
   public async optimizeProfile(input: ImproveProfileInput): Promise<ImprovedProfileResult> {
     return this.cvOptimizationService.improveProfile(input);
+  }
+
+  /**
+   * Evalúa la presencia ejecutiva y el lenguaje no verbal (FACS, postura, tensión y contacto visual).
+   */
+  public async evaluateFacialBehavior(
+    params: EvaluateFacialBehaviorParams
+  ): Promise<FacialBehaviorFeedback> {
+    return this.facialBehaviorEvaluationService.evaluate(params);
   }
 }
 

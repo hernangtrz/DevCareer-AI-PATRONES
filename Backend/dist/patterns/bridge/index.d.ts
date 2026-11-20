@@ -9,3 +9,4 @@ export * from "./reports/english-proficiency.report";
 export * from "./report-renderer.registry";
 export * from "./reports/job-applications.report";
 export * from "./reports/user-dashboard.report";
+export * from "./reports/non-verbal-behavior.report";

@@ -29,6 +29,7 @@ class AIServiceFacade {
         this.cvAnalysisService = new ai_1.CvAnalysisService(provider);
         this.codeChallengeService = new ai_1.CodeChallengeService(provider);
         this.cvOptimizationService = new cv_optimization_service_1.CvOptimizationService(provider);
+        this.facialBehaviorEvaluationService = new ai_1.FacialBehaviorEvaluationService(provider);
     }
     /**
      * Evalúa multidimensionalmente el desempeño técnico y blando en una entrevista de voz.
@@ -65,6 +66,12 @@ class AIServiceFacade {
      */
     async optimizeProfile(input) {
         return this.cvOptimizationService.improveProfile(input);
+    }
+    /**
+     * Evalúa la presencia ejecutiva y el lenguaje no verbal (FACS, postura, tensión y contacto visual).
+     */
+    async evaluateFacialBehavior(params) {
+        return this.facialBehaviorEvaluationService.evaluate(params);
     }
 }
 exports.AIServiceFacade = AIServiceFacade;

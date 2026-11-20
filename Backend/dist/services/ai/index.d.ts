@@ -7,3 +7,4 @@ export * from "./interview-evaluation.service";
 export * from "./english-proficiency.service";
 export * from "./cv-analysis.service";
 export * from "./code-challenge.service";
+export * from "./facial-behavior-evaluation.service";

@@ -10,6 +10,7 @@ export interface ProcessInterviewEvaluationInput {
         content?: string;
     }> | string;
     language?: string;
+    facialMetrics?: import("../../types").FacialTelemetrySummary;
 }
 export interface EvaluationProcessResult {
     feedbackId: string;
@@ -55,4 +56,8 @@ export declare class InterviewEvaluationFacade {
      * Ejecuta la evaluación de inglés CEFR si aplica, sin bloquear en caso de error.
      */
     private executeEnglishEvaluation;
+    /**
+     * Ejecuta la evaluación de presencia y lenguaje no verbal (Edge AI + FACS) si se proporcionó telemetría.
+     */
+    private executeFacialEvaluation;
 }

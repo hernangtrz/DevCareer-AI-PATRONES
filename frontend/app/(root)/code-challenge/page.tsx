@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Code2,
@@ -11,31 +11,40 @@ import {
   ChevronLeft,
   Sparkles,
   Layers,
+  Briefcase,
 } from "lucide-react";
 import {
   PROBLEMS,
+  getAllProblems,
   DIFFICULTY_LABELS,
   DIFFICULTY_COLORS,
   type Difficulty,
+  type Problem,
 } from "@/lib/problems";
 import { useRouter } from "next/navigation";
-
-const ALL_CATEGORIES = Array.from(
-  new Set(PROBLEMS.flatMap((p) => p.category))
-).sort();
 
 export default function CodeChallengePage() {
   const router = useRouter();
   const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [problemsList, setProblemsList] = useState<Problem[]>(PROBLEMS);
+
+  useEffect(() => {
+    const list = getAllProblems();
+    setProblemsList(list);
+  }, []);
+
+  const allCategories = useMemo(() => {
+    return Array.from(new Set(problemsList.flatMap((p) => p.category))).sort();
+  }, [problemsList]);
 
   const filtered = useMemo(() => {
-    return PROBLEMS.filter((p) => {
+    return problemsList.filter((p) => {
       const matchDiff = difficultyFilter === "all" || p.difficulty === difficultyFilter;
       const matchCat = categoryFilter === "all" || p.category.includes(categoryFilter);
       return matchDiff && matchCat;
     });
-  }, [difficultyFilter, categoryFilter]);
+  }, [problemsList, difficultyFilter, categoryFilter]);
 
   const handleRandom = () => {
     const random = filtered[Math.floor(Math.random() * filtered.length)];
@@ -146,7 +155,7 @@ export default function CodeChallengePage() {
           className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 outline-none focus:border-zinc-700 transition-colors cursor-pointer"
         >
           <option value="all">Todas las categorías</option>
-          {ALL_CATEGORIES.map((cat) => (
+          {allCategories.map((cat) => (
             <option key={cat} value={cat}>
               {cat}
             </option>
@@ -162,22 +171,33 @@ export default function CodeChallengePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((problem) => {
           const isPattern = problem.category.includes("Patrones de Diseño");
+          const isJobCustom = problem.id.startsWith("job-");
 
           return (
             <Link
               key={problem.id}
               href={`/code-challenge/${problem.id}`}
               className={`group flex flex-col gap-4 p-5 rounded-2xl border transition-all hover:scale-[1.01] ${
-                isPattern
+                isJobCustom
+                  ? "bg-gradient-to-b from-cyan-950/20 via-zinc-900/60 to-zinc-900/80 border-cyan-500/30 hover:border-cyan-400/60 shadow-lg shadow-cyan-950/20"
+                  : isPattern
                   ? "bg-indigo-950/20 border-indigo-500/20 hover:border-indigo-500/40 hover:bg-indigo-950/30"
                   : "bg-zinc-900/40 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/80"
               }`}
             >
               {/* Top row */}
               <div className="flex items-start justify-between gap-2">
-                <span className="text-white font-semibold text-sm leading-snug group-hover:text-cyan-200 transition-colors">
-                  {problem.title}
-                </span>
+                <div className="flex flex-col gap-1">
+                  {isJobCustom && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
+                      <Briefcase className="w-3 h-3" />
+                      Reto de Oferta Laboral
+                    </span>
+                  )}
+                  <span className="text-white font-semibold text-sm leading-snug group-hover:text-cyan-200 transition-colors">
+                    {problem.title}
+                  </span>
+                </div>
                 <span
                   className={`flex-shrink-0 text-xs font-semibold border px-2.5 py-0.5 rounded-full ${
                     DIFFICULTY_COLORS[problem.difficulty]

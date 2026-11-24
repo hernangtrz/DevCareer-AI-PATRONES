@@ -594,11 +594,633 @@ Si la fuente no es reconocida, retorna \`null\`. Asegura que \`remote\` sea bool
       "El patrón Adapter convierte la interfaz de una clase o formato de datos en otra interfaz que el cliente espera.",
     ],
   },
+
+  // ──────────────────────────────────────────
+  // 12. Visitor Pattern: Auditoría de Portafolio
+  // ──────────────────────────────────────────
+  {
+    id: "visitor-pattern-portfolio",
+    title: "Patrón Visitor: Auditoría de Expediente y Métricas de Candidato",
+    difficulty: "medium",
+    category: ["Patrones de Diseño", "GoF Comportamental", "Refactoring", "SOLID"],
+    patternObjective: "Visitor Pattern (GoF Comportamental)",
+    timeLimit: 25,
+    description: `Aplica el **Patrón Visitor** para desacoplar las operaciones analíticas sobre un portafolio heterogéneo de un candidato (entrevistas, retos de código y postulaciones) sin modificar la estructura de los datos.
+
+Crea la función \`auditPortfolioWithVisitor(elements, visitorType)\`:
+- Si \`visitorType === "seniority"\`:
+  Calcula y retorna:
+  \`{ avgTechnicalScore, codeChallengeAccuracy, totalApplications, readinessLevel }\`
+  - \`avgTechnicalScore\`: promedio del \`score\` de todas las entrevistas (0 si no hay, redondeado a 1 decimal).
+  - \`codeChallengeAccuracy\`: porcentaje de tests pasados \`(totalTestsPassed / totalTests) * 100\` redondeado a 1 decimal (0 si no hay).
+  - \`totalApplications\`: cantidad de postulaciones de empleo.
+  - \`readinessLevel\`:
+    - \`"Senior"\` si \`avgTechnicalScore >= 80 && codeChallengeAccuracy >= 80\`
+    - \`"Mid-Level"\` si \`avgTechnicalScore >= 60 && codeChallengeAccuracy >= 60\`
+    - \`"Junior"\` en cualquier otro caso.
+- Si \`visitorType === "blindspots"\`:
+  Retorna un arreglo de alertas (strings):
+  - Para entrevistas con \`score < 70\`: \`"Alerta: Rendimiento bajo en entrevista de \${role} (\${score}/100)"\`
+  - Para retos de código donde \`testsPassed < totalTests\`: \`"Alerta: Pruebas incompletas en reto (\${testsPassed}/\${totalTests})"\`
+  - Para postulaciones con \`status === "rejected"\`: \`"Alerta: Postulacion rechazada en \${company}"\`
+- Si el tipo de visitante es desconocido, retorna \`null\`.`,
+    legacySpaghettiCode: `// ❌ Código Legacy sin Visitor: Switch monolítico y violación de OCP
+function auditPortfolioSpaghetti(elements, mode) {
+  if (mode === "seniority") {
+    let intScore = 0, intCount = 0, passed = 0, total = 0, apps = 0;
+    for (const el of elements) {
+      if (el.type === "interview") { intScore += el.score; intCount++; }
+      else if (el.type === "code_challenge") { passed += el.testsPassed; total += el.totalTests; }
+      else if (el.type === "job_application") { apps++; }
+    }
+  }
+}`,
+    examples: [
+      {
+        input: 'elements = [{ type: "interview", score: 85, role: "Backend Lead" }, { type: "code_challenge", testsPassed: 9, totalTests: 10 }, { type: "job_application", status: "interviewing", company: "Google" }], visitorType = "seniority"',
+        output: '{ avgTechnicalScore: 85, codeChallengeAccuracy: 90, totalApplications: 1, readinessLevel: "Senior" }',
+        explanation: "El visitante de Seniority recorre los elementos y computa el nivel acumulado.",
+      },
+    ],
+    starterCode: `function auditPortfolioWithVisitor(elements, visitorType) {
+  // Implementa el Patrón Visitor aquí
+  
+}`,
+    functionName: "auditPortfolioWithVisitor",
+    testCases: [
+      {
+        input: [
+          [
+            { type: "interview", score: 85, role: "Backend Lead" },
+            { type: "code_challenge", testsPassed: 9, totalTests: 10 },
+            { type: "job_application", status: "interviewing", company: "Google" },
+          ],
+          "seniority",
+        ],
+        expected: { avgTechnicalScore: 85, codeChallengeAccuracy: 90, totalApplications: 1, readinessLevel: "Senior" },
+      },
+      {
+        input: [
+          [
+            { type: "interview", score: 65, role: "Frontend Dev" },
+            { type: "code_challenge", testsPassed: 3, totalTests: 5 },
+            { type: "job_application", status: "rejected", company: "Meta" },
+          ],
+          "blindspots",
+        ],
+        expected: [
+          "Alerta: Rendimiento bajo en entrevista de Frontend Dev (65/100)",
+          "Alerta: Pruebas incompletas en reto (3/5)",
+          "Alerta: Postulacion rechazada en Meta",
+        ],
+      },
+      {
+        input: [[], "unknown_type"],
+        expected: null,
+      },
+    ],
+    hints: [
+      "El patrón Visitor define operaciones sobre elementos de una estructura sin modificar sus clases.",
+      "Crea un objeto visitante para 'seniority' y otro para 'blindspots' y delega la visita de cada elemento.",
+    ],
+  },
+
+  // ──────────────────────────────────────────
+  // 13. Builder Pattern: Fluent Interview Creator
+  // ──────────────────────────────────────────
+  {
+    id: "builder-pattern-interview",
+    title: "Patrón Builder: Constructor Fluido de Sesión de Entrevista",
+    difficulty: "easy",
+    category: ["Patrones de Diseño", "GoF Creacional", "Fluent API"],
+    patternObjective: "Builder Pattern (GoF Creacional)",
+    timeLimit: 20,
+    description: `Aplica el **Patrón Builder** para simplificar la creación de objetos complejos \`InterviewSession\`.
+
+Implementa la función \`buildInterviewSession(config)\`:
+- Parámetro \`config\`: objeto con opciones de configuración:
+  - \`role\`: string obligatorio. Si falta o es un string vacío, retorna \`null\`.
+  - \`company\`: string opcional (por defecto \`"Confidential Tech Corp"\`).
+  - \`seniority\`: string opcional (por defecto \`"Mid-Level"\`).
+  - \`voiceMode\`: booleano opcional (por defecto \`true\`).
+  - \`questionsLimit\`: número opcional entre 1 y 10 (por defecto \`5\`). Si se pasa un valor fuera de rango, ajústalo al límite correspondiente.
+  - \`skills\`: array de strings opcional (por defecto \`["Problem Solving", "System Design"]\`). Si viene vacío, usa el valor por defecto.
+- Retorna el objeto construido con la propiedad adicional \`readyForSimulation: true\`.`,
+    legacySpaghettiCode: `// ❌ Código Legacy sin Builder: Telescoping Constructor con demasiados parámetros
+function createInterviewTelescoping(role, company, seniority, voiceMode, limit, skills) {
+  return { role, company, seniority, voiceMode, limit, skills };
+}`,
+    examples: [
+      {
+        input: 'config = { role: "Frontend Developer" }',
+        output: '{ role: "Frontend Developer", company: "Confidential Tech Corp", seniority: "Mid-Level", voiceMode: true, questionsLimit: 5, skills: ["Problem Solving", "System Design"], readyForSimulation: true }',
+        explanation: "Aplica los valores por defecto ante la ausencia de campos opcionales.",
+      },
+    ],
+    starterCode: `function buildInterviewSession(config) {
+  // Implementa el Patrón Builder aquí
+  
+}`,
+    functionName: "buildInterviewSession",
+    testCases: [
+      {
+        input: [{ role: "Backend Engineer", company: "Stripe", seniority: "Senior", voiceMode: false, questionsLimit: 8, skills: ["Go", "PostgreSQL"] }],
+        expected: { role: "Backend Engineer", company: "Stripe", seniority: "Senior", voiceMode: false, questionsLimit: 8, skills: ["Go", "PostgreSQL"], readyForSimulation: true },
+      },
+      {
+        input: [{ role: "Frontend Developer" }],
+        expected: { role: "Frontend Developer", company: "Confidential Tech Corp", seniority: "Mid-Level", voiceMode: true, questionsLimit: 5, skills: ["Problem Solving", "System Design"], readyForSimulation: true },
+      },
+      {
+        input: [{ role: "" }],
+        expected: null,
+      },
+      {
+        input: [{ role: "AI Engineer", questionsLimit: 20 }],
+        expected: { role: "AI Engineer", company: "Confidential Tech Corp", seniority: "Mid-Level", voiceMode: true, questionsLimit: 10, skills: ["Problem Solving", "System Design"], readyForSimulation: true },
+      },
+    ],
+    hints: [
+      "El patrón Builder separa la construcción de un objeto complejo de su representación final.",
+      "Valida primero la existencia del campo obligatorio 'role'.",
+    ],
+  },
+
+  // ──────────────────────────────────────────
+  // 14. Mediator Pattern: Orquestador de Eventos de Carrera
+  // ──────────────────────────────────────────
+  {
+    id: "mediator-career-workflow",
+    title: "Patrón Mediator: Desacoplamiento de Eventos entre Módulos",
+    difficulty: "medium",
+    category: ["Patrones de Diseño", "GoF Comportamental", "Event Bus"],
+    patternObjective: "Mediator Pattern (GoF Comportamental)",
+    timeLimit: 25,
+    description: `Aplica el **Patrón Mediator** para centralizar la comunicación entre subsistemas independientes (Entrevistas, Postulaciones y Analítica).
+
+Implementa la función \`dispatchMediatorEvent(eventName, payload)\`:
+- Evento \`"INTERVIEW_EVALUATED"\`:
+  - Recibe payload: \`{ interviewId, company, score, cefrLevel }\`.
+  - Acción del mediador:
+    - Evalúa alerta de puntos ciegos: \`blindspotAlert = score < 70 || ["A1", "A2", "B1"].includes(cefrLevel)\`.
+    - Retorna: \`{ handled: true, event: "INTERVIEW_EVALUATED", interviewFinalized: true, notes: "Score: " + score + "/100, CEFR: " + cefrLevel, blindspotAlert }\`.
+- Evento \`"APPLICATION_STATUS_CHANGED"\`:
+  - Recibe payload: \`{ applicationId, newStatus }\`.
+  - Retorna: \`{ handled: true, event: "APPLICATION_STATUS_CHANGED", applicationId, newStatus, autoSyncDashboard: true }\`.
+- Cualquier otro evento:
+  - Retorna: \`{ handled: false, error: "UNKNOWN_EVENT" }\`.`,
+    legacySpaghettiCode: `// ❌ Código Legacy sin Mediator: Comunicación acoplada todos con todos (N*M dependencias)
+function onInterviewDone(interview, jobsModule, analyticsModule) {
+  jobsModule.updateApplication(interview.company);
+  analyticsModule.trackMetric(interview.score);
+}`,
+    examples: [
+      {
+        input: 'eventName = "INTERVIEW_EVALUATED", payload = { interviewId: "int-1", company: "Amazon", score: 85, cefrLevel: "C1" }',
+        output: '{ handled: true, event: "INTERVIEW_EVALUATED", interviewFinalized: true, notes: "Score: 85/100, CEFR: C1", blindspotAlert: false }',
+        explanation: "El mediador coordina la finalización y la detección de puntos ciegos sin llamadas directas entre módulos.",
+      },
+    ],
+    starterCode: `function dispatchMediatorEvent(eventName, payload) {
+  // Implementa el Patrón Mediator aquí
+  
+}`,
+    functionName: "dispatchMediatorEvent",
+    testCases: [
+      {
+        input: ["INTERVIEW_EVALUATED", { interviewId: "int-101", company: "Amazon", score: 85, cefrLevel: "C1" }],
+        expected: { handled: true, event: "INTERVIEW_EVALUATED", interviewFinalized: true, notes: "Score: 85/100, CEFR: C1", blindspotAlert: false },
+      },
+      {
+        input: ["INTERVIEW_EVALUATED", { interviewId: "int-102", company: "Uber", score: 62, cefrLevel: "B1" }],
+        expected: { handled: true, event: "INTERVIEW_EVALUATED", interviewFinalized: true, notes: "Score: 62/100, CEFR: B1", blindspotAlert: true },
+      },
+      {
+        input: ["APPLICATION_STATUS_CHANGED", { applicationId: "app-5", newStatus: "offered" }],
+        expected: { handled: true, event: "APPLICATION_STATUS_CHANGED", applicationId: "app-5", newStatus: "offered", autoSyncDashboard: true },
+      },
+      {
+        input: ["INVALID_EVENT", {}],
+        expected: { handled: false, error: "UNKNOWN_EVENT" },
+      },
+    ],
+    hints: [
+      "El patrón Mediator encapsula cómo interactúan un conjunto de objetos para promover el bajo acoplamiento.",
+      "Usa una estructura de despacho basada en el nombre del evento.",
+    ],
+  },
+
+  // ──────────────────────────────────────────
+  // 15. Observer Pattern: Suscripción a Eventos de Empleo
+  // ──────────────────────────────────────────
+  {
+    id: "observer-application-events",
+    title: "Patrón Observer: Notificador Reactivo de Cambios de Postulación",
+    difficulty: "medium",
+    category: ["Patrones de Diseño", "GoF Comportamental", "Event-Driven"],
+    patternObjective: "Observer Pattern (GoF Comportamental)",
+    timeLimit: 20,
+    description: `Aplica el **Patrón Observer** (Publicador/Suscriptor) para notificar a observadores registrados cuando ocurren cambios en las postulaciones de un candidato.
+
+Implementa la función \`runObserverWorkflow(subscriptions, eventsToPublish)\`:
+- \`subscriptions\`: arreglo de \`{ event: string, observerName: string }\` (ej: \`[{ event: "OFFER", observerName: "Email" }]\`).
+- \`eventsToPublish\`: arreglo de \`{ event: string, payload: { company: string, role: string } }\`.
+- Para cada evento publicado, cada observador suscrito a dicho evento genera un mensaje con el formato:
+  \`"[\${observerName}] Evento \${event} recibido para \${role} en \${company}"\`
+- Retorna el arreglo con todos los mensajes emitidos en orden cronológico. Si ningún observador estaba suscrito, retorna \`[]\`.`,
+    legacySpaghettiCode: `// ❌ Código Legacy sin Observer: Notificaciones cableadas en el servicio
+function updateJobStatus(app, newStatus) {
+  sendEmailNotification(app);
+  sendTelegramMessage(app);
+  pushToAnalytics(app);
+}`,
+    examples: [
+      {
+        input: 'subscriptions = [{ event: "OFFER", observerName: "Slack" }], events = [{ event: "OFFER", payload: { company: "Google", role: "Dev" } }]',
+        output: '["[Slack] Evento OFFER recibido para Dev en Google"]',
+        explanation: "Slack estaba suscrito a OFFER y recibió la notificación con su payload.",
+      },
+    ],
+    starterCode: `function runObserverWorkflow(subscriptions, eventsToPublish) {
+  // Implementa el Patrón Observer aquí
+  
+}`,
+    functionName: "runObserverWorkflow",
+    testCases: [
+      {
+        input: [
+          [
+            { event: "OFFER_RECEIVED", observerName: "EmailNotifier" },
+            { event: "OFFER_RECEIVED", observerName: "TelegramBot" },
+          ],
+          [
+            { event: "OFFER_RECEIVED", payload: { company: "Google", role: "Software Engineer" } },
+          ],
+        ],
+        expected: [
+          "[EmailNotifier] Evento OFFER_RECEIVED recibido para Software Engineer en Google",
+          "[TelegramBot] Evento OFFER_RECEIVED recibido para Software Engineer en Google",
+        ],
+      },
+      {
+        input: [
+          [{ event: "REJECTED", observerName: "Analytics" }],
+          [{ event: "ACCEPTED", payload: { company: "Vercel", role: "Frontend Lead" } }],
+        ],
+        expected: [],
+      },
+      {
+        input: [
+          [
+            { event: "INTERVIEW_READY", observerName: "CalendarSync" },
+            { event: "INTERVIEW_READY", observerName: "PushNotification" },
+          ],
+          [
+            { event: "INTERVIEW_READY", payload: { company: "GitLab", role: "DevOps Engineer" } },
+          ],
+        ],
+        expected: [
+          "[CalendarSync] Evento INTERVIEW_READY recibido para DevOps Engineer en GitLab",
+          "[PushNotification] Evento INTERVIEW_READY recibido para DevOps Engineer en GitLab",
+        ],
+      },
+    ],
+    hints: [
+      "El patrón Observer define una dependencia uno-a-muchos entre objetos para que cuando uno cambie de estado, todos sus dependientes sean notificados.",
+      "Mapea los suscriptores por el nombre del evento.",
+    ],
+  },
+
+  // ──────────────────────────────────────────
+  // 16. Decorator Pattern: Middleware de Peticiones
+  // ──────────────────────────────────────────
+  {
+    id: "decorator-api-requests",
+    title: "Patrón Decorator: Enriquecimiento Dinámico de Peticiones API",
+    difficulty: "easy",
+    category: ["Patrones de Diseño", "GoF Estructural", "Middleware"],
+    patternObjective: "Decorator Pattern (GoF Estructural)",
+    timeLimit: 15,
+    description: `Aplica el **Patrón Decorator** para envolver y enriquecer dinámicamente peticiones HTTP con capas de funcionalidad sin alterar la petición base.
+
+Implementa la función \`executeDecoratedRequest(baseRequest, decorators)\`:
+- \`baseRequest\`: objeto con \`{ url: string, method: string, headers?: Record<string, string> }\`.
+- \`decorators\`: arreglo con los decoradores a aplicar en orden:
+  - \`"auth"\`: añade el header \`"Authorization": "Bearer devcareer_secure_token"\`.
+  - \`"compression"\`: añade el header \`"Accept-Encoding": "gzip, br"\`.
+  - \`"requestId"\`: añade el header \`"X-Correlation-ID": "corr-uuid-999"\`.
+- La función debe retornar la petición con los headers resultantes combinados. Si un decorador no es reconocido, se ignora. Asegúrate de preservar los headers originales si existían.`,
+    legacySpaghettiCode: `// ❌ Código Legacy sin Decorator: Modificación directa de argumentos y código disperso
+function sendApi(req, withAuth, withGzip, withId) {
+  if (withAuth) req.headers.Authorization = "Bearer token";
+  if (withGzip) req.headers["Accept-Encoding"] = "gzip";
+}`,
+    examples: [
+      {
+        input: 'baseRequest = { url: "/jobs", method: "GET" }, decorators = ["auth"]',
+        output: '{ url: "/jobs", method: "GET", headers: { "Authorization": "Bearer devcareer_secure_token" } }',
+        explanation: "El decorador auth inyecta el token en las cabeceras.",
+      },
+    ],
+    starterCode: `function executeDecoratedRequest(baseRequest, decorators) {
+  // Implementa el Patrón Decorator aquí
+  
+}`,
+    functionName: "executeDecoratedRequest",
+    testCases: [
+      {
+        input: [
+          { url: "/api/interview", method: "POST", headers: { "Content-Type": "application/json" } },
+          ["auth", "compression"],
+        ],
+        expected: {
+          url: "/api/interview",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer devcareer_secure_token",
+            "Accept-Encoding": "gzip, br",
+          },
+        },
+      },
+      {
+        input: [
+          { url: "/api/profile", method: "GET" },
+          ["requestId"],
+        ],
+        expected: {
+          url: "/api/profile",
+          method: "GET",
+          headers: {
+            "X-Correlation-ID": "corr-uuid-999",
+          },
+        },
+      },
+      {
+        input: [
+          { url: "/health", method: "GET" },
+          [],
+        ],
+        expected: {
+          url: "/health",
+          method: "GET",
+          headers: {},
+        },
+      },
+    ],
+    hints: [
+      "El patrón Decorator adjunta responsabilidades adicionales a un objeto de forma dinámica.",
+      "Itera sobre la lista de decoradores componiendo o mutando de forma segura los headers del objeto.",
+    ],
+  },
+
+  // ──────────────────────────────────────────
+  // 17. Abstract Factory: Familia de Infraestructura Cloud
+  // ──────────────────────────────────────────
+  {
+    id: "abstract-factory-infra",
+    title: "Patrón Abstract Factory: Familia de Infraestructura Cloud vs Local",
+    difficulty: "medium",
+    category: ["Patrones de Diseño", "GoF Creacional", "Cloud Architecture"],
+    patternObjective: "Abstract Factory (GoF Creacional)",
+    timeLimit: 20,
+    description: `Aplica el **Patrón Abstract Factory** para crear familias completas de servicios de infraestructura relacionados sin especificar sus clases concretas.
+
+Implementa la función \`createCloudInfrastructure(environment)\`:
+- Para \`environment === "aws"\`:
+  - \`database\`: \`{ service: "DynamoDB", table: "devcareer_data", encryption: "KMS" }\`
+  - \`storage\`: \`{ service: "S3", bucket: "devcareer-cvs-bucket", region: "us-east-1" }\`
+  - \`telemetry\`: \`{ service: "CloudWatch", metricNamespace: "DevCareer/Prod" }\`
+- Para \`environment === "local"\`:
+  - \`database\`: \`{ service: "SQLite/Memory", table: "devcareer_memory.db", encryption: "none" }\`
+  - \`storage\`: \`{ service: "LocalStorageFS", bucket: "/tmp/devcareer_uploads", region: "localhost" }\`
+  - \`telemetry\`: \`{ service: "ConsoleLogger", metricNamespace: "DevCareer/Dev" }\`
+- Si el entorno no es soportado, retorna \`null\`.
+- Retorna el objeto unificado \`{ environment, database, storage, telemetry }\`.`,
+    legacySpaghettiCode: `// ❌ Código Legacy sin Abstract Factory: Instanciación cruzada e incoherente
+function getStorageBad(env) {
+  if (env === "aws") return new S3();
+  return new LocalFS();
+}`,
+    examples: [
+      {
+        input: 'environment = "aws"',
+        output: '{ environment: "aws", database: { service: "DynamoDB", ... }, storage: { ... }, telemetry: { ... } }',
+        explanation: "La fábrica de AWS produce la familia coordinada de servicios compatibles.",
+      },
+    ],
+    starterCode: `function createCloudInfrastructure(environment) {
+  // Implementa el Patrón Abstract Factory aquí
+  
+}`,
+    functionName: "createCloudInfrastructure",
+    testCases: [
+      {
+        input: ["aws"],
+        expected: {
+          environment: "aws",
+          database: { service: "DynamoDB", table: "devcareer_data", encryption: "KMS" },
+          storage: { service: "S3", bucket: "devcareer-cvs-bucket", region: "us-east-1" },
+          telemetry: { service: "CloudWatch", metricNamespace: "DevCareer/Prod" },
+        },
+      },
+      {
+        input: ["local"],
+        expected: {
+          environment: "local",
+          database: { service: "SQLite/Memory", table: "devcareer_memory.db", encryption: "none" },
+          storage: { service: "LocalStorageFS", bucket: "/tmp/devcareer_uploads", region: "localhost" },
+          telemetry: { service: "ConsoleLogger", metricNamespace: "DevCareer/Dev" },
+        },
+      },
+      {
+        input: ["gcp"],
+        expected: null,
+      },
+    ],
+    hints: [
+      "Abstract Factory proporciona una interfaz para crear familias de objetos relacionados o dependientes sin especificar sus clases concretas.",
+      "Usa una fábrica concreta para 'aws' y otra para 'local'.",
+    ],
+  },
+
+  // ──────────────────────────────────────────
+  // 18. LRU Cache Simulator
+  // ──────────────────────────────────────────
+  {
+    id: "lru-cache-simulator",
+    title: "Caché LRU: Desalojo por Menor Uso Reciente",
+    difficulty: "hard",
+    category: ["Estructuras de Datos", "Algoritmos", "Hash Map", "Cache"],
+    timeLimit: 30,
+    description: `Diseña una estructura de datos que siga las restricciones de una caché **LRU (Least Recently Used)**.
+
+Implementa la función \`simulateLruCache(capacity, operations)\`:
+- \`capacity\`: número entero positivo indicando la capacidad máxima de la caché.
+- \`operations\`: arreglo de comandos a ejecutar secuencialmente:
+  - \`["put", key, value]\`: inserta o actualiza el valor de la clave. Si la cantidad de claves supera la capacidad, desaloja la clave menos recientemente usada.
+  - \`["get", key]\`: retorna el valor de la clave si existe y la marca como recientemente usada; si no existe, retorna \`-1\`.
+- La función debe retornar un arreglo con los resultados de todas las operaciones \`"get"\` en el orden en que ocurrieron.`,
+    examples: [
+      {
+        input: 'capacity = 2, operations = [["put", 1, 1], ["put", 2, 2], ["get", 1], ["put", 3, 3], ["get", 2]]',
+        output: '[1, -1]',
+        explanation: "put(1,1), put(2,2). get(1)->1. put(3,3) desaloja la clave 2 porque 1 fue usada recientemente. get(2)->-1.",
+      },
+    ],
+    starterCode: `function simulateLruCache(capacity, operations) {
+  // Escribe tu solución aquí
+  
+}`,
+    functionName: "simulateLruCache",
+    testCases: [
+      {
+        input: [
+          2,
+          [
+            ["put", 1, 1],
+            ["put", 2, 2],
+            ["get", 1],
+            ["put", 3, 3],
+            ["get", 2],
+            ["put", 4, 4],
+            ["get", 1],
+            ["get", 3],
+            ["get", 4],
+          ],
+        ],
+        expected: [1, -1, -1, 3, 4],
+      },
+      {
+        input: [
+          1,
+          [
+            ["put", "a", 100],
+            ["get", "a"],
+            ["put", "b", 200],
+            ["get", "a"],
+            ["get", "b"],
+          ],
+        ],
+        expected: [100, -1, 200],
+      },
+    ],
+    hints: [
+      "En JavaScript, un objeto Map mantiene el orden de inserción de sus claves.",
+      "Cuando se accede a un elemento con 'get' o se actualiza con 'put', puedes eliminarlo y volverlo a insertar al final para mantener el orden de recencia.",
+      "Para desalojar el elemento más antiguo, toma la primera clave con map.keys().next().value.",
+    ],
+  },
+
+  // ──────────────────────────────────────────
+  // 19. Topological Build Order
+  // ──────────────────────────────────────────
+  {
+    id: "topological-build-order",
+    title: "Orden Topológico de Compilación de Módulos (Grafos)",
+    difficulty: "medium",
+    category: ["Grafos", "Algoritmos", "Topological Sort", "System Architecture"],
+    timeLimit: 25,
+    description: `Dado un arreglo de nombres de proyectos y un arreglo de pares de dependencias directas \`[target, dependency]\` (donde \`dependency\` debe compilarse **antes** que \`target\`), determina un orden seguro de compilación.
+
+Implementa la función \`findBuildOrder(projects, dependencies)\`:
+- Si se puede compilar todo sin conflictos, retorna el arreglo con los nombres en el orden de compilación adecuado.
+- En caso de existir múltiples órdenes válidos con la misma prioridad, desempata en orden alfabético.
+- Si existe una dependencia circular (ciclo) que haga imposible la compilación, retorna \`null\`.`,
+    examples: [
+      {
+        input: 'projects = ["a", "b", "c"], dependencies = [["b", "a"], ["c", "b"]]',
+        output: '["a", "b", "c"]',
+        explanation: "b depende de a, c depende de b, por lo tanto el orden es a -> b -> c.",
+      },
+    ],
+    starterCode: `function findBuildOrder(projects, dependencies) {
+  // Escribe tu solución aquí
+  
+}`,
+    functionName: "findBuildOrder",
+    testCases: [
+      {
+        input: [
+          ["a", "b", "c", "d"],
+          [
+            ["b", "a"],
+            ["c", "b"],
+            ["d", "c"],
+          ],
+        ],
+        expected: ["a", "b", "c", "d"],
+      },
+      {
+        input: [
+          ["a", "b"],
+          [
+            ["a", "b"],
+            ["b", "a"],
+          ],
+        ],
+        expected: null,
+      },
+      {
+        input: [
+          ["core", "auth", "api", "web"],
+          [
+            ["auth", "core"],
+            ["api", "core"],
+            ["api", "auth"],
+            ["web", "api"],
+          ],
+        ],
+        expected: ["core", "auth", "api", "web"],
+      },
+    ],
+    hints: [
+      "Calcula el grado de entrada (in-degree) de cada nodo contando cuántas dependencias tiene pendientes.",
+      "Usa el algoritmo de Kahn para procesar sucesivamente los nodos con grado 0.",
+    ],
+  },
 ];
 
 export function getProblemById(id: string): Problem | undefined {
-  return PROBLEMS.find((p) => p.id === id);
+  const staticProblem = PROBLEMS.find((p) => p.id === id);
+  if (staticProblem) return staticProblem;
+
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("devcareer_custom_problems");
+      if (stored) {
+        const customProblems: Problem[] = JSON.parse(stored);
+        const customFound = customProblems.find((p) => p.id === id);
+        if (customFound) return customFound;
+      }
+    } catch (e) {
+      console.error("Error reading custom problems from localStorage", e);
+    }
+  }
+
+  return undefined;
 }
+
+export function getAllProblems(): Problem[] {
+  let custom: Problem[] = [];
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("devcareer_custom_problems");
+      if (stored) {
+        custom = JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error("Error reading custom problems", e);
+    }
+  }
+  return [...custom, ...PROBLEMS];
+}
+
+export {
+  generateJobCustomChallenge,
+  saveCustomProblem,
+  getCustomProblems,
+} from "./jobChallengeGenerator";
 
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   easy: "Fácil",

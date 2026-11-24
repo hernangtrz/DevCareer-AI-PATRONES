@@ -228,6 +228,31 @@ export async function calculateRealUserAnalytics(userId: string): Promise<UserAn
   ];
   const severities: ("high" | "medium" | "low")[] = ["high", "medium", "low", "medium", "low"];
 
+  // Función auxiliar para títulos claros y semánticos (sin truncar con ...)
+  function deriveBlindspotTitle(text: string, defaultCategory: string): string {
+    const lower = (text || "").toLowerCase();
+    if (lower.includes("ejemplo") || lower.includes("arquitectura")) return "Profundidad en Ejemplos Técnicos";
+    if (lower.includes("frase") || lower.includes("monosílabo") || lower.includes("cortas") || lower.includes("ampliar") || lower.includes("respuestas")) {
+      return "Elaboración y Extensión de Respuestas";
+    }
+    if (lower.includes("pregunta") || lower.includes("competencia") || lower.includes("desarroll")) {
+      return "Demostración de Competencias Clave";
+    }
+    if (lower.includes("star") || lower.includes("métrica") || lower.includes("cuantific")) {
+      return "Estructuración con Metodología STAR";
+    }
+    if (lower.includes("resiliencia") || lower.includes("error") || lower.includes("fallo") || lower.includes("circuito")) {
+      return "Patrones de Resiliencia y Manejo de Errores";
+    }
+    if (lower.includes("base de datos") || lower.includes("concurrencia") || lower.includes("acid") || lower.includes("bloqueo")) {
+      return "Control de Concurrencia y Bases de Datos";
+    }
+    if (lower.includes("algoritm") || lower.includes("complejidad") || lower.includes("big-o")) {
+      return "Optimización Algorítmica y Big-O";
+    }
+    return defaultCategory || "Área de Mejora Identificada";
+  }
+
   const dbBlindspots: BlindspotItem[] = (
     distinctAreas.length > 0
       ? distinctAreas.slice(0, 5)
@@ -236,14 +261,17 @@ export async function calculateRealUserAnalytics(userId: string): Promise<UserAn
           "Estructurar respuestas bajo el framework STAR cuantificando métricas de rendimiento y disponibilidad.",
           "Profundizar en patrones de resiliencia y manejo de errores distribuidos.",
         ]
-  ).map((detail, idx) => ({
-    id: `bs-real-${idx + 1}`,
-    severity: severities[idx % severities.length],
-    title: detail.length > 60 ? detail.slice(0, 57) + "..." : detail,
-    detail,
-    action: "Estructurar la intervención técnica con contexto, arquitectura, decisión de diseño y resultado medible.",
-    category: categories[idx % categories.length],
-  }));
+  ).map((detail, idx) => {
+    const cat = categories[idx % categories.length];
+    return {
+      id: `bs-real-${idx + 1}`,
+      severity: severities[idx % severities.length],
+      title: deriveBlindspotTitle(detail, cat),
+      detail: detail.trim(),
+      action: "Estructurar la intervención técnica con contexto, arquitectura, decisión de diseño y resultado medible.",
+      category: cat,
+    };
+  });
 
   // Incorporar alertas proactivas registradas por el Patrón Mediator (CandidateAnalyticsColleague)
   const mediator = getDefaultCareerMediator();
@@ -251,8 +279,8 @@ export async function calculateRealUserAnalytics(userId: string): Promise<UserAn
   const mediatorBlindspots: BlindspotItem[] = mediatorAlerts.map((alert) => ({
     id: alert.id,
     severity: alert.severity,
-    title: alert.message.length > 60 ? alert.message.slice(0, 57) + "..." : alert.message,
-    detail: alert.message,
+    title: deriveBlindspotTitle(alert.message, alert.category),
+    detail: alert.message.trim(),
     action: alert.recommendedAction,
     category: alert.category,
   }));

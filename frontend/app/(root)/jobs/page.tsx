@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -41,8 +41,89 @@ import {
   Calendar,
   MessageSquare,
   X,
+  ChevronRight,
   Copy,
+  Bell,
+  BellRing,
+  CheckCheck,
+  Inbox,
+  Eye,
 } from "lucide-react";
+import { generateJobCustomChallenge, saveCustomProblem } from "@/lib/problems";
+
+export interface JobNotification {
+  id: string;
+  type: "application" | "job_alert" | "interview" | "status_change" | "system";
+  title: string;
+  message: string;
+  company?: string;
+  jobId?: string;
+  timestamp: string;
+  timeAgo: string;
+  read: boolean;
+  priority: "high" | "normal" | "low";
+  actionLabel?: string;
+  actionTab?: "feed" | "saved" | "applications" | "notifications";
+}
+
+const DEFAULT_JOB_NOTIFICATIONS: JobNotification[] = [
+  {
+    id: "notif-1",
+    type: "status_change",
+    title: "¡Avance a Entrevista Técnica!",
+    message: "Tu postulación en GitLab para Senior Backend Engineer (Go & Ruby) avanzó a la fase de entrevista técnica con el equipo de ingeniería.",
+    company: "GitLab",
+    jobId: "gh-8843512002",
+    timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+    timeAgo: "Hace 25 min",
+    read: false,
+    priority: "high",
+    actionLabel: "Ver en Seguimiento",
+    actionTab: "applications",
+  },
+  {
+    id: "notif-2",
+    type: "job_alert",
+    title: "Nueva vacante con 98% de Match",
+    message: "Detectamos una nueva vacante remota en Greenhouse: Senior Backend Engineer en GitLab con afinidad sobresaliente para tu perfil.",
+    company: "GitLab",
+    jobId: "gh-8843512002",
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    timeAgo: "Hace 2 horas",
+    read: false,
+    priority: "normal",
+    actionLabel: "Ver Vacante",
+    actionTab: "feed",
+  },
+  {
+    id: "notif-3",
+    type: "interview",
+    title: "Reto Técnico Personalizado Disponible",
+    message: "Se generó una simulación 360° (Voz + Código) adaptada a los requisitos técnicos de Palantir Technologies.",
+    company: "Palantir Technologies",
+    jobId: "lev-10dfc8bc",
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+    timeAgo: "Hace 5 horas",
+    read: false,
+    priority: "high",
+    actionLabel: "Iniciar Simulación",
+    actionTab: "feed",
+  },
+  {
+    id: "notif-4",
+    type: "application",
+    title: "Materiales de Postulación Listos",
+    message: "Tu Cover Letter y CV adaptado para Klardaten fueron preparados con éxito mediante el Patrón Facade.",
+    company: "Klardaten",
+    jobId: "rok-1137571",
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    timeAgo: "Ayer",
+    read: true,
+    priority: "normal",
+    actionLabel: "Revisar Materiales",
+    actionTab: "applications",
+  },
+];
 
 interface JobOffer {
   id: string;
@@ -82,6 +163,14 @@ function dedupeSkills(skills?: string[]): string[] {
 
 function makeClientAppId(): string {
   return `app-${Date.now()}`;
+}
+
+function makeNotificationId(): string {
+  return `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+}
+
+function pickRandomItem<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
 }
 
 const CONNECTED_PLATFORMS = [
@@ -157,12 +246,17 @@ export default function JobsPage() {
   const router = useRouter();
 
   // Navigation tabs
-  const [activeMainTab, setActiveMainTab] = useState<"feed" | "saved" | "applications">("feed");
+  const [activeMainTab, setActiveMainTab] = useState<"feed" | "saved" | "applications" | "notifications">("feed");
   const [liveApplications, setLiveApplications] = useState<JobApplicationDto[]>([]);
   const [liveJobs, setLiveJobs] = useState<JobOffer[]>([]);
   const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
   const [simulatingJobId, setSimulatingJobId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Notificaciones & Alertas del Portal de Empleo
+  const [notifications, setNotifications] = useState<JobNotification[]>([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [notifFilter, setNotifFilter] = useState<"all" | "unread" | "application" | "job_alert" | "interview">("all");
 
   // Search & Filter in Feed
   const [searchQuery, setSearchQuery] = useState("");
@@ -178,11 +272,20 @@ export default function JobsPage() {
   const [savingNotesId, setSavingNotesId] = useState<string | null>(null);
   const [savedNotesSuccess, setSavedNotesSuccess] = useState<{ [appId: string]: boolean }>({});
   const [preparedByApp, setPreparedByApp] = useState<{ [appId: string]: string }>({});
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Custom offer modal
   const [showCustomOfferModal, setShowCustomOfferModal] = useState(false);
   const [customOfferText, setCustomOfferText] = useState("");
+
+  // Modal de Selección de Modalidad de Preparación (Voz, Reto de Código o Ambos)
+  const [practiceModalJob, setPracticeModalJob] = useState<{
+    title: string;
+    company: string;
+    description?: string;
+    matchedSkills?: string[];
+    seniority?: string;
+    id?: string;
+  } | null>(null);
 
   // Modal de Materiales de Postulación (Patrón Facade)
   const [applicationModal, setApplicationModal] = useState<{
@@ -222,10 +325,7 @@ export default function JobsPage() {
 
   const showToast = (msg: string, durationMs = 4500) => {
     setToastMessage(msg);
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    toastTimerRef.current = setTimeout(() => setToastMessage(null), durationMs);
+    setTimeout(() => setToastMessage(null), durationMs);
   };
 
   // Carga inicial de datos
@@ -233,11 +333,13 @@ export default function JobsPage() {
     let isMounted = true;
 
     async function loadData() {
-      // Restaurar postulaciones y guardados de localStorage si existen
+      // Restaurar postulaciones, guardados y notificaciones de localStorage si existen
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
         if (params.get("tab") === "applications") {
           setActiveMainTab("applications");
+        } else if (params.get("tab") === "notifications") {
+          setActiveMainTab("notifications");
         }
         try {
           const savedApplied = localStorage.getItem("devcareer_applied_jobs");
@@ -258,6 +360,22 @@ export default function JobsPage() {
               });
               setEditingNotes((prev) => ({ ...notesMap, ...prev }));
             }
+          }
+
+          const savedNotifs = localStorage.getItem("devcareer_job_notifications");
+          if (savedNotifs) {
+            const parsedNotifs: unknown = JSON.parse(savedNotifs);
+            if (Array.isArray(parsedNotifs) && parsedNotifs.length > 0) {
+              setNotifications(parsedNotifs as JobNotification[]);
+            } else {
+              setNotifications(DEFAULT_JOB_NOTIFICATIONS);
+            }
+          } else {
+            setNotifications(DEFAULT_JOB_NOTIFICATIONS);
+            localStorage.setItem(
+              "devcareer_job_notifications",
+              JSON.stringify(DEFAULT_JOB_NOTIFICATIONS)
+            );
           }
         } catch (e) {
           console.error("Error leyendo de localStorage:", e);
@@ -366,7 +484,132 @@ export default function JobsPage() {
     };
   }, []);
 
+  // ── MÉTODOS DEL SISTEMA DE NOTIFICACIONES ──
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
+
+  const addNotification = (
+    notif: Omit<JobNotification, "id" | "timestamp" | "timeAgo" | "read">
+  ) => {
+    const newNotif: JobNotification = {
+      ...notif,
+      id: makeNotificationId(),
+      timestamp: new Date().toISOString(),
+      timeAgo: "Ahora mismo",
+      read: false,
+    };
+    setNotifications((prev) => {
+      const updated = [newNotif, ...prev];
+      if (typeof window !== "undefined") {
+        localStorage.setItem("devcareer_job_notifications", JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const markNotificationAsRead = (id: string) => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("devcareer_job_notifications", JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const toggleNotificationUnread = (id: string) => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, read: !n.read } : n));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("devcareer_job_notifications", JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, read: true }));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("devcareer_job_notifications", JSON.stringify(updated));
+      }
+      return updated;
+    });
+    showToast("Todas las alertas fueron marcadas como leídas");
+  };
+
+  const deleteNotification = (id: string) => {
+    setNotifications((prev) => {
+      const updated = prev.filter((n) => n.id !== id);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("devcareer_job_notifications", JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("devcareer_job_notifications");
+    }
+    showToast("Historial de alertas eliminado");
+  };
+
+  const handleNotificationAction = (notif: JobNotification) => {
+    markNotificationAsRead(notif.id);
+    setShowNotifDropdown(false);
+    if (notif.actionTab) {
+      setActiveMainTab(notif.actionTab);
+    }
+  };
+
+  const handleSimulateNewNotification = () => {
+    const samples = [
+      {
+        company: "Stripe",
+        role: "Staff Infrastructure Engineer",
+        type: "job_alert" as const,
+        title: "Nueva vacante con 96% de Match en Stripe",
+        message: "Detectamos una nueva vacante remota: Staff Infrastructure Engineer con alta afinidad técnica para tu perfil.",
+        actionLabel: "Ver Oferta",
+        actionTab: "feed" as const,
+      },
+      {
+        company: "Vercel",
+        role: "Senior Full Stack Systems",
+        type: "interview" as const,
+        title: "Reto Técnico generado para Vercel",
+        message: "Tu simulación de voz y reto de programación adaptado a Next.js y Edge Runtime están listos para practicar.",
+        actionLabel: "Iniciar Reto",
+        actionTab: "feed" as const,
+      },
+      {
+        company: "GitLab",
+        role: "Senior Backend Engineer",
+        type: "status_change" as const,
+        title: "¡Avance de fase en GitLab!",
+        message: "El equipo de reclutamiento ha revisado tu CV adaptado y programó una entrevista técnica.",
+        actionLabel: "Ver Seguimiento",
+        actionTab: "applications" as const,
+      },
+    ];
+    const pick = pickRandomItem(samples);
+    addNotification({
+      type: pick.type,
+      title: pick.title,
+      message: pick.message,
+      company: pick.company,
+      priority: "high",
+      actionLabel: pick.actionLabel,
+      actionTab: pick.actionTab,
+    });
+    showToast(`¡Alerta recibida: ${pick.title}!`);
+  };
+
   const toggleSaveJob = (id: string) => {
+    const isAlreadySaved = savedJobs.includes(id);
+    const targetJob = (liveJobs.length > 0 ? liveJobs : MOCK_JOBS).find((j) => j.id === id);
+
     setSavedJobs((prev) => {
       const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
       if (typeof window !== "undefined") {
@@ -374,6 +617,19 @@ export default function JobsPage() {
       }
       return next;
     });
+
+    if (!isAlreadySaved && targetJob) {
+      addNotification({
+        type: "job_alert",
+        title: `Oferta guardada: ${targetJob.company}`,
+        message: `Guardaste "${targetJob.title}" en tus ofertas favoritas para revisarla o practicar más tarde.`,
+        company: targetJob.company,
+        jobId: id,
+        priority: "normal",
+        actionLabel: "Ver Guardadas",
+        actionTab: "saved",
+      });
+    }
   };
 
     // POSTULACIÓN DIRECTA (1-CLIC) A TRAVÉS DEL PATRÓN FACADE
@@ -450,6 +706,18 @@ export default function JobsPage() {
       });
 
       showToast(`¡Materiales preparados para ${job.company}! Carta de presentación y CV adaptado listos.`);
+
+      // Disparar Notificación en el Centro de Empleo
+      addNotification({
+        type: "application",
+        title: `¡Postulación enviada a ${job.company}!`,
+        message: `Has aplicado exitosamente a la vacante de ${job.title}. Se generó tu Cover Letter y adaptación de perfil con el Patrón Facade.`,
+        company: job.company,
+        jobId: job.id,
+        priority: "high",
+        actionLabel: "Ver en Seguimiento",
+        actionTab: "applications",
+      });
     } catch (e: unknown) {
       console.error("Error al registrar postulación:", e);
       showToast("Error registrando postulación: " + (e instanceof Error ? e.message : "Error desconocido"));
@@ -563,12 +831,32 @@ export default function JobsPage() {
     appId: string,
     newStatus: "applied" | "interviewing" | "offered" | "rejected"
   ) => {
+    const targetApp = liveApplications.find((a) => a.id === appId);
+    const statusLabels: Record<string, string> = {
+      applied: "En Espera / Enviada",
+      interviewing: "En Entrevista Técnica",
+      offered: "Oferta Recibida",
+      rejected: "Descartada",
+    };
+
     setLiveApplications((prev) => {
       const updated = prev.map((a) => (a.id === appId ? { ...a, status: newStatus } : a));
       if (typeof window !== "undefined") {
         localStorage.setItem("devcareer_applications", JSON.stringify(updated));
       }
       return updated;
+    });
+
+    // Disparar Notificación de cambio de estado
+    addNotification({
+      type: "status_change",
+      title: `Estado actualizado: ${targetApp?.company || "Vacante"}`,
+      message: `Tu postulación para ${targetApp?.jobTitle || "el puesto"} ha cambiado a: "${statusLabels[newStatus] || newStatus}".`,
+      company: targetApp?.company,
+      jobId: targetApp?.jobId,
+      priority: newStatus === "interviewing" || newStatus === "offered" ? "high" : "normal",
+      actionLabel: "Ver en Seguimiento",
+      actionTab: "applications",
     });
 
     try {
@@ -707,6 +995,90 @@ export default function JobsPage() {
     }
   };
 
+  // RETO TÉCNICO DE CÓDIGO PERSONALIZADO PARA LA OFERTA
+  const handleStartCodeChallenge = (job: {
+    title: string;
+    company: string;
+    description?: string;
+    matchedSkills?: string[];
+    seniority?: string;
+    id?: string;
+  }) => {
+    const problem = generateJobCustomChallenge({
+      id: job.id,
+      title: job.title,
+      company: job.company,
+      description: job.description,
+      requiredSkills: job.matchedSkills,
+      seniority: job.seniority,
+    });
+    saveCustomProblem(problem);
+    setPracticeModalJob(null);
+    showToast(`Reto de código para ${job.company} generado con éxito`);
+    router.push(`/code-challenge/${problem.id}`);
+  };
+
+  // PREPARACIÓN COMPLETA (VOZ + CÓDIGO) 360°
+  const handleStartDualPreparation = async (job: {
+    title: string;
+    company: string;
+    description?: string;
+    matchedSkills?: string[];
+    seniority?: string;
+    id?: string;
+  }) => {
+    const targetId = job.id || job.title;
+    setSimulatingJobId(targetId);
+    try {
+      // 1. Generar reto técnico interactivo a medida
+      const problem = generateJobCustomChallenge({
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        description: job.description,
+        requiredSkills: job.matchedSkills,
+        seniority: job.seniority,
+      });
+      saveCustomProblem(problem);
+
+      // 2. Generar sesión de entrevista por voz
+      const res = await createJobInterview({
+        jobTitle: job.title,
+        company: job.company,
+        description: job.description || `Vacante para ${job.title} en ${job.company}`,
+        requiredSkills: job.matchedSkills || ["TypeScript", "React", "Node.js"],
+        seniority: job.seniority || "Mid-Level",
+      });
+
+      if (res.success && res.interviewId) {
+        // 3. Vincular con notas de postulación si existe
+        const matchingApp = liveApplications.find(
+          (a) => a.company.toLowerCase() === job.company.toLowerCase() || (job.id && a.jobId === job.id)
+        );
+        if (matchingApp) {
+          const prepNote = `🎯 Preparación 360° generada:\n- Reto Técnico: ${problem.title} (/code-challenge/${problem.id})\n- Entrevista por Voz: Simulación generada (/interview/${res.interviewId})`;
+          const newNotes = matchingApp.notes ? `${matchingApp.notes}\n\n${prepNote}` : prepNote;
+          setEditingNotes((prev) => ({ ...prev, [matchingApp.id]: newNotes }));
+          updateJobApplicationNotes(matchingApp.id, newNotes).catch(console.error);
+        }
+
+        setPracticeModalJob(null);
+        showToast("¡Preparación completa configurada! Iniciando reto de código...");
+        router.push(`/code-challenge/${problem.id}?nextInterview=${res.interviewId}`);
+      } else {
+        setPracticeModalJob(null);
+        router.push(`/code-challenge/${problem.id}`);
+      }
+    } catch (e: unknown) {
+      alert(
+        "Error preparando sesión combinada: " +
+          (e instanceof Error ? e.message : "Error desconocido")
+      );
+    } finally {
+      setSimulatingJobId(null);
+    }
+  };
+
   // Filtros de ofertas
   const allCurrentJobs = liveJobs.length > 0 ? liveJobs : MOCK_JOBS;
   const filteredJobs = allCurrentJobs.filter((job) => {
@@ -735,6 +1107,15 @@ export default function JobsPage() {
       const matchNotes = app.notes?.toLowerCase().includes(q);
       if (!matchTitle && !matchCompany && !matchTech && !matchNotes) return false;
     }
+    return true;
+  });
+
+  // Filtros de Notificaciones & Alertas
+  const filteredNotifications = notifications.filter((n) => {
+    if (notifFilter === "unread") return !n.read;
+    if (notifFilter === "application") return n.type === "application" || n.type === "status_change";
+    if (notifFilter === "job_alert") return n.type === "job_alert";
+    if (notifFilter === "interview") return n.type === "interview";
     return true;
   });
 
@@ -773,6 +1154,117 @@ export default function JobsPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Botón de Campana con Dropdown Flotante */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                className="relative px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 border border-zinc-700/60"
+                title="Notificaciones y Alertas de Empleo"
+              >
+                {unreadNotificationsCount > 0 ? (
+                  <BellRing className="w-4 h-4 text-amber-400 animate-pulse" />
+                ) : (
+                  <Bell className="w-4 h-4 text-zinc-400" />
+                )}
+                <span className="hidden sm:inline">Alertas</span>
+                {unreadNotificationsCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold shadow-lg shadow-rose-500/50">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Popover Flotante de Notificaciones */}
+              {showNotifDropdown && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowNotifDropdown(false)}
+                  />
+
+                  <div className="absolute right-0 top-12 z-50 w-80 sm:w-96 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl p-4 flex flex-col gap-3 animate-fadeIn">
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-purple-400" />
+                        <h4 className="text-xs font-bold text-white">Notificaciones</h4>
+                        {unreadNotificationsCount > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-[10px] text-white font-mono font-bold">
+                            {unreadNotificationsCount}
+                          </span>
+                        )}
+                      </div>
+
+                      {unreadNotificationsCount > 0 && (
+                        <button
+                          onClick={markAllNotificationsAsRead}
+                          className="text-[11px] text-zinc-400 hover:text-emerald-400 font-medium transition cursor-pointer flex items-center gap-1"
+                        >
+                          <CheckCheck className="w-3 h-3" />
+                          <span>Marcar leídas</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                      {notifications.slice(0, 4).map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => handleNotificationAction(n)}
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex flex-col gap-1 ${
+                            !n.read
+                              ? "bg-purple-950/20 border-purple-500/40 hover:bg-purple-950/30"
+                              : "bg-zinc-900/50 border-zinc-800/80 hover:bg-zinc-900"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-white truncate">
+                              {n.title}
+                            </span>
+                            {!n.read && (
+                              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-zinc-300 line-clamp-2 leading-snug">
+                            {n.message}
+                          </p>
+                          <span className="text-[9px] text-zinc-500">
+                            {n.timeAgo} {n.company ? `· ${n.company}` : ""}
+                          </span>
+                        </div>
+                      ))}
+
+                      {notifications.length === 0 && (
+                        <p className="text-xs text-zinc-500 text-center py-4">
+                          No tienes notificaciones por el momento
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="border-t border-zinc-800 pt-2 flex items-center justify-between">
+                      <button
+                        onClick={handleSimulateNewNotification}
+                        className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Sparkles className="w-3 h-3 text-yellow-300" />
+                        <span>Simular alerta</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowNotifDropdown(false);
+                          setActiveMainTab("notifications");
+                        }}
+                        className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Ver todas ({notifications.length})</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             <button
               onClick={() => setShowCustomOfferModal(true)}
               className="px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-2"
@@ -790,7 +1282,7 @@ export default function JobsPage() {
           </div>
         </div>
 
-        {/* Navigation Tabs (Feed / Saved / Mis Postulaciones) */}
+        {/* Navigation Tabs (Feed / Saved / Mis Postulaciones / Notificaciones) */}
         <div className="flex items-center gap-2 border-t border-zinc-800/80 pt-4 flex-wrap">
           <button
             onClick={() => setActiveMainTab("feed")}
@@ -832,6 +1324,27 @@ export default function JobsPage() {
             <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[10px] text-emerald-300 font-mono font-bold">
               {liveApplications.length}
             </span>
+          </button>
+
+          <button
+            onClick={() => setActiveMainTab("notifications")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer relative ${
+              activeMainTab === "notifications"
+                ? "bg-purple-600 text-white shadow-lg shadow-purple-600/25 ring-2 ring-purple-400/50"
+                : "bg-zinc-950/60 text-zinc-400 hover:text-white border border-zinc-800"
+            }`}
+          >
+            <Bell className="w-4 h-4 text-purple-300" />
+            <span>Notificaciones & Alertas</span>
+            {unreadNotificationsCount > 0 ? (
+              <span className="px-2 py-0.5 rounded-full bg-rose-500 text-[10px] text-white font-mono font-bold animate-pulse">
+                {unreadNotificationsCount}
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.2 rounded-full bg-zinc-800 text-[10px] text-zinc-400 font-mono">
+                {notifications.length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -1044,17 +1557,17 @@ export default function JobsPage() {
                         {/* Tecnologías / Stack Requerido */}
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[10px] text-zinc-500 uppercase font-bold mr-1">Tecnologías:</span>
-                          {job.matchedSkills.map((sk, idx) => (
+                          {job.matchedSkills.map((sk) => (
                             <span
-                              key={`matched-${sk}-${idx}`}
+                              key={sk}
                               className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 text-[11px] font-medium border border-emerald-500/20"
                             >
                               ✓ {sk}
                             </span>
                           ))}
-                          {job.missingSkills.map((sk, idx) => (
+                          {job.missingSkills.map((sk) => (
                             <span
-                              key={`missing-${sk}-${idx}`}
+                              key={sk}
                               className="px-2 py-0.5 rounded-md bg-zinc-800/60 text-zinc-400 text-[11px] font-medium border border-zinc-700"
                             >
                               + {sk}
@@ -1064,16 +1577,38 @@ export default function JobsPage() {
 
                         {/* Botones de Acción */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-zinc-800/80">
-                          {/* Botón Simular Entrevista */}
-                          <button
-                            onClick={() => handleSimulateInterviewForJob(job)}
-                            disabled={isSimulating}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-pink-400 hover:text-pink-300 transition-colors cursor-pointer disabled:opacity-50"
-                            title="Crear simulación técnica con el patrón Builder"
-                          >
-                            <Mic className={`w-4 h-4 ${isSimulating ? "animate-spin" : ""}`} />
-                            <span>{isSimulating ? "Creando entrevista a la medida..." : "Simular entrevista para esta oferta"}</span>
-                          </button>
+                          {/* Grupo de Práctica: Modal + Accesos Directos */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={() => setPracticeModalJob(job)}
+                              disabled={isSimulating}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500/15 via-purple-500/15 to-cyan-500/15 hover:from-pink-500/25 hover:via-purple-500/25 hover:to-cyan-500/25 border border-pink-500/30 text-xs font-semibold text-pink-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+                              title="Elegir entre entrevista de voz, reto de código o ambos"
+                            >
+                              <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                              <span>{isSimulating ? "Preparando..." : "Preparar prueba para esta oferta"}</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleSimulateInterviewForJob(job)}
+                              disabled={isSimulating}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-pink-400 hover:border-pink-500/30 text-[11px] font-medium transition cursor-pointer"
+                              title="Iniciar directamente entrevista simulada por voz"
+                            >
+                              <Mic className={`w-3.5 h-3.5 ${isSimulating ? "animate-spin text-pink-400" : ""}`} />
+                              <span>Voz</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleStartCodeChallenge(job)}
+                              disabled={isSimulating}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-cyan-400 hover:border-cyan-500/30 text-[11px] font-medium transition cursor-pointer"
+                              title="Iniciar directamente reto técnico de código en vivo"
+                            >
+                              <Code2 className="w-3.5 h-3.5" />
+                              <span>Código</span>
+                            </button>
+                          </div>
 
                           <div className="flex items-center gap-2">
                             {/* Guardar en Favoritos */}
@@ -1758,29 +2293,64 @@ export default function JobsPage() {
                     )}
 
                     {/* Acciones de la Postulación */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                      {/* Botón Practicar Entrevista Técnica Simulada */}
-                      <button
-                        onClick={() =>
-                          handleSimulateInterviewForJob({
-                            title: app.jobTitle,
-                            company: app.company,
-                            description: `Vacante para ${app.jobTitle} en ${app.company}`,
-                            matchedSkills: app.techstack || ["TypeScript", "React", "Node.js"],
-                            id: app.jobId || app.id,
-                          })
-                        }
-                        disabled={isSimulating}
-                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:from-pink-500 text-white text-xs font-bold shadow-lg shadow-pink-600/20 flex items-center gap-2 transition-all hover:scale-[1.01] cursor-pointer disabled:opacity-50 w-fit"
-                        title="Crear una sesión de entrevista simulada por voz para este puesto específico con IA"
-                      >
-                        <Mic className={`w-4 h-4 ${isSimulating ? "animate-spin" : ""}`} />
-                        <span>
-                          {isSimulating
-                            ? "Preparando entrevista..."
-                            : "Practicar Entrevista Técnica Simulada"}
-                        </span>
-                      </button>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 flex-wrap">
+                      {/* Grupo de Botones de Preparación */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() =>
+                            setPracticeModalJob({
+                              title: app.jobTitle,
+                              company: app.company,
+                              description: `Vacante para ${app.jobTitle} en ${app.company}`,
+                              matchedSkills: app.techstack || ["TypeScript", "React", "Node.js"],
+                              id: app.jobId || app.id,
+                            })
+                          }
+                          disabled={isSimulating}
+                          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:from-pink-500 text-white text-xs font-bold shadow-lg shadow-pink-600/20 flex items-center gap-2 transition-all hover:scale-[1.01] cursor-pointer disabled:opacity-50"
+                          title="Elegir modalidad de preparación: entrevista de voz, reto de código o ambos"
+                        >
+                          <Zap className="w-4 h-4 text-yellow-300" />
+                          <span>
+                            {isSimulating ? "Preparando..." : "Preparar Prueba (Voz / Código)"}
+                          </span>
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handleStartCodeChallenge({
+                              title: app.jobTitle,
+                              company: app.company,
+                              description: `Vacante para ${app.jobTitle} en ${app.company}`,
+                              matchedSkills: app.techstack || ["TypeScript", "React", "Node.js"],
+                              id: app.jobId || app.id,
+                            })
+                          }
+                          className="px-3 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-cyan-400 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                          title="Iniciar directamente reto de código personalizado"
+                        >
+                          <Code2 className="w-3.5 h-3.5" />
+                          <span>Reto Código</span>
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handleSimulateInterviewForJob({
+                              title: app.jobTitle,
+                              company: app.company,
+                              description: `Vacante para ${app.jobTitle} en ${app.company}`,
+                              matchedSkills: app.techstack || ["TypeScript", "React", "Node.js"],
+                              id: app.jobId || app.id,
+                            })
+                          }
+                          disabled={isSimulating}
+                          className="px-3 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-pink-400 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                          title="Iniciar directamente simulación de entrevista por voz"
+                        >
+                          <Mic className="w-3.5 h-3.5" />
+                          <span>Voz</span>
+                        </button>
+                      </div>
 
                       {/* Abrir Formulario Oficial */}
                       {app.url && (
@@ -1794,6 +2364,291 @@ export default function JobsPage() {
                           <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
                         </a>
                       )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* VISTA 4: CENTRO DE NOTIFICACIONES & ALERTAS DE EMPLEO      */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {activeMainTab === "notifications" && (
+        <div className="flex flex-col gap-6 animate-fadeIn">
+          {/* Banner de Cabecera del Centro de Notificaciones */}
+          <div className="p-6 rounded-3xl bg-[#11131c] border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+                <BellRing className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-black text-white tracking-tight">
+                    Centro de Notificaciones & Alertas
+                  </h2>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[10px] font-bold font-mono">
+                      {unreadNotificationsCount} sin leer
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Alertas en tiempo real sobre postulaciones, cambios de fase, retos disponibles y nuevas vacantes IA.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleSimulateNewNotification}
+                className="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                title="Simular recepción de una nueva alerta para probar el sistema"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                <span>Simular Alerta</span>
+              </button>
+
+              {unreadNotificationsCount > 0 && (
+                <button
+                  onClick={markAllNotificationsAsRead}
+                  className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Marcar todas como leídas</span>
+                </button>
+              )}
+
+              {notifications.length > 0 && (
+                <button
+                  onClick={clearAllNotifications}
+                  className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-red-500/10 border border-zinc-800 hover:border-red-500/30 text-zinc-400 hover:text-red-400 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  title="Limpiar todo el historial"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Limpiar</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 4 Métricas de Notificaciones */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between">
+              <span className="text-xs text-zinc-400 font-medium flex items-center justify-between">
+                Total Alertas
+                <Inbox className="w-4 h-4 text-zinc-500" />
+              </span>
+              <span className="text-2xl font-black text-white font-mono mt-2">
+                {notifications.length}
+              </span>
+              <span className="text-[10px] text-zinc-500 mt-0.5">Historial acumulado</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#11131c] border border-rose-500/20 flex flex-col justify-between">
+              <span className="text-xs text-rose-300 font-medium flex items-center justify-between">
+                Sin Leer
+                <Bell className="w-4 h-4 text-rose-400" />
+              </span>
+              <span className="text-2xl font-black text-rose-400 font-mono mt-2">
+                {unreadNotificationsCount}
+              </span>
+              <span className="text-[10px] text-rose-300/80 mt-0.5">Requieren tu atención</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#11131c] border border-emerald-500/20 flex flex-col justify-between">
+              <span className="text-xs text-emerald-300 font-medium flex items-center justify-between">
+                Postulaciones
+                <Send className="w-4 h-4 text-emerald-400" />
+              </span>
+              <span className="text-2xl font-black text-emerald-400 font-mono mt-2">
+                {notifications.filter((n) => n.type === "application" || n.type === "status_change").length}
+              </span>
+              <span className="text-[10px] text-emerald-300/80 mt-0.5">Avances de procesos</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#11131c] border border-cyan-500/20 flex flex-col justify-between">
+              <span className="text-xs text-cyan-300 font-medium flex items-center justify-between">
+                Vacantes & Retos
+                <Sparkles className="w-4 h-4 text-cyan-400" />
+              </span>
+              <span className="text-2xl font-black text-cyan-400 font-mono mt-2">
+                {notifications.filter((n) => n.type === "job_alert" || n.type === "interview").length}
+              </span>
+              <span className="text-[10px] text-cyan-300/80 mt-0.5">Oportunidades de práctica</span>
+            </div>
+          </div>
+
+          {/* Filtros de Notificaciones */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {[
+              { id: "all", label: "Todas", count: notifications.length },
+              { id: "unread", label: "Sin leer", count: unreadNotificationsCount },
+              {
+                id: "application",
+                label: "Postulaciones",
+                count: notifications.filter((n) => n.type === "application" || n.type === "status_change").length,
+              },
+              {
+                id: "job_alert",
+                label: "Vacantes IA",
+                count: notifications.filter((n) => n.type === "job_alert").length,
+              },
+              {
+                id: "interview",
+                label: "Retos & Entrevistas",
+                count: notifications.filter((n) => n.type === "interview").length,
+              },
+            ].map((f) => {
+              const active = notifFilter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  onClick={() =>
+                    setNotifFilter(
+                      f.id as "all" | "unread" | "application" | "job_alert" | "interview"
+                    )
+                  }
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                    active
+                      ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
+                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                  }`}
+                >
+                  <span>{f.label}</span>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      active ? "bg-white/20 text-white" : "bg-zinc-800 text-zinc-500"
+                    }`}
+                  >
+                    {f.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Lista de Notificaciones */}
+          {filteredNotifications.length === 0 ? (
+            <div className="p-12 rounded-3xl bg-[#11131c] border border-zinc-800 flex flex-col items-center justify-center text-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500">
+                <Inbox className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-white">No tienes notificaciones en este filtro</h3>
+              <p className="text-xs text-zinc-400 max-w-sm">
+                Cuando te postules a una vacante, guardes una oferta o cambie el estado de un proceso, recibirás alertas aquí.
+              </p>
+              <button
+                onClick={handleSimulateNewNotification}
+                className="mt-2 px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                <span>Simular una alerta de prueba</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredNotifications.map((notif) => {
+                const isUnread = !notif.read;
+                const borderHighlight = isUnread ? "border-purple-500/40 bg-purple-950/10" : "border-zinc-800/80 bg-zinc-900/60";
+                let iconEl = <Bell className="w-4 h-4 text-zinc-400" />;
+                let tagLabel = "Aviso";
+                let tagColor = "bg-zinc-800 text-zinc-400 border-zinc-700/60";
+
+                if (notif.type === "application") {
+                  iconEl = <Send className="w-4 h-4 text-emerald-400" />;
+                  tagLabel = "Postulación";
+                  tagColor = "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
+                } else if (notif.type === "status_change") {
+                  iconEl = <TrendingUp className="w-4 h-4 text-indigo-400" />;
+                  tagLabel = "Cambio de Estado";
+                  tagColor = "bg-indigo-500/10 text-indigo-300 border-indigo-500/20";
+                } else if (notif.type === "job_alert") {
+                  iconEl = <Sparkles className="w-4 h-4 text-cyan-400" />;
+                  tagLabel = "Vacante Recomendada";
+                  tagColor = "bg-cyan-500/10 text-cyan-300 border-cyan-500/20";
+                } else if (notif.type === "interview") {
+                  iconEl = <Code2 className="w-4 h-4 text-pink-400" />;
+                  tagLabel = "Reto & Entrevista";
+                  tagColor = "bg-pink-500/10 text-pink-300 border-pink-500/20";
+                }
+
+                return (
+                  <div
+                    key={notif.id}
+                    className={`p-4 md:p-5 rounded-2xl border transition-all shadow-lg flex flex-col md:flex-row md:items-start justify-between gap-4 group ${borderHighlight}`}
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
+                        {iconEl}
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-xs font-bold text-white tracking-wide">
+                            {notif.title}
+                          </h4>
+
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${tagColor}`}>
+                            {tagLabel}
+                          </span>
+
+                          {notif.company && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300">
+                              {notif.company}
+                            </span>
+                          )}
+
+                          {isUnread && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                              NUEVA
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-zinc-300 leading-relaxed max-w-2xl">
+                          {notif.message}
+                        </p>
+
+                        <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>{notif.timeAgo || new Date(notif.timestamp).toLocaleDateString("es-ES")}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Acciones */}
+                    <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                      {notif.actionLabel && (
+                        <button
+                          onClick={() => handleNotificationAction(notif)}
+                          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
+                        >
+                          <span>{notif.actionLabel}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() =>
+                          isUnread ? markNotificationAsRead(notif.id) : toggleNotificationUnread(notif.id)
+                        }
+                        className="p-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition cursor-pointer"
+                        title={isUnread ? "Marcar como leída" : "Marcar como no leída"}
+                      >
+                        {isUnread ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+
+                      <button
+                        onClick={() => deleteNotification(notif.id)}
+                        className="p-1.5 rounded-xl bg-zinc-900 hover:bg-red-500/10 border border-zinc-800 hover:border-red-500/30 text-zinc-400 hover:text-red-400 transition cursor-pointer"
+                        title="Eliminar notificación"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -2024,6 +2879,163 @@ export default function JobsPage() {
                 className="px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold transition cursor-pointer"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Selección de Modalidad de Preparación Técnica (Voz, Código o Ambos) */}
+      {practiceModalJob && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#101216] border border-zinc-800 rounded-3xl max-w-3xl w-full p-6 sm:p-8 flex flex-col gap-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-zinc-800/80">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500/20 via-purple-500/20 to-cyan-500/20 border border-pink-500/30 flex items-center justify-center text-pink-400">
+                  <Zap className="w-6 h-6 text-yellow-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20">
+                      Preparación Técnica Personalizada
+                    </span>
+                    <span className="text-[11px] text-zinc-500 font-mono">
+                      {practiceModalJob.seniority || "Mid-Level"}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mt-1">
+                    {practiceModalJob.title}
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    {practiceModalJob.company} · Selecciona la modalidad con la que deseas practicar
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPracticeModalJob(null)}
+                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Grid de Modalidades */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Opción 1: Entrevista por Voz */}
+              <div className="group flex flex-col justify-between p-5 rounded-2xl bg-zinc-900/60 border border-zinc-800 hover:border-pink-500/40 hover:bg-zinc-900/90 transition-all flex-1">
+                <div className="flex flex-col gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400">
+                    <Mic className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white group-hover:text-pink-300 transition-colors">
+                      Entrevista por Voz
+                    </h4>
+                    <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
+                      Simulación hablada interactiva con IA (LiveKit + Gemini) centrada en arquitectura, experiencia previa y soft skills.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 font-medium">
+                      Audio en vivo
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 font-medium">
+                      Patrón Builder
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    const job = practiceModalJob;
+                    setPracticeModalJob(null);
+                    handleSimulateInterviewForJob(job);
+                  }}
+                  disabled={Boolean(simulatingJobId)}
+                  className="mt-5 w-full py-2.5 px-3 rounded-xl bg-pink-600/20 hover:bg-pink-600 border border-pink-500/30 hover:border-pink-500 text-pink-300 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Iniciar Voz</span>
+                </button>
+              </div>
+
+              {/* Opción 2: Reto Técnico de Código */}
+              <div className="group flex flex-col justify-between p-5 rounded-2xl bg-zinc-900/60 border border-zinc-800 hover:border-cyan-500/40 hover:bg-zinc-900/90 transition-all flex-1">
+                <div className="flex flex-col gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                    <Code2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">
+                      Reto Técnico de Código
+                    </h4>
+                    <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
+                      Desafío de programación en vivo con editor Monaco y pruebas unitarias basadas en el stack de la oferta ({practiceModalJob.matchedSkills?.slice(0, 3).join(", ") || "TypeScript/Node"}).
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 font-medium">
+                      Editor Monaco
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 font-medium">
+                      Feedback IA & Big-O
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleStartCodeChallenge(practiceModalJob)}
+                  className="mt-5 w-full py-2.5 px-3 rounded-xl bg-cyan-600/20 hover:bg-cyan-600 border border-cyan-500/30 hover:border-cyan-500 text-cyan-300 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Code2 className="w-3.5 h-3.5" />
+                  <span>Iniciar Reto Código</span>
+                </button>
+              </div>
+
+              {/* Opción 3: Ambos (Preparación Completa 360°) */}
+              <div className="relative group flex flex-col justify-between p-5 rounded-2xl bg-gradient-to-b from-purple-950/30 via-zinc-900/80 to-zinc-900/90 border border-purple-500/40 hover:border-purple-400 transition-all flex-1 shadow-lg shadow-purple-950/20">
+                <div className="absolute -top-3 right-4 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white text-[10px] font-bold tracking-wide uppercase shadow-md">
+                  Recomendado
+                </div>
+                <div className="flex flex-col gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300">
+                    <Sparkles className="w-5 h-5 text-yellow-300" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white group-hover:text-purple-200 transition-colors">
+                      Preparación Completa
+                    </h4>
+                    <p className="text-xs text-zinc-300 mt-1.5 leading-relaxed">
+                      Entrenamiento integral 360°: resuelve primero el reto técnico de código y luego valida tus conceptos en la entrevista técnica por voz.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-medium">
+                      Voz + Código
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-medium">
+                      Seguimiento Dual
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleStartDualPreparation(practiceModalJob)}
+                  disabled={Boolean(simulatingJobId)}
+                  className="mt-5 w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-pink-600 via-purple-600 to-cyan-600 hover:from-pink-500 hover:via-purple-500 hover:to-cyan-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-lg shadow-purple-600/30 cursor-pointer disabled:opacity-50"
+                >
+                  <Zap className="w-3.5 h-3.5 text-yellow-300" />
+                  <span>{simulatingJobId ? "Generando..." : "Realizar Ambos (360°)"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-2 border-t border-zinc-800 text-xs text-zinc-500">
+              <span>Las sesiones quedan registradas en tu historial de preparación.</span>
+              <button
+                onClick={() => setPracticeModalJob(null)}
+                className="text-zinc-400 hover:text-white transition cursor-pointer"
+              >
+                Cancelar
               </button>
             </div>
           </div>

@@ -22,10 +22,13 @@ router.get("/token", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    const voiceIsolation = req.query.voiceIsolation !== "false";
+
     // Crear el token de acceso
     const at = new AccessToken(apiKey, apiSecret, {
       identity: identity,
-      ttl: "15m", // Tiempo de vida del token
+      ttl: "60m", // Tiempo de vida extendido para entrevistas largas sin corte
+      metadata: JSON.stringify({ voiceIsolation }),
     });
 
     // Añadir permisos para unirse a la sala

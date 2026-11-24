@@ -19,10 +19,12 @@ router.get("/token", async (req, res) => {
             res.status(500).json({ error: "Configuración de LiveKit incompleta en el servidor" });
             return;
         }
+        const voiceIsolation = req.query.voiceIsolation !== "false";
         // Crear el token de acceso
         const at = new livekit_server_sdk_1.AccessToken(apiKey, apiSecret, {
             identity: identity,
-            ttl: "15m", // Tiempo de vida del token
+            ttl: "60m", // Tiempo de vida extendido para entrevistas largas sin corte
+            metadata: JSON.stringify({ voiceIsolation }),
         });
         // Añadir permisos para unirse a la sala
         at.addGrant({

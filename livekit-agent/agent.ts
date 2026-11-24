@@ -1,30 +1,89 @@
-import { cli, WorkerOptions, defineAgent, type JobContext, voice } from '@livekit/agents';
-import * as deepgram from '@livekit/agents-plugin-deepgram';
-import * as cartesia from '@livekit/agents-plugin-cartesia';
-import * as openai from '@livekit/agents-plugin-openai';
+import { cli, WorkerOptions, defineAgent, type JobContext, type JobProcess, voice } from '@livekit/agents';
 import * as silero from '@livekit/agents-plugin-silero';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { VoiceAgentStrategyResolver, GreetingContext } from './strategies/voice-agent.strategy.js';
+import { VoicePipelineFactory } from './factories/voice-pipeline.factory.js';
+import { SessionWatchdog } from './services/session-watchdog.js';
+import { InterviewTurnDetector, InterviewVoiceAgent } from './services/interview-turns.js';
 
 dotenv.config();
 
-// Cargar Silero VAD con parámetros de alta sensibilidad y baja latencia
-// - activationThreshold 0.35: detecta la voz del usuario sin omitir inicios suaves ni respuestas breves
-// - minSilenceDuration 0.35: detecta el final de la respuesta en 350ms para un turno conversacional ágil
-// - prefixPaddingDuration 0.3: conserva 300ms previos para que la primera sílaba nunca se corte
-const vad = await silero.VAD.load({
-  activationThreshold: 0.35,
-  minSilenceDuration: 0.35,
-  minSpeechDuration: 0.08,
-  prefixPaddingDuration: 0.3,
-});
+/**
+ * Opciones de Silero VAD en MILISEGUNDOS (unidad oficial en @livekit/agents-plugin-silero Node.js).
+ * - minSpeechDuration: 220ms evita disparos por clics, respiraciones o ecos breves.
+ * - minSilenceDuration: 1200ms da tiempo al candidato para pensar entre cláusulas técnicas sin cortarlo.
+ * - prefixPaddingDuration: 400ms preserva la primera sílaba del candidato.
+ */
+const VAD_OPTIONS = {
+  activationThreshold: 0.55,
+  minSpeechDuration: 220,
+  minSilenceDuration: 1200,
+  prefixPaddingDuration: 400,
+};
+
+/**
+ * Limpia y normaliza el título de la vacante para síntesis de voz natural,
+ * evitando que la IA lea texto administrativo como 'Buscamos un...' o '(Refuerzo ATS)'.
+ */
+function sanitizeRoleForSpeech(rawRole: string): string {
+  if (!rawRole) return 'Desarrollador de Software';
+  const cleaned = rawRole
+    .replace(/^entrevista\s+(de\s+|para\s+)?/i, '')
+    .replace(/^buscamos\s+(un|una)\s+/i, '')
+    .replace(/\s*\(refuerzo\s+ats\)/gi, '')
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || rawRole;
+}
+
+/**
+ * Lee la preferencia de aislamiento de voz (BVC) desde los metadatos del token del candidato.
+ */
+function parseVoiceIsolationMetadata(metadata?: string): boolean {
+  if (!metadata) return true;
+  try {
+    const parsed = JSON.parse(metadata);
+    if (typeof parsed?.voiceIsolation === 'boolean') {
+      return parsed.voiceIsolation;
+    }
+  } catch {
+    // Si el metadata no es JSON válido, mantener BVC activo por defecto
+  }
+  return true;
+}
 
 export default defineAgent({
+  // IMPORTANTE: Cargar Silero VAD dentro de prewarm() y NO con top-level await.
+  // Un top-level await bloquea import(agent.ts) por >10s en Windows, haciendo que
+  // SupervisedProc.initialize() expire a los 10s, no inicie pingInterval, y que el
+  // proceso hijo se auto-elimine con ORPHANED_TIMEOUT (15s) a mitad del saludo.
+  prewarm: async (proc: JobProcess) => {
+    proc.userData.vad = await silero.VAD.load(VAD_OPTIONS);
+  },
   entry: async (ctx: JobContext) => {
+    const vad =
+      (ctx.proc.userData.vad as silero.VAD) || (await silero.VAD.load(VAD_OPTIONS));
+
     console.log(`[Agent] Conectando a la sala: ${ctx.job.room?.name || 'desconocida'}`);
     await ctx.connect();
     console.log(`[Agent] Conectado a LiveKit.`);
+
+    // Esperar al participante antes de iniciar la sesión para leer sus preferencias (BVC)
+    // y garantizar que el saludo no arranque antes de que el candidato esté listo.
+    const participant =
+      ctx.room.remoteParticipants.size > 0
+        ? Array.from(ctx.room.remoteParticipants.values())[0]
+        : await ctx.waitForParticipant();
+
+    const voiceIsolationRequested = parseVoiceIsolationMetadata(participant?.metadata);
+    console.log(
+      `[Agent] Participante listo (${participant?.identity || 'desconocido'}). Aislamiento BVC solicitado=${voiceIsolationRequested}.`
+    );
+
+    // El módulo nativo @livekit/noise-cancellation-node ya quedó registrado en top-level antes de ctx.connect()
+    const noiseCancellation = await VoicePipelineFactory.createNoiseCancellation(voiceIsolationRequested);
 
     const roomName = ctx.job.room?.name || '';
     const parts = roomName.split('_');
@@ -77,9 +136,10 @@ export default defineAgent({
       questionsList = strategy.getFallbackQuestions();
     }
 
+    const spokenRole = sanitizeRoleForSpeech(role);
     const greetingContext: GreetingContext = {
       interviewerName: config.name,
-      role,
+      role: spokenRole,
       company,
       techstack,
     };
@@ -88,53 +148,11 @@ export default defineAgent({
     console.log(`[Agent] Saludo inicial personalizado preparado:\n"${greeting}"`);
 
     // Generar instrucciones polimórficamente sin condicionales de idioma
-    const instructions = strategy.getInstructions(role, questionsList, greetingContext);
+    const instructions = strategy.getInstructions(spokenRole, questionsList, greetingContext);
 
-    // Groq como LLM (modelo conversacional de ultra baja latencia)
-    const groqModel = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
-    console.log(`[Agent] Utilizando modelo LLM en Groq: ${groqModel}`);
-
-    // Crear el pipeline con AgentSession optimizado para fluidez y baja latencia
-    const session = new voice.AgentSession({
-      vad,
-      // Deepgram STT dinámico según idioma provisto por la estrategia
-      stt: new deepgram.STT({
-        model: 'nova-2-general',
-        language: config.language,
-      }),
-      // Groq como LLM mediante plugin oficial
-      llm: openai.LLM.withGroq({
-        model: groqModel,
-        apiKey: process.env.GROQ_API_KEY,
-      }),
-      // Cartesia TTS dinámico según la voz provista por la estrategia
-      tts: new cartesia.TTS({
-        model: 'sonic-2',
-        voice: config.voice,
-        language: config.language,
-        encoding: 'pcm_s16le',
-        sampleRate: 16000,
-      }),
-      // Warmup AEC reducido de 3000ms a 400ms para evitar el bloqueo inicial de audio
-      aecWarmupDuration: 400,
-      // Configuración de turnos conversacionales instantáneos
-      turnHandling: {
-        turnDetection: 'vad',
-        endpointing: {
-          mode: 'fixed',
-          minDelay: 400, // 400ms de silencio para responder rápido y natural
-          maxDelay: 2000,
-        },
-        interruption: {
-          enabled: true,
-          minDuration: 350,
-          discardAudioIfUninterruptible: false,
-        },
-        preemptiveGeneration: {
-          enabled: true, // Inicia inferencia mientras el usuario termina de hablar
-        },
-      },
-    });
+    // Crear pipeline resiliente tolerante a fallos transitorios y falsas interrupciones
+    const detector = new InterviewTurnDetector(config.language);
+    const session = VoicePipelineFactory.createSession(config, vad, detector);
 
     // Logging de eventos para monitoreo y depuración en tiempo real
     session.on(voice.AgentSessionEventTypes.Error, (ev) => {
@@ -161,32 +179,46 @@ export default defineAgent({
       }
     });
 
-    const agent = new voice.Agent({
-      instructions,
-      tools: {},
+    // Vincular Watchdog de Salud, recuperación bidireccional y DataChannel
+    const watchdog = new SessionWatchdog({
+      session,
+      room: ctx.room,
+      isEs: config.language === 'es',
+      bvcEnabled: !!noiseCancellation,
     });
 
-    // Iniciar la sesión vinculada a la sala de LiveKit
+    session.on(voice.AgentSessionEventTypes.Close, (ev) => {
+      console.log(`[Agent] Sesión cerrada (razón: ${ev.reason}).`);
+      watchdog.dispose();
+    });
+
+    const agent = new InterviewVoiceAgent({
+      instructions,
+      tools: {},
+    }, detector);
+
+    // Iniciar la sesión vinculada a la sala de LiveKit con cancelación de ruido BVC (según toggle)
     await session.start({
       agent,
       room: ctx.room,
+      inputOptions: {
+        noiseCancellation,
+      },
     });
 
-    console.log('[Agent] Sesión iniciada. Verificando estado del participante...');
-    if (ctx.room.remoteParticipants.size === 0) {
-      await ctx.waitForParticipant();
-    }
-    console.log('[Agent] Participante listo. Enviando saludo inicial inmediato...');
+    console.log('[Agent] Sesión iniciada. Enviando saludo inicial protegido...');
 
-    // Breve pausa para asegurar el pipeline WebRTC
-    await new Promise((r) => setTimeout(r, 200));
-    await session.say(greeting);
+    // Breve pausa para estabilizar la suscripción WebRTC y emitir saludo protegido contra falsas interrupciones
+    await new Promise((r) => setTimeout(r, 350));
+    await session.say(greeting, { allowInterruptions: false });
   },
 });
 
-// Registrar el proceso del CLI para arrancar el worker
+// Registrar el proceso del CLI para arrancar el worker con pre-warming y timeout de inicialización extendido (60s)
 cli.runApp(
   new WorkerOptions({
     agent: fileURLToPath(import.meta.url),
+    initializeProcessTimeout: 60 * 1000,
+    numIdleProcesses: 1,
   })
 );

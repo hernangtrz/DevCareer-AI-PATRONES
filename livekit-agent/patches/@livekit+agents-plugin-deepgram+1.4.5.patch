@@ -1,0 +1,139 @@
+diff --git a/node_modules/@livekit/agents-plugin-deepgram/src/stt.ts b/node_modules/@livekit/agents-plugin-deepgram/src/stt.ts
+--- a/node_modules/@livekit/agents-plugin-deepgram/src/stt.ts
++++ b/node_modules/@livekit/agents-plugin-deepgram/src/stt.ts
+@@ -5,7 +5,6 @@
+   type APIConnectOptions,
+   type AudioBuffer,
+   AudioByteStream,
+-  AudioEnergyFilter,
+   Future,
+   Task,
+   createTimedString,
+@@ -155,7 +154,6 @@
+ 
+ export class SpeechStream extends stt.SpeechStream {
+   #opts: STTOptions;
+-  #audioEnergyFilter: AudioEnergyFilter;
+   #logger = log();
+   #speaking = false;
+   #resetWS = new Future();
+@@ -167,7 +165,6 @@
+     super(stt, opts.sampleRate, connOptions);
+     this.#opts = opts;
+     this.closed = false;
+-    this.#audioEnergyFilter = new AudioEnergyFilter();
+     this.#audioDurationCollector = new PeriodicCollector(
+       (duration) => this.onAudioDurationReport(duration),
+       { duration: 5.0 },
+@@ -312,17 +309,20 @@
+             data.sampleRate === this.#opts.sampleRate ||
+             data.channels === this.#opts.numChannels
+           ) {
+-            frames = stream.write(data.data.buffer as ArrayBuffer);
++            frames = stream.write(data.data);
+           } else {
+             throw new Error(`sample rate or channel count of frame does not match`);
+           }
+ 
+           for await (const frame of frames) {
+-            if (this.#audioEnergyFilter.pushFrame(frame)) {
++            if (frame.samplesPerChannel > 0) {
+               const frameDuration = frame.samplesPerChannel / frame.sampleRate;
+               this.#audioDurationCollector.push(frameDuration);
+               ws.send(frame.data.buffer);
+             }
++          }
++          if (data === SpeechStream.FLUSH_SENTINEL) {
++            ws.send(JSON.stringify({ type: 'Finalize' }));
+           }
+         }
+       } finally {
+diff --git a/node_modules/@livekit/agents-plugin-deepgram/dist/stt.js b/node_modules/@livekit/agents-plugin-deepgram/dist/stt.js
+--- a/node_modules/@livekit/agents-plugin-deepgram/dist/stt.js
++++ b/node_modules/@livekit/agents-plugin-deepgram/dist/stt.js
+@@ -1,6 +1,5 @@
+ import {
+   AudioByteStream,
+-  AudioEnergyFilter,
+   Future,
+   Task,
+   createTimedString,
+@@ -102,7 +101,6 @@
+ }
+ class SpeechStream extends stt.SpeechStream {
+   #opts;
+-  #audioEnergyFilter;
+   #logger = log();
+   #speaking = false;
+   #resetWS = new Future();
+@@ -113,7 +111,6 @@
+     super(stt2, opts.sampleRate, connOptions);
+     this.#opts = opts;
+     this.closed = false;
+-    this.#audioEnergyFilter = new AudioEnergyFilter();
+     this.#audioDurationCollector = new PeriodicCollector(
+       (duration) => this.onAudioDurationReport(duration),
+       { duration: 5 }
+@@ -233,16 +230,19 @@
+             frames = stream.flush();
+             this.#audioDurationCollector.flush();
+           } else if (data.sampleRate === this.#opts.sampleRate || data.channels === this.#opts.numChannels) {
+-            frames = stream.write(data.data.buffer);
++            frames = stream.write(data.data);
+           } else {
+             throw new Error(`sample rate or channel count of frame does not match`);
+           }
+           for await (const frame of frames) {
+-            if (this.#audioEnergyFilter.pushFrame(frame)) {
++            if (frame.samplesPerChannel > 0) {
+               const frameDuration = frame.samplesPerChannel / frame.sampleRate;
+               this.#audioDurationCollector.push(frameDuration);
+               ws.send(frame.data.buffer);
+             }
++          }
++          if (data === SpeechStream.FLUSH_SENTINEL) {
++            ws.send(JSON.stringify({ type: "Finalize" }));
+           }
+         }
+       } finally {
+diff --git a/node_modules/@livekit/agents-plugin-deepgram/dist/stt.cjs b/node_modules/@livekit/agents-plugin-deepgram/dist/stt.cjs
+--- a/node_modules/@livekit/agents-plugin-deepgram/dist/stt.cjs
++++ b/node_modules/@livekit/agents-plugin-deepgram/dist/stt.cjs
+@@ -115,7 +115,6 @@
+ }
+ class SpeechStream extends import_agents.stt.SpeechStream {
+   #opts;
+-  #audioEnergyFilter;
+   #logger = (0, import_agents.log)();
+   #speaking = false;
+   #resetWS = new import_agents.Future();
+@@ -126,7 +125,6 @@
+     super(stt2, opts.sampleRate, connOptions);
+     this.#opts = opts;
+     this.closed = false;
+-    this.#audioEnergyFilter = new import_agents.AudioEnergyFilter();
+     this.#audioDurationCollector = new import_utils.PeriodicCollector(
+       (duration) => this.onAudioDurationReport(duration),
+       { duration: 5 }
+@@ -246,16 +244,19 @@
+             frames = stream.flush();
+             this.#audioDurationCollector.flush();
+           } else if (data.sampleRate === this.#opts.sampleRate || data.channels === this.#opts.numChannels) {
+-            frames = stream.write(data.data.buffer);
++            frames = stream.write(data.data);
+           } else {
+             throw new Error(`sample rate or channel count of frame does not match`);
+           }
+           for await (const frame of frames) {
+-            if (this.#audioEnergyFilter.pushFrame(frame)) {
++            if (frame.samplesPerChannel > 0) {
+               const frameDuration = frame.samplesPerChannel / frame.sampleRate;
+               this.#audioDurationCollector.push(frameDuration);
+               ws.send(frame.data.buffer);
+             }
++          }
++          if (data === SpeechStream.FLUSH_SENTINEL) {
++            ws.send(JSON.stringify({ type: "Finalize" }));
+           }
+         }
+       } finally {

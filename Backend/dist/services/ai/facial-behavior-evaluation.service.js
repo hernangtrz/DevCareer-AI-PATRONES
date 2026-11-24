@@ -25,8 +25,12 @@ class FacialBehaviorEvaluationService {
         try {
             const prompt = this.buildPrompt(facialMetrics, role, isEnglish);
             const aiResponse = await this.aiProvider.generateJson([{ text: prompt }], { temperature: 0.3 });
+            const basePresence = facialMetrics.scores.overallPresence ?? 80;
+            let finalOverallScore = typeof aiResponse.overallScore === "number" ? aiResponse.overallScore : basePresence;
+            // Anclar la calificación para que sea 100% coherente con la telemetría física medida (máximo ±8 puntos de variación)
+            finalOverallScore = Math.max(20, Math.min(100, Math.max(basePresence - 8, Math.min(basePresence + 8, finalOverallScore))));
             return {
-                overallScore: aiResponse.overallScore ?? facialMetrics.scores.overallPresence ?? 80,
+                overallScore: finalOverallScore,
                 expressiveProfile: aiResponse.expressiveProfile || (isEnglish ? "Calm & Natural" : "Sereno y Natural"),
                 summaryComment: aiResponse.summaryComment || (isEnglish ? "Solid non-verbal presence throughout the interview." : "Buena presencia y lenguaje no verbal durante la entrevista."),
                 metrics: {

@@ -4,6 +4,9 @@ import {
   FacialPeakEvent,
   FacialTelemetrySummary,
   LiveCoachingCue,
+  FacialBaselineCalibration,
+  LiveFacialSnapshot,
+  HeadEulerAngles,
 } from "./types";
 import {
   TensionStrategy,
@@ -13,16 +16,24 @@ import {
   PostureWarmthStrategy,
   IFacialMetricStrategy,
 } from "./strategies/facial-metric.strategy";
+import { Vector3OneEuroFilter, OneEuroFilter, computeMedian } from "./signal-filters";
 
 /**
- * Agregador de telemetría conductual y gestor de eventos en vivo.
- * Responsable de calibrar la expresión neutra base, calcular buckets temporales,
- * detectar eventos pico y generar el resumen consolidado al finalizar la llamada.
+ * ============================================================================
+ * AGREGADOR DE TELEMETRÍA CONDUCTUAL Y EVENTOS EN VIVO (DevCareer AI)
+ * ============================================================================
+ * Responsable de:
+ *  - Suavizado cinemático con filtro One-Euro en tiempo real.
+ *  - Calibración matemática por mediana (rostro + ángulo de cámara + iris).
+ *  - Cálculo O(1) de snapshots en vivo sobre ventana deslizante de 5s.
+ *  - Generación de buckets temporales cada 10s y detección de eventos pico.
+ *  - Consolidación del resumen final para el LLM y reportes Bridge.
  */
 export class FacialBehaviorAggregator {
   private samples: FacialFrameSample[] = [];
   private baselineSamples: FacialFrameSample[] = [];
   private baselineBlendshapes: Record<string, number> = {};
+  private baselineCalibration: FacialBaselineCalibration | null = null;
   private isCalibrated = false;
 
   private timelineBuckets: FacialTimelineBucket[] = [];
@@ -30,83 +41,199 @@ export class FacialBehaviorAggregator {
 
   private lastBucketSecond = -1;
   private lastAlertTimestamp = 0;
-  private alertCooldownMs = 25000; // 25 s entre alertas en vivo (Anti-Ansiedad)
+  private alertCooldownMs = 20000; // 20s entre alertas HUD para evitar sobrecargar al candidato
 
-  // Instancias de estrategias
+  // Filtros One-Euro para reducción de ruido de alta frecuencia
+  private headAngleFilter = new Vector3OneEuroFilter({ minCutoff: 1.2, beta: 0.03, dCutoff: 1.0 });
+  private centroidFilterX = new OneEuroFilter({ minCutoff: 1.0, beta: 0.02 });
+  private centroidFilterY = new OneEuroFilter({ minCutoff: 1.0, beta: 0.02 });
+
+  // Estrategias GoF
   private tensionStrategy: IFacialMetricStrategy = new TensionStrategy();
   private gestureStrategy: IFacialMetricStrategy = new GestureVolatilityStrategy();
   private eyeContactStrategy: IFacialMetricStrategy = new EyeContactStrategy();
   private blinkStrategy: IFacialMetricStrategy = new BlinkRateStrategy();
   private postureStrategy: IFacialMetricStrategy = new PostureWarmthStrategy();
 
-  constructor(cooldownMs = 25000) {
+  constructor(cooldownMs = 20000) {
     this.alertCooldownMs = cooldownMs;
   }
 
   /**
-   * Agrega una muestra de frame capturada por el loop de visión.
+   * Agrega y filtra una muestra de frame capturada por el loop de visión.
    */
   public addSample(
-    sample: FacialFrameSample,
+    rawSample: FacialFrameSample,
     elapsedSeconds: number,
     currentTranscriptSnippet = ""
   ): LiveCoachingCue | null {
-    this.samples.push(sample);
+    // 1. Suavizado cinemático One-Euro
+    const filteredAngles = this.headAngleFilter.filter(
+      rawSample.headAngles.yaw,
+      rawSample.headAngles.pitch,
+      rawSample.headAngles.roll,
+      rawSample.timestamp
+    );
 
-    // 1. Calibración de línea base durante los primeros ~3.5 s (aprox 20-25 frames con rostro)
+    const smoothedSample: FacialFrameSample = {
+      ...rawSample,
+      rawHeadAngles: rawSample.headAngles,
+      headAngles: {
+        yaw: Math.round(filteredAngles.x * 10) / 10,
+        pitch: Math.round(filteredAngles.y * 10) / 10,
+        roll: Math.round(filteredAngles.z * 10) / 10,
+      },
+      centroid: {
+        x: this.centroidFilterX.filter(rawSample.centroid.x, rawSample.timestamp),
+        y: this.centroidFilterY.filter(rawSample.centroid.y, rawSample.timestamp),
+      },
+    };
+
+    this.samples.push(smoothedSample);
+
+    // 2. Calibración inicial durante los primeros frames estables (~25 frames)
     if (!this.isCalibrated) {
-      if (sample.faceDetected) {
-        this.baselineSamples.push(sample);
-        if (this.baselineSamples.length >= 22) {
+      if (smoothedSample.faceDetected) {
+        this.baselineSamples.push(smoothedSample);
+        if (this.baselineSamples.length >= 24) {
           this.computeBaseline();
         }
       }
       return null;
     }
 
-    // 2. Comprobación y corte de bucket temporal cada 15 segundos
-    const currentBucketIndex = Math.floor(elapsedSeconds / 15);
-    if (currentBucketIndex > this.lastBucketSecond && elapsedSeconds >= 15) {
-      this.closeTimelineBucket(currentBucketIndex * 15, sample.isSpeaking);
+    // 3. Corte de buckets cada 10 segundos
+    const currentBucketIndex = Math.floor(elapsedSeconds / 10);
+    if (currentBucketIndex > this.lastBucketSecond && elapsedSeconds >= 10) {
+      this.closeTimelineBucket(currentBucketIndex * 10, smoothedSample.isSpeaking);
       this.lastBucketSecond = currentBucketIndex;
     }
 
-    // 3. Evaluación de alertas y eventos pico en una ventana reciente (últimos 4-5 s)
-    return this.evaluateLiveCues(sample, elapsedSeconds, currentTranscriptSnippet);
+    // 4. Detección de picos y sugerencias
+    return this.evaluateLiveCues(smoothedSample, elapsedSeconds, currentTranscriptSnippet);
   }
 
   /**
-   * Calcula el vector promedio de blendshapes en estado neutro.
+   * Inicia o reinicia la calibración guiada
+   */
+  public resetCalibration(): void {
+    this.isCalibrated = false;
+    this.baselineSamples = [];
+    this.baselineCalibration = null;
+    this.headAngleFilter.reset();
+    this.centroidFilterX.reset();
+    this.centroidFilterY.reset();
+  }
+
+  /**
+   * Calcula la línea base neutra usando la mediana estadística (inmune a parpadeos)
    */
   private computeBaseline(): void {
-    const accumulator: Record<string, number> = {};
-    const count = this.baselineSamples.length;
+    if (this.baselineSamples.length === 0) return;
 
-    for (const s of this.baselineSamples) {
-      for (const [key, val] of Object.entries(s.blendshapes)) {
-        accumulator[key] = (accumulator[key] || 0) + val;
-      }
-    }
+    // Mediana de blendshapes
+    const allKeys = Object.keys(this.baselineSamples[0].blendshapes);
+    const medianBlendshapes: Record<string, number> = {};
 
-    for (const [key, total] of Object.entries(accumulator)) {
-      this.baselineBlendshapes[key] = total / count;
+    for (const key of allKeys) {
+      const values = this.baselineSamples.map((s) => s.blendshapes[key] || 0);
+      medianBlendshapes[key] = computeMedian(values);
     }
+    this.baselineBlendshapes = medianBlendshapes;
+
+    // Mediana de orientación de cabeza (compensa inclinación de cámara/laptop)
+    const yaws = this.baselineSamples.map((s) => s.headAngles.yaw);
+    const pitches = this.baselineSamples.map((s) => s.headAngles.pitch);
+    const rolls = this.baselineSamples.map((s) => s.headAngles.roll);
+    const medianAngles: HeadEulerAngles = {
+      yaw: Math.round(computeMedian(yaws) * 10) / 10,
+      pitch: Math.round(computeMedian(pitches) * 10) / 10,
+      roll: Math.round(computeMedian(rolls) * 10) / 10,
+    };
+
+    // Mediana de iris y escala interocular
+    const irisX = this.baselineSamples.map((s) => s.irisGaze?.avgHorizontalOffset || 0);
+    const irisY = this.baselineSamples.map((s) => s.irisGaze?.avgVerticalOffset || 0);
+    const scales = this.baselineSamples.map((s) => s.interocularDistance || 0.2);
+
+    this.baselineCalibration = {
+      blendshapes: medianBlendshapes,
+      headAngles: medianAngles,
+      irisOffset: { x: computeMedian(irisX), y: computeMedian(irisY) },
+      faceScale: computeMedian(scales) || 0.2,
+      calibratedAt: Date.now(),
+    };
 
     this.isCalibrated = true;
+    console.log("[FacialBehaviorAggregator] ✅ Calibración completada con éxito:", {
+      baselineAngles: medianAngles,
+      scale: this.baselineCalibration.faceScale,
+    });
   }
 
   /**
-   * Genera un bucket de la línea de tiempo cada 15 segundos.
+   * Retorna una instantánea rápida O(1) de métricas en vivo sobre los últimos 5 segundos
+   */
+  public getLiveSnapshot(): LiveFacialSnapshot {
+    if (!this.isCalibrated || this.samples.length < 5) {
+      return {
+        composure: 88,
+        eyeContact: 85,
+        gestureBalance: 88,
+        postureStability: 90,
+        warmth: 75,
+        liveCue: null,
+      };
+    }
+
+    // Ventana deslizante de ~35 frames (aprox 2.5 a 4 segundos a 15 FPS)
+    const windowSamples = this.samples.slice(-35);
+    const ctx = {
+      samples: windowSamples,
+      baselineBlendshapes: this.baselineBlendshapes,
+      baselineCalibration: this.baselineCalibration || undefined,
+      windowDurationSec: 4.0,
+    };
+
+    const tensionRes = this.tensionStrategy.evaluate(ctx);
+    const eyeRes = this.eyeContactStrategy.evaluate(ctx);
+    const gestureRes = this.gestureStrategy.evaluate(ctx);
+    const postureRes = this.postureStrategy.evaluate(ctx);
+
+    const rawCue = tensionRes.alertCue || eyeRes.alertCue || gestureRes.alertCue || null;
+    const liveCue = rawCue
+      ? {
+          id: `cue-${Date.now()}-${rawCue.type}`,
+          type: rawCue.type,
+          text: rawCue.text,
+          severity: rawCue.severity,
+          timestamp: Date.now(),
+        }
+      : null;
+
+    return {
+      composure: tensionRes.score,
+      eyeContact: eyeRes.score,
+      gestureBalance: gestureRes.score,
+      postureStability: postureRes.details.postureStability ?? 85,
+      warmth: postureRes.details.warmth ?? 75,
+      liveCue,
+    };
+  }
+
+  /**
+   * Genera un bucket de la línea de tiempo cada 10 segundos
    */
   private closeTimelineBucket(second: number, isSpeaking: boolean): void {
-    // Tomar las muestras correspondientes a los últimos 15 segundos
-    const recentSamples = this.samples.slice(-100);
+    // Muestras de los últimos 10 segundos (~150 frames a 15-20 FPS)
+    const recentSamples = this.samples.slice(-150);
     if (recentSamples.length === 0) return;
 
     const ctx = {
       samples: recentSamples,
       baselineBlendshapes: this.baselineBlendshapes,
-      windowDurationSec: 15,
+      baselineCalibration: this.baselineCalibration || undefined,
+      windowDurationSec: 10,
     };
 
     const tensionRes = this.tensionStrategy.evaluate(ctx);
@@ -116,68 +243,83 @@ export class FacialBehaviorAggregator {
 
     this.timelineBuckets.push({
       second,
-      tension: Math.round((tensionRes.details.avgTensionIndex ?? 0.2) * 100),
+      tension: Math.round((tensionRes.details.avgTensionIndex ?? 0.18) * 100),
       eyeContact: eyeRes.score,
-      gestureIntensity: Math.min(100, Math.round(gestureRes.metricValue * 2.5)),
+      gestureIntensity: Math.min(100, Math.round(gestureRes.metricValue * 2.8)),
       warmth: postureRes.details.warmth ?? 70,
       speaker: isSpeaking ? "user" : "agent",
     });
   }
 
   /**
-   * Evalúa si corresponde emitir una sugerencia sutil o registrar un evento pico.
+   * Evalúa alertas y eventos pico con cooldown
    */
   private evaluateLiveCues(
     sample: FacialFrameSample,
     elapsedSeconds: number,
     snippet: string
   ): LiveCoachingCue | null {
-    // Tomar los últimos ~30 frames (~4.5 segundos)
-    const windowSamples = this.samples.slice(-30);
-    if (windowSamples.length < 20) return null;
+    const windowSamples = this.samples.slice(-40);
+    if (windowSamples.length < 15) return null;
 
     const ctx = {
       samples: windowSamples,
       baselineBlendshapes: this.baselineBlendshapes,
-      windowDurationSec: 4.5,
+      baselineCalibration: this.baselineCalibration || undefined,
+      windowDurationSec: 3.5,
     };
 
     const tensionRes = this.tensionStrategy.evaluate(ctx);
     const eyeRes = this.eyeContactStrategy.evaluate(ctx);
     const gestureRes = this.gestureStrategy.evaluate(ctx);
 
-    // Registro de picos significativos (top 8 máx)
-    if ((tensionRes.details.maxHighTensionStreakFrames ?? 0) >= 25 && this.peakEvents.length < 8) {
-      const alreadyHasRecent = this.peakEvents.some(
-        (e) => Math.abs(e.timestampSec - elapsedSeconds) < 20 && e.type === "high_tension"
+    // Registro de picos significativos (hasta 8 máx en la entrevista)
+    if ((tensionRes.details.maxHighTensionStreakFrames ?? 0) >= 16 && this.peakEvents.length < 8) {
+      const alreadyRecent = this.peakEvents.some(
+        (e) => Math.abs(e.timestampSec - elapsedSeconds) < 15 && e.type === "high_tension"
       );
-      if (!alreadyHasRecent) {
+      if (!alreadyRecent) {
         this.peakEvents.push({
           timestampSec: elapsedSeconds,
           type: "high_tension",
           severity: "high",
-          durationSec: 4,
-          contextSnippet: snippet ? snippet.slice(-120) : undefined,
+          durationSec: 3,
+          contextSnippet: snippet ? snippet.slice(-100) : undefined,
         });
       }
     }
 
-    if ((eyeRes.details.maxProlongedAwayFrames ?? 0) >= 32 && this.peakEvents.length < 8) {
-      const alreadyHasRecent = this.peakEvents.some(
-        (e) => Math.abs(e.timestampSec - elapsedSeconds) < 20 && e.type === "low_eye_contact"
+    if ((eyeRes.details.maxProlongedAwayFrames ?? 0) >= 22 && this.peakEvents.length < 8) {
+      const alreadyRecent = this.peakEvents.some(
+        (e) => Math.abs(e.timestampSec - elapsedSeconds) < 15 && e.type === "low_eye_contact"
       );
-      if (!alreadyHasRecent) {
+      if (!alreadyRecent) {
         this.peakEvents.push({
           timestampSec: elapsedSeconds,
           type: "low_eye_contact",
           severity: "moderate",
-          durationSec: 5,
-          contextSnippet: snippet ? snippet.slice(-120) : undefined,
+          durationSec: 4,
+          contextSnippet: snippet ? snippet.slice(-100) : undefined,
         });
       }
     }
 
-    // Alertas en vivo para el HUD (con cooldown)
+    if (gestureRes.details.gestureProfile === "over_expressive" && this.peakEvents.length < 8) {
+      const alreadyRecent = this.peakEvents.some(
+        (e) => Math.abs(e.timestampSec - elapsedSeconds) < 20 && e.type === "over_gesturing"
+      );
+      if (!alreadyRecent) {
+        this.peakEvents.push({
+          timestampSec: elapsedSeconds,
+          type: "over_gesturing",
+          severity: "moderate",
+          durationSec: 4,
+          contextSnippet: snippet ? snippet.slice(-100) : undefined,
+        });
+      }
+    }
+
+    // Alertas en el HUD con cooldown
     const now = Date.now();
     if (now - this.lastAlertTimestamp < this.alertCooldownMs) {
       return null;
@@ -199,7 +341,7 @@ export class FacialBehaviorAggregator {
   }
 
   /**
-   * Finaliza la sesión y consolida la telemetría completa.
+   * Finaliza la sesión y consolida la telemetría completa
    */
   public finalizeSummary(totalDurationSeconds: number): FacialTelemetrySummary {
     const validSamples = this.samples.filter((s) => s.faceDetected);
@@ -210,6 +352,7 @@ export class FacialBehaviorAggregator {
     const ctx = {
       samples: this.samples,
       baselineBlendshapes: this.baselineBlendshapes,
+      baselineCalibration: this.baselineCalibration || undefined,
       windowDurationSec: totalDurationSeconds,
     };
 
@@ -219,31 +362,33 @@ export class FacialBehaviorAggregator {
     const blinkRes = this.blinkStrategy.evaluate(ctx);
     const postureRes = this.postureStrategy.evaluate(ctx);
 
-    // Desglose de tensión hablando vs escuchando
+    // Comparativa hablando vs escuchando
     const speakingSamples = validSamples.filter((s) => s.isSpeaking);
     const listeningSamples = validSamples.filter((s) => !s.isSpeaking);
 
     const speakingTensionCtx = {
       samples: speakingSamples,
       baselineBlendshapes: this.baselineBlendshapes,
-      windowDurationSec: totalDurationSeconds / 2,
+      baselineCalibration: this.baselineCalibration || undefined,
+      windowDurationSec: Math.max(1, totalDurationSeconds / 2),
     };
     const listeningEyeCtx = {
       samples: listeningSamples,
       baselineBlendshapes: this.baselineBlendshapes,
-      windowDurationSec: totalDurationSeconds / 2,
+      baselineCalibration: this.baselineCalibration || undefined,
+      windowDurationSec: Math.max(1, totalDurationSeconds / 2),
     };
 
-    const speakingTension = this.tensionStrategy.evaluate(speakingTensionCtx).details.avgTensionIndex || 0.2;
-    const listeningEyeContact = this.eyeContactStrategy.evaluate(listeningEyeCtx).score || 85;
+    const speakingTension = this.tensionStrategy.evaluate(speakingTensionCtx).details.avgTensionIndex ?? 0.18;
+    const listeningEyeContact = this.eyeContactStrategy.evaluate(listeningEyeCtx).score ?? 85;
 
-    // Puntuación global de presencia ejecutiva (0..100)
+    // Presencia ejecutiva balanceada
     const overallPresence = Math.round(
       eyeRes.score * 0.25 +
       tensionRes.score * 0.25 +
       gestureRes.score * 0.20 +
-      (postureRes.details.postureStability ?? 70) * 0.15 +
-      (postureRes.details.warmth ?? 70) * 0.15
+      (postureRes.details.postureStability ?? 85) * 0.15 +
+      (postureRes.details.warmth ?? 75) * 0.15
     );
 
     return {
@@ -258,11 +403,11 @@ export class FacialBehaviorAggregator {
         eyeContact: eyeRes.score,
         composure: tensionRes.score,
         gestureBalance: gestureRes.score,
-        postureStability: postureRes.details.postureStability ?? 70,
-        warmth: postureRes.details.warmth ?? 70,
+        postureStability: postureRes.details.postureStability ?? 85,
+        warmth: postureRes.details.warmth ?? 75,
       },
       indicators: {
-        avgTensionIndex: tensionRes.details.avgTensionIndex ?? 0.2,
+        avgTensionIndex: tensionRes.details.avgTensionIndex ?? 0.18,
         gestureProfile: gestureRes.details.gestureProfile || "natural",
         blinkRatePerMin: blinkRes.metricValue,
         headMovementVolatility: gestureRes.details.headMovementVolatility || 2.5,

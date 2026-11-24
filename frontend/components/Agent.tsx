@@ -20,6 +20,8 @@ import {
   Code2,
   Camera,
   CameraOff,
+  Volume2,
+  RotateCcw,
 } from "lucide-react";
 import { FacialMonitorPanel } from "./FacialMonitorPanel";
 import { useFacialBehaviorAnalyzer } from "@/lib/facial/useFacialBehaviorAnalyzer";
@@ -69,6 +71,7 @@ const Agent = ({
 }: AgentProps) => {
   const router = useRouter();
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isCandidateSpeaking, setIsCandidateSpeaking] = useState(false);
   const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
   const [messages, setMessages] = useState<SavedMessage[]>([]);
   const [latestSpeaker, setLatestSpeaker] = useState<"agent" | "user">("agent");
@@ -83,6 +86,45 @@ const Agent = ({
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // Aislamiento de voz inteligente (BVC - Krisp AI server-side)
+  const [isVoiceIsolationEnabled, setIsVoiceIsolationEnabled] = useState(true);
+
+  // Monitor de salud del agente de voz
+  const [agentHealth, setAgentHealth] = useState<{
+    status: "ok" | "recovering" | "error";
+    message?: string;
+  }>({ status: "ok" });
+
+  // Mapa de segmentos de transcripción deduplicados por segmentId (evita colisiones y pérdida de frases)
+  const usingTextStreamRef = useRef<boolean>(false);
+  const lkRoomRef = useRef<Room | null>(null);
+  const audioElementsRef = useRef<Set<HTMLMediaElement>>(new Set());
+  const healthResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cleanupAudioElements = useCallback(() => {
+    audioElementsRef.current.forEach((el) => {
+      try {
+        el.pause();
+        el.remove();
+      } catch {
+        // ignore cleanup errors
+      }
+    });
+    audioElementsRef.current.clear();
+  }, []);
+
+  // Limpieza segura de WebRTC y elementos <audio> al desmontar
+  useEffect(() => {
+    return () => {
+      if (healthResetTimerRef.current) clearTimeout(healthResetTimerRef.current);
+      cleanupAudioElements();
+      if (lkRoomRef.current) {
+        lkRoomRef.current.disconnect().catch(() => {});
+        lkRoomRef.current = null;
+      }
+    };
+  }, [cleanupAudioElements]);
+
   // Estado de análisis facial (Edge AI)
   const [isCameraActive, setIsCameraActive] = useState(true);
   const [showMeshOverlay, setShowMeshOverlay] = useState(false);
@@ -90,11 +132,16 @@ const Agent = ({
   const facial = useFacialBehaviorAnalyzer({
     isEnabled: isCameraActive,
     isCallActive: callStatus === CallStatus.ACTIVE,
-    isSpeaking: latestSpeaker === "user",
+    isSpeaking: isCandidateSpeaking || latestSpeaker === "user",
     elapsedSeconds,
     currentTranscriptSnippet: messages[messages.length - 1]?.content || "",
     showMeshOverlay,
   });
+
+  const finalizeSummaryRef = useRef(facial.finalizeSummary);
+  useEffect(() => {
+    finalizeSummaryRef.current = facial.finalizeSummary;
+  }, [facial.finalizeSummary]);
 
   // Active call duration timer
   useEffect(() => {
@@ -124,6 +171,25 @@ const Agent = ({
     }
   };
 
+  // Enviar comandos al watchdog del agente por DataChannel
+  const sendInterviewControl = useCallback(
+    async (command: "repeat_last" | "resume_turn") => {
+      if (!lkRoom || callStatus !== CallStatus.ACTIVE) return;
+      try {
+        const payload = new TextEncoder().encode(
+          JSON.stringify({ action: command, type: command, timestamp: Date.now() })
+        );
+        await lkRoom.localParticipant.publishData(payload, {
+          reliable: true,
+          topic: "interview-control",
+        });
+      } catch (e) {
+        console.warn("[Agent] Failed to send interview-control command:", e);
+      }
+    },
+    [lkRoom, callStatus]
+  );
+
   const handleGenerateFeedback = useCallback(
     async (msgs: SavedMessage[]) => {
       console.log("[Agent] Generando reporte y feedback de entrevista...");
@@ -135,7 +201,7 @@ const Agent = ({
         const voiceOpt = VOICE_OPTIONS.find((opt) => opt.key === selectedVoice);
         const language = voiceOpt ? voiceOpt.lang : "es";
 
-        const facialSummary = facial.finalizeSummary();
+        const facialSummary = finalizeSummaryRef.current();
         const res = await createFeedback(
           {
             interviewId: interviewId!,
@@ -159,7 +225,7 @@ const Agent = ({
         router.push("/dashboard");
       }
     },
-    [interviewId, router, selectedVoice, facial]
+    [interviewId, router, selectedVoice]
   );
 
   useEffect(() => {
@@ -172,10 +238,34 @@ const Agent = ({
     }
   }, [callStatus, handleGenerateFeedback, router, type]);
 
+  const upsertTranscriptSegment = useCallback(
+    (segmentId: string, sender: "user" | "assistant", text: string) => {
+      const cleaned = text.trim();
+      if (!cleaned) return;
+      setLatestSpeaker(sender === "user" ? "user" : "agent");
+
+      setMessages((prev) => {
+        const existingIdx = prev.findIndex((m) => m.id === segmentId);
+        if (existingIdx !== -1) {
+          if (prev[existingIdx].content === cleaned) return prev;
+          const next = [...prev];
+          next[existingIdx] = { ...next[existingIdx], content: cleaned };
+          return next;
+        }
+        return [...prev, { id: segmentId, role: sender, content: cleaned }];
+      });
+    },
+    []
+  );
+
   const handleCall = async () => {
     setCallStatus(CallStatus.CONNECTING);
     setElapsedSeconds(0);
     setIsMicMuted(false);
+    setMessages([]);
+    usingTextStreamRef.current = false;
+    cleanupAudioElements();
+    setAgentHealth({ status: "ok" });
 
     try {
       const roomName =
@@ -188,7 +278,9 @@ const Agent = ({
         typeof window !== "undefined"
           ? "/api/proxy"
           : process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const tokenResponse = await fetch(`${apiUrl}/api/livekit/token?room=${roomName}&identity=${identity}`);
+      const tokenResponse = await fetch(
+        `${apiUrl}/api/livekit/token?room=${roomName}&identity=${identity}&voiceIsolation=${isVoiceIsolationEnabled}`
+      );
 
       if (!tokenResponse.ok) {
         throw new Error("No se pudo obtener el token de LiveKit.");
@@ -205,7 +297,15 @@ const Agent = ({
         console.log("[LiveKit] ConnectionState:", state);
         if (state === ConnectionState.Connected) {
           setCallStatus(CallStatus.ACTIVE);
+          setAgentHealth({ status: "ok" });
+        } else if (state === ConnectionState.Reconnecting) {
+          setAgentHealth({
+            status: "recovering",
+            message: "Reconectando enlace de audio...",
+          });
         } else if (state === ConnectionState.Disconnected) {
+          cleanupAudioElements();
+          lkRoomRef.current = null;
           setCallStatus((prev) => {
             if (prev === CallStatus.ACTIVE) {
               return CallStatus.FINISHED;
@@ -214,63 +314,146 @@ const Agent = ({
           });
           setLkRoom(null);
           setIsSpeaking(false);
+          setIsCandidateSpeaking(false);
         }
       });
 
-      currentRoom.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      // Reanudación automática de audio tras reconexión temporal de WebRTC
+      currentRoom.on(RoomEvent.Reconnected, () => {
+        setAgentHealth({ status: "ok" });
+        currentRoom.startAudio().catch(() => {});
+      });
+
+      // Desbloqueo proactivo de audio en navegadores estrictos
+      currentRoom.on(RoomEvent.AudioPlaybackStatusChanged, (canPlayAudio) => {
+        if (!canPlayAudio) {
+          currentRoom.startAudio().catch((err) => {
+            console.warn("[LiveKit] Audio autoplay unlock failed:", err);
+          });
+        }
+      });
+
+      currentRoom.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
         if (track.kind === Track.Kind.Audio) {
           const element = track.attach();
+          element.autoplay = true;
           document.body.appendChild(element);
+          audioElementsRef.current.add(element);
+          element.play().catch((err) => {
+            console.warn("[LiveKit] Audio element play failed, unlocking via room:", err);
+            currentRoom.startAudio().catch(() => {});
+          });
           console.log(`[Audio Subscribed] Reproduciendo audio de: ${participant.identity}`);
         }
       });
 
       currentRoom.on(RoomEvent.TrackUnsubscribed, (track) => {
-        track.detach().forEach((element) => element.remove());
+        track.detach().forEach((element) => {
+          audioElementsRef.current.delete(element);
+          element.remove();
+        });
       });
 
+      // Detección de oradores para animación y supresión de falsos positivos gestuales
       currentRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         const isAgentSpeaking = speakers.some(
           (s) => !s.identity.startsWith("developer_") && s instanceof RemoteParticipant
         );
+        const candidateActive = speakers.some(
+          (s) => s instanceof LocalParticipant || s.identity.startsWith("developer_")
+        );
         setIsSpeaking(isAgentSpeaking);
+        setIsCandidateSpeaking(candidateActive);
       });
 
+      // Monitor de salud y recuperación del agente por DataChannel
       currentRoom.on(
-        RoomEvent.TranscriptionReceived,
-        (segments: TranscriptionSegment[], participant?: Participant) => {
-          if (!participant) return;
-          const isSelf = participant instanceof LocalParticipant;
-          const sender = isSelf ? "user" : "assistant";
-          setLatestSpeaker(isSelf ? "user" : "agent");
-
-          const text = segments
-            .map((s) => s.text)
-            .join(" ")
-            .trim();
-
-          if (text) {
-            setMessages((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && last.role === sender) {
-                return [...prev.slice(0, -1), { ...last, content: text }];
+        RoomEvent.DataReceived,
+        (payload: Uint8Array, _participant?: Participant, _kind?: unknown, topic?: string) => {
+          if (topic === "agent-health") {
+            try {
+              const str = new TextDecoder().decode(payload);
+              const data = JSON.parse(str);
+              if (data.status) {
+                if (healthResetTimerRef.current) clearTimeout(healthResetTimerRef.current);
+                setAgentHealth({ status: data.status, message: data.message });
+                if (data.status === "ok") {
+                  healthResetTimerRef.current = setTimeout(
+                    () => setAgentHealth({ status: "ok" }),
+                    3500
+                  );
+                }
               }
-              return [...prev, { role: sender, content: text }];
-            });
+            } catch (err) {
+              console.warn("[LiveKit] Error parsing agent health message:", err);
+            }
           }
         }
       );
 
+      // Transcripción incremental en vivo (LiveKit 1.x TextStream primario, Legacy Event solo respaldo)
+      currentRoom.on(
+        RoomEvent.TranscriptionReceived,
+        (segments: TranscriptionSegment[], participant?: Participant) => {
+          if (!participant || usingTextStreamRef.current) return;
+          const isSelf = participant instanceof LocalParticipant;
+          const sender = isSelf ? "user" : "assistant";
+
+          for (const seg of segments) {
+            if (seg.text?.trim()) {
+              upsertTranscriptSegment(seg.id || `legacy-${sender}`, sender, seg.text);
+            }
+          }
+        }
+      );
+
+      try {
+        currentRoom.registerTextStreamHandler(
+          "lk.transcription",
+          async (reader, participantInfo) => {
+            usingTextStreamRef.current = true;
+            const isSelf =
+              participantInfo.identity === currentRoom.localParticipant.identity ||
+              participantInfo.identity.startsWith("developer_");
+            const sender = isSelf ? "user" : "assistant";
+            const segmentId =
+              reader.info?.attributes?.["lk.segment_id"] ||
+              reader.info?.id ||
+              `stream-${sender}-${Date.now()}`;
+
+            let accumulated = "";
+            for await (const chunk of reader) {
+              accumulated += chunk;
+              if (accumulated.trim()) {
+                upsertTranscriptSegment(segmentId, sender, accumulated);
+              }
+            }
+          }
+        );
+      } catch (streamErr) {
+        console.warn("[LiveKit] TextStream handler already registered:", streamErr);
+      }
+
       await currentRoom.connect(url, token);
+      lkRoomRef.current = currentRoom;
       setLkRoom(currentRoom);
 
       try {
-        await currentRoom.localParticipant.setMicrophoneEnabled(true);
+        // Evitar doble supresión destructiva: cuando Krisp BVC corre en servidor,
+        // desactivamos noiseSuppression del navegador y mantenemos AEC + AGC.
+        const audioConstraints = {
+          echoCancellation: true,
+          noiseSuppression: !isVoiceIsolationEnabled,
+          autoGainControl: true,
+        };
+
+        await currentRoom.localParticipant.setMicrophoneEnabled(true, audioConstraints);
       } catch (micErr) {
         console.warn("[LiveKit] No se pudo habilitar el micrófono:", micErr);
       }
     } catch (err) {
       console.error("Error al iniciar llamada con LiveKit:", err);
+      cleanupAudioElements();
       setCallStatus(CallStatus.INACTIVE);
     }
   };
@@ -431,21 +614,73 @@ const Agent = ({
             </div>
           </div>
 
-          {/* Voice Selector as Audio Output Setting */}
-          <div className="flex items-center gap-2">
-            <Globe className="w-3.5 h-3.5 text-zinc-400" />
-            <select
-              value={selectedVoice}
-              onChange={(e) => setSelectedVoice(e.target.value)}
+          {/* Voice Selector as Audio Output Setting & Voice Isolation (BVC) */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Indicador de recuperación o alerta de salud del agente */}
+            {(agentHealth.status === "recovering" || agentHealth.status === "error") && (
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs border",
+                  agentHealth.status === "recovering"
+                    ? "bg-amber-500/20 border-amber-500/40 text-amber-200 animate-pulse"
+                    : "bg-rose-500/20 border-rose-500/40 text-rose-200"
+                )}
+              >
+                <RotateCcw
+                  className={cn(
+                    "w-3 h-3",
+                    agentHealth.status === "recovering"
+                      ? "animate-spin text-amber-400"
+                      : "text-rose-400"
+                  )}
+                />
+                <span>
+                  {agentHealth.message ||
+                    (agentHealth.status === "recovering"
+                      ? "Reanudando agente..."
+                      : "Pulsa 'Reanudar IA' para continuar")}
+                </span>
+              </div>
+            )}
+
+            {/* Toggle de Aislamiento de Voz Inteligente (Krisp BVC) */}
+            <button
+              type="button"
+              onClick={() => setIsVoiceIsolationEnabled((prev) => !prev)}
               disabled={callStatus === CallStatus.CONNECTING || callStatus === CallStatus.ACTIVE}
-              className="bg-zinc-900/90 text-zinc-200 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-indigo-500 disabled:opacity-50 transition cursor-pointer font-medium hover:bg-zinc-800"
+              className={cn(
+                "px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition border cursor-pointer",
+                isVoiceIsolationEnabled
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200",
+                (callStatus === CallStatus.CONNECTING || callStatus === CallStatus.ACTIVE) &&
+                  "opacity-80 cursor-default"
+              )}
+              title={
+                isVoiceIsolationEnabled
+                  ? "Aislamiento de voz activo (Krisp AI): bloquea voces de fondo y ruido de ambiente"
+                  : "Aislamiento de voz desactivado: usa supresión de ruido estándar"
+              }
             >
-              {VOICE_OPTIONS.map((opt) => (
-                <option key={opt.key} value={opt.key} className="bg-zinc-950 text-zinc-200">
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Aislamiento Voz {isVoiceIsolationEnabled ? "ON" : "OFF"}</span>
+            </button>
+
+            <div className="flex items-center gap-1.5 bg-zinc-900/90 border border-zinc-800 rounded-xl px-2.5 py-1">
+              <Globe className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <select
+                value={selectedVoice}
+                onChange={(e) => setSelectedVoice(e.target.value)}
+                disabled={callStatus === CallStatus.CONNECTING || callStatus === CallStatus.ACTIVE}
+                className="bg-transparent text-zinc-200 text-xs outline-none disabled:opacity-50 transition cursor-pointer font-medium"
+              >
+                {VOICE_OPTIONS.map((opt) => (
+                  <option key={opt.key} value={opt.key} className="bg-zinc-950 text-zinc-200">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -563,6 +798,7 @@ const Agent = ({
                   liveScores={facial.liveScores}
                   showMeshOverlay={showMeshOverlay}
                   onToggleMeshOverlay={() => setShowMeshOverlay((prev) => !prev)}
+                  onRecalibrate={facial.triggerRecalibration}
                 />
               </div>
             </div>
@@ -725,6 +961,30 @@ const Agent = ({
                 {isCameraActive ? "Cámara Activa" : "Cámara Desactivada"}
               </span>
             </button>
+
+            {/* Controles de resiliencia durante la llamada activa */}
+            {callStatus === CallStatus.ACTIVE && (
+              <div className="flex items-center gap-1.5 ml-1 border-l border-zinc-800/80 pl-2">
+                <button
+                  type="button"
+                  onClick={() => sendInterviewControl("repeat_last")}
+                  className="px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-zinc-900 text-zinc-300 border border-zinc-800 hover:bg-zinc-800 hover:text-white transition cursor-pointer"
+                  title="Pedir a la IA que repita la última intervención"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden md:inline">Repetir</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => sendInterviewControl("resume_turn")}
+                  className="px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-zinc-900 text-zinc-300 border border-zinc-800 hover:bg-zinc-800 hover:text-white transition cursor-pointer"
+                  title="Reactivar a la IA si se quedó en silencio esperando"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden md:inline">Reanudar IA</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Main Action Button: Start or End Meeting */}

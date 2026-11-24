@@ -1,5 +1,5 @@
 import { IFaceLandmarkProvider, RawFaceLandmarkResult } from "./face-landmark-provider.interface";
-import { HeadEulerAngles, FaceLandmarkPoint } from "./types";
+import { HeadEulerAngles, FaceLandmarkPoint, IrisGazeMetric } from "./types";
 
 /**
  * Filtro de compatibilidad: Emscripten/WASM redirige internamente stderr a console.error
@@ -214,11 +214,48 @@ export class MediaPipeFaceProvider implements IFaceLandmarkProvider {
         headAngles = this.estimateEulerAnglesFromLandmarks(landmarks);
       }
 
+      // 4. Extraer métricas de Iris (landmarks 468-477) y distancia interocular
+      let irisGaze: IrisGazeMetric | undefined = undefined;
+      let interocularDistance = 0.2;
+
+      if (landmarks.length >= 478) {
+        const leftOuter = landmarks[33];
+        const leftInner = landmarks[133];
+        const leftIris = landmarks[468];
+        const rightInner = landmarks[362];
+        const rightOuter = landmarks[263];
+        const rightIris = landmarks[473];
+
+        if (leftOuter && leftInner && leftIris && rightInner && rightOuter && rightIris) {
+          const leftWidth = Math.max(0.01, Math.abs(leftInner.x - leftOuter.x));
+          const rightWidth = Math.max(0.01, Math.abs(rightOuter.x - rightInner.x));
+
+          const leftRatioX = (leftIris.x - Math.min(leftOuter.x, leftInner.x)) / leftWidth;
+          const rightRatioX = (rightIris.x - Math.min(rightInner.x, rightOuter.x)) / rightWidth;
+
+          const avgHorizontalOffset = ((leftRatioX - 0.5) + (rightRatioX - 0.5)) / 2;
+          const avgVerticalOffset = ((leftIris.y - (leftOuter.y + leftInner.y) / 2) + (rightIris.y - (rightOuter.y + rightInner.y) / 2)) / 2;
+
+          irisGaze = {
+            leftRatioX,
+            leftRatioY: 0.5,
+            rightRatioX,
+            rightRatioY: 0.5,
+            avgHorizontalOffset: Math.round(avgHorizontalOffset * 100) / 100,
+            avgVerticalOffset: Math.round(avgVerticalOffset * 100) / 100,
+          };
+
+          interocularDistance = Math.hypot(rightOuter.x - leftOuter.x, rightOuter.y - leftOuter.y);
+        }
+      }
+
       return {
         faceDetected: true,
         landmarks,
         blendshapes,
         headAngles,
+        irisGaze,
+        interocularDistance,
       };
     } catch (detectErr) {
       console.warn("[MediaPipeFaceProvider] Error en procesamiento de frame:", detectErr);

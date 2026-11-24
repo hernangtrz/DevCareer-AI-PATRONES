@@ -11,6 +11,7 @@ WORKDIR /app
 
 # Copiar manifiestos e instalar dependencias primero (capa cacheada)
 COPY package.json package-lock.json ./
+COPY patches ./patches
 RUN npm ci
 
 # Copiar el resto del código fuente

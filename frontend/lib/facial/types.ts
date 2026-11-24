@@ -93,11 +93,40 @@ export interface HeadEulerAngles {
   roll: number;  // Inclinación lateral (ladear cabeza) en grados
 }
 
+export interface IrisGazeMetric {
+  leftRatioX: number;  // 0..1 (0.5 = centro de la órbita)
+  leftRatioY: number;  // 0..1 (0.5 = centro vertical)
+  rightRatioX: number; // 0..1
+  rightRatioY: number; // 0..1
+  avgHorizontalOffset: number; // -1 (izq) a +1 (der)
+  avgVerticalOffset: number;   // -1 (arriba) a +1 (abajo)
+}
+
+export interface FacialBaselineCalibration {
+  blendshapes: Record<string, number>;
+  headAngles: HeadEulerAngles;
+  irisOffset: { x: number; y: number };
+  faceScale: number; // Distancia interocular en coordenadas normalizadas
+  calibratedAt: number;
+}
+
+export interface LiveFacialSnapshot {
+  composure: number;
+  eyeContact: number;
+  gestureBalance: number;
+  postureStability: number;
+  warmth: number;
+  liveCue: LiveCoachingCue | null;
+}
+
 export interface FacialFrameSample {
   timestamp: number;
   faceDetected: boolean;
   blendshapes: Record<string, number>;
   headAngles: HeadEulerAngles;
+  rawHeadAngles?: HeadEulerAngles;
   centroid: { x: number; y: number };
+  interocularDistance?: number;
+  irisGaze?: IrisGazeMetric;
   isSpeaking: boolean;
 }

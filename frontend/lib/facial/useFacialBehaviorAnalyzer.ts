@@ -8,6 +8,7 @@ import {
   FacialTelemetrySummary,
   FacialFrameSample,
   FaceLandmarkPoint,
+  LiveFacialSnapshot,
 } from "./types";
 
 interface UseFacialBehaviorAnalyzerProps {
@@ -18,6 +19,18 @@ interface UseFacialBehaviorAnalyzerProps {
   currentTranscriptSnippet?: string;
   showMeshOverlay?: boolean;
 }
+
+// Grupos anatómicos canónicos de MediaPipe Face Landmarker
+const FACE_OVAL_INDICES = [
+  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379,
+  378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127,
+  162, 21, 54, 103, 67, 109, 10,
+];
+const LEFT_EYE_INDICES = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246, 33];
+const RIGHT_EYE_INDICES = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398, 362];
+const LEFT_EYEBROW_INDICES = [70, 63, 105, 66, 107];
+const RIGHT_EYEBROW_INDICES = [300, 293, 334, 296, 336];
+const LIPS_OUTER_INDICES = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95, 78, 61];
 
 export function useFacialBehaviorAnalyzer({
   isEnabled,
@@ -41,16 +54,38 @@ export function useFacialBehaviorAnalyzer({
   const [hasPermission, setHasPermission] = useState(false);
 
   const [liveScores, setLiveScores] = useState({
-    composure: 85,
+    composure: 88,
     eyeContact: 85,
-    gestureBalance: 85,
+    gestureBalance: 88,
+    postureStability: 90,
+    warmth: 75,
   });
 
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameId = useRef<number | null>(null);
   const lastProcessedTimeRef = useRef<number>(0);
-  const TARGET_FPS = 7;
-  const FRAME_INTERVAL_MS = 1000 / TARGET_FPS; // ~142ms por frame (Edge AI optimizado)
+  const lastScoreUpdateTimeRef = useRef<number>(0);
+
+  // Refs de estado dinámico para desacoplar el requestAnimationFrame y evitar reinicios cada segundo
+  const isCallActiveRef = useRef(isCallActive);
+  const isSpeakingRef = useRef(isSpeaking);
+  const elapsedSecondsRef = useRef(elapsedSeconds);
+  const currentTranscriptSnippetRef = useRef(currentTranscriptSnippet);
+  const showMeshOverlayRef = useRef(showMeshOverlay);
+
+  useEffect(() => {
+    isCallActiveRef.current = isCallActive;
+    isSpeakingRef.current = isSpeaking;
+    elapsedSecondsRef.current = elapsedSeconds;
+    currentTranscriptSnippetRef.current = currentTranscriptSnippet;
+    showMeshOverlayRef.current = showMeshOverlay;
+  }, [isCallActive, isSpeaking, elapsedSeconds, currentTranscriptSnippet, showMeshOverlay]);
+
+  // Pacing adaptativo de frames para proteger prioridad de audio WebRTC (~13 FPS normal, ~8 FPS si CPU pesada)
+  const targetFrameIntervalMsRef = useRef<number>(75);
+  const inferenceDurationEmaRef = useRef<number>(20);
+  const lastFaceDetectedRef = useRef<boolean>(false);
+  const lastCalibratedRef = useRef<boolean>(false);
 
   // 1. Inicialización del proveedor Adapter (Singleton compartido)
   useEffect(() => {
@@ -93,7 +128,7 @@ export function useFacialBehaviorAnalyzer({
           video: {
             width: { ideal: 640 },
             height: { ideal: 480 },
-            frameRate: { ideal: 15 },
+            frameRate: { ideal: 20 },
           },
           audio: false,
         });
@@ -136,33 +171,105 @@ export function useFacialBehaviorAnalyzer({
     };
   }, [isEnabled]);
 
-  // 3. Dibujo de contornos en canvas para Modo Demostración
+  // 3. Proyección matemática exacta de la Malla 3D sobre video object-cover
   const drawLandmarks = useCallback((landmarks: FaceLandmarkPoint[]) => {
     const canvas = canvasRef.current;
-    if (!canvas || landmarks.length === 0) return;
+    const video = videoRef.current;
+    if (!canvas || !video || landmarks.length === 0) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Sincronizar dimensiones visibles reales
+    const rect = video.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const targetW = Math.round(rect.width * dpr);
+    const targetH = Math.round(rect.height * dpr);
+
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dibujar puntos clave sutiles (ojos, cejas, labios, contorno)
-    ctx.fillStyle = "rgba(165, 180, 252, 0.65)"; // indigo-300 traslúcido
-    const keyIndices = [1, 33, 133, 263, 362, 61, 291, 199, 10, 152];
+    // Transformación precisa de object-cover
+    const videoW = video.videoWidth || 640;
+    const videoH = video.videoHeight || 480;
+    const videoAspect = videoW / videoH;
+    const canvasAspect = canvas.width / canvas.height;
 
-    for (const idx of keyIndices) {
-      const pt = landmarks[idx];
-      if (!pt) continue;
-      const px = (1 - pt.x) * canvas.width; // Espejo horizontal
-      const py = pt.y * canvas.height;
+    let renderW = canvas.width;
+    let renderH = canvas.height;
+    let offX = 0;
+    let offY = 0;
+
+    if (canvasAspect > videoAspect) {
+      renderH = canvas.width / videoAspect;
+      offY = (canvas.height - renderH) / 2;
+    } else {
+      renderW = canvas.height * videoAspect;
+      offX = (canvas.width - renderW) / 2;
+    }
+
+    // Proyección con espejo horizontal (scale-x-[-1])
+    const toPx = (pt: FaceLandmarkPoint) => ({
+      x: offX + (1 - pt.x) * renderW,
+      y: offY + pt.y * renderH,
+    });
+
+    // Helper para trazar cadenas de líneas
+    const drawPath = (indices: number[], color: string, lineWidth = 1.5) => {
       ctx.beginPath();
-      ctx.arc(px, py, 2.5, 0, 2 * Math.PI);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth * dpr;
+      let first = true;
+      for (const idx of indices) {
+        const pt = landmarks[idx];
+        if (!pt) continue;
+        const screen = toPx(pt);
+        if (first) {
+          ctx.moveTo(screen.x, screen.y);
+          first = false;
+        } else {
+          ctx.lineTo(screen.x, screen.y);
+        }
+      }
+      ctx.stroke();
+    };
+
+    // 1. Contorno Facial
+    drawPath(FACE_OVAL_INDICES, "rgba(99, 102, 241, 0.45)", 1.2);
+
+    // 2. Ojos y Cejas
+    drawPath(LEFT_EYE_INDICES, "rgba(165, 180, 252, 0.75)", 1.5);
+    drawPath(RIGHT_EYE_INDICES, "rgba(165, 180, 252, 0.75)", 1.5);
+    drawPath(LEFT_EYEBROW_INDICES, "rgba(129, 140, 248, 0.7)", 1.5);
+    drawPath(RIGHT_EYEBROW_INDICES, "rgba(129, 140, 248, 0.7)", 1.5);
+
+    // 3. Labios
+    drawPath(LIPS_OUTER_INDICES, "rgba(244, 114, 182, 0.65)", 1.5);
+
+    // 4. Centros de Iris (puntos 468 y 473)
+    const leftIris = landmarks[468];
+    const rightIris = landmarks[473];
+    ctx.fillStyle = "rgba(52, 211, 153, 0.9)"; // Esmeralda
+    if (leftIris) {
+      const p = toPx(leftIris);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3 * dpr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (rightIris) {
+      const p = toPx(rightIris);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3 * dpr, 0, Math.PI * 2);
       ctx.fill();
     }
   }, []);
 
-  // 4. Bucle throttled de inferencia por frame
+  // 4. Bucle desacoplado de inferencia por frame a 15–20 FPS adaptativos
   useEffect(() => {
-    if (!isEnabled || !isModelReady || !hasPermission || !isCallActive) {
+    if (!isEnabled || !isModelReady || !hasPermission) {
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       return;
     }
@@ -175,19 +282,38 @@ export function useFacialBehaviorAnalyzer({
       const video = videoRef.current;
       const provider = providerRef.current;
 
+      const elapsedSinceLast = now - lastProcessedTimeRef.current;
       if (
         video &&
         video.readyState >= 2 &&
         provider &&
         provider.isReady() &&
-        now - lastProcessedTimeRef.current >= FRAME_INTERVAL_MS
+        elapsedSinceLast >= targetFrameIntervalMsRef.current
       ) {
         lastProcessedTimeRef.current = now;
+        const inferStart = performance.now();
 
         const rawResult = provider.detect(video, now);
-        setFaceDetected(rawResult.faceDetected);
+        if (rawResult.faceDetected !== lastFaceDetectedRef.current) {
+          lastFaceDetectedRef.current = rawResult.faceDetected;
+          setFaceDetected(rawResult.faceDetected);
+        }
 
-        if (showMeshOverlay && canvasRef.current) {
+        const inferDuration = performance.now() - inferStart;
+        // EMA de tiempo de inferencia para pacing adaptativo (prioriza audio WebRTC)
+        inferenceDurationEmaRef.current =
+          0.85 * inferenceDurationEmaRef.current + 0.15 * inferDuration;
+
+        if (inferenceDurationEmaRef.current > 28) {
+          // Si MediaPipe corre en CPU o carga alta, reducimos a ~8 FPS para no frenar el audio
+          targetFrameIntervalMsRef.current = 125;
+        } else {
+          // Fluidez estable a ~13 FPS (~75ms)
+          targetFrameIntervalMsRef.current = 75;
+        }
+
+        // Malla 3D en vivo
+        if (showMeshOverlayRef.current && canvasRef.current) {
           if (rawResult.faceDetected) {
             drawLandmarks(rawResult.landmarks);
           } else {
@@ -205,32 +331,51 @@ export function useFacialBehaviorAnalyzer({
             centroid: rawResult.landmarks[1]
               ? { x: rawResult.landmarks[1].x, y: rawResult.landmarks[1].y }
               : { x: 0.5, y: 0.5 },
-            isSpeaking,
+            irisGaze: rawResult.irisGaze,
+            interocularDistance: rawResult.interocularDistance,
+            isSpeaking: isSpeakingRef.current,
           };
 
           const newCue = aggregatorRef.current.addSample(
             sample,
-            elapsedSeconds,
-            currentTranscriptSnippet
+            elapsedSecondsRef.current,
+            currentTranscriptSnippetRef.current
           );
 
           if (newCue) {
             setLiveCue(newCue);
-            // Auto-ocultar alerta visual a los 6 segundos
             setTimeout(() => {
               setLiveCue((prev) => (prev?.id === newCue.id ? null : prev));
-            }, 6000);
+            }, 5500);
           }
 
-          setIsCalibrated(aggregatorRef.current.getCalibrated());
+          const calibratedNow = aggregatorRef.current.getCalibrated();
+          if (calibratedNow !== lastCalibratedRef.current) {
+            lastCalibratedRef.current = calibratedNow;
+            setIsCalibrated(calibratedNow);
+          }
 
-          // Actualizar liveScores cada 2 segundos para retroalimentación visual sutil
-          if (elapsedSeconds % 2 === 0) {
-            const currentSummary = aggregatorRef.current.finalizeSummary(elapsedSeconds || 1);
-            setLiveScores({
-              composure: currentSummary.scores.composure,
-              eyeContact: currentSummary.scores.eyeContact,
-              gestureBalance: currentSummary.scores.gestureBalance,
+          // Actualizar liveScores en O(1) cada 1000ms solo si hay cambios reales
+          if (now - lastScoreUpdateTimeRef.current >= 1000) {
+            lastScoreUpdateTimeRef.current = now;
+            const snapshot: LiveFacialSnapshot = aggregatorRef.current.getLiveSnapshot();
+            setLiveScores((prev) => {
+              if (
+                prev.composure === snapshot.composure &&
+                prev.eyeContact === snapshot.eyeContact &&
+                prev.gestureBalance === snapshot.gestureBalance &&
+                prev.postureStability === snapshot.postureStability &&
+                prev.warmth === snapshot.warmth
+              ) {
+                return prev;
+              }
+              return {
+                composure: snapshot.composure,
+                eyeContact: snapshot.eyeContact,
+                gestureBalance: snapshot.gestureBalance,
+                postureStability: snapshot.postureStability,
+                warmth: snapshot.warmth,
+              };
             });
           }
         }
@@ -245,25 +390,21 @@ export function useFacialBehaviorAnalyzer({
       isRunning = false;
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
     };
-  }, [
-    isEnabled,
-    isModelReady,
-    hasPermission,
-    isCallActive,
-    isSpeaking,
-    elapsedSeconds,
-    currentTranscriptSnippet,
-    showMeshOverlay,
-    drawLandmarks,
-    FRAME_INTERVAL_MS,
-  ]);
+  }, [isEnabled, isModelReady, hasPermission, drawLandmarks]);
 
-  // 5. Finalizar telemetría completa
+  // Recalibración manual guiada
+  const triggerRecalibration = useCallback(() => {
+    aggregatorRef.current.resetCalibration();
+    lastCalibratedRef.current = false;
+    setIsCalibrated(false);
+  }, []);
+
+  // 5. Finalizar telemetría completa al terminar llamada
   const finalizeSummary = useCallback((): FacialTelemetrySummary => {
     if (!isEnabled || !hasPermission) {
       return {
         enabled: false,
-        durationSeconds: elapsedSeconds,
+        durationSeconds: elapsedSecondsRef.current,
         sampledFrames: 0,
         validFaceFrames: 0,
         facePresenceRatio: 0,
@@ -277,12 +418,12 @@ export function useFacialBehaviorAnalyzer({
           warmth: 70,
         },
         indicators: {
-          avgTensionIndex: 0.2,
+          avgTensionIndex: 0.18,
           gestureProfile: "natural",
           blinkRatePerMin: 16,
           headMovementVolatility: 2.5,
           speakingVsListening: {
-            speakingTensionAvg: 0.2,
+            speakingTensionAvg: 0.18,
             listeningEyeContactAvg: 70,
           },
         },
@@ -291,8 +432,8 @@ export function useFacialBehaviorAnalyzer({
       };
     }
 
-    return aggregatorRef.current.finalizeSummary(elapsedSeconds);
-  }, [isEnabled, hasPermission, elapsedSeconds]);
+    return aggregatorRef.current.finalizeSummary(elapsedSecondsRef.current);
+  }, [isEnabled, hasPermission]);
 
   return {
     videoRef,
@@ -304,6 +445,7 @@ export function useFacialBehaviorAnalyzer({
     cameraError,
     hasPermission,
     liveScores,
+    triggerRecalibration,
     finalizeSummary,
   };
 }

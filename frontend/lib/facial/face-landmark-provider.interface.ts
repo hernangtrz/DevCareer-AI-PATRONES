@@ -1,4 +1,4 @@
-import { FaceLandmarkPoint, HeadEulerAngles } from "./types";
+import { FaceLandmarkPoint, HeadEulerAngles, IrisGazeMetric } from "./types";
 
 /**
  * Resultado crudo extraído de un frame de video por el proveedor de visión.
@@ -9,6 +9,8 @@ export interface RawFaceLandmarkResult {
   blendshapes: Record<string, number>;
   headAngles: HeadEulerAngles;
   facialTransformationMatrix?: number[];
+  irisGaze?: IrisGazeMetric;
+  interocularDistance?: number;
 }
 
 /**

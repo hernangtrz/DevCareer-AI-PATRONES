@@ -10,6 +10,7 @@ import {
   Sparkles,
   AlertCircle,
   ScanFace,
+  RotateCcw,
 } from "lucide-react";
 import { LiveCoachingCue } from "@/lib/facial/types";
 
@@ -30,6 +31,7 @@ interface FacialMonitorPanelProps {
   };
   showMeshOverlay: boolean;
   onToggleMeshOverlay: () => void;
+  onRecalibrate?: () => void;
 }
 
 export const FacialMonitorPanel: React.FC<FacialMonitorPanelProps> = ({
@@ -45,6 +47,7 @@ export const FacialMonitorPanel: React.FC<FacialMonitorPanelProps> = ({
   liveScores,
   showMeshOverlay,
   onToggleMeshOverlay,
+  onRecalibrate,
 }) => {
   return (
     <div className="relative w-full rounded-2xl bg-[#0b0d14] border border-white/[0.08] shadow-xl overflow-hidden flex flex-col justify-between min-h-[260px] md:min-h-[300px]">
@@ -79,22 +82,35 @@ export const FacialMonitorPanel: React.FC<FacialMonitorPanelProps> = ({
           </div>
         </div>
 
-        {/* Toggle de Malla 3D (Demo Mode) */}
+        {/* Botones de Control: Recalibrar y Toggle de Malla 3D */}
         {isEnabled && hasPermission && (
-          <button
-            type="button"
-            onClick={onToggleMeshOverlay}
-            className={cn(
-              "px-2 py-1 rounded-lg text-[10px] font-medium flex items-center gap-1 transition border cursor-pointer",
-              showMeshOverlay
-                ? "bg-indigo-600/30 text-indigo-200 border-indigo-500/40"
-                : "bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200"
+          <div className="flex items-center gap-1.5">
+            {onRecalibrate && (
+              <button
+                type="button"
+                onClick={onRecalibrate}
+                className="px-2 py-1 rounded-lg text-[10px] font-medium flex items-center gap-1 transition border cursor-pointer bg-zinc-900/80 text-zinc-300 border-zinc-800 hover:bg-zinc-850 hover:text-white"
+                title="Recalibrar expresión neutra y centro de mirada si cambiaste de postura"
+              >
+                <RotateCcw className="w-3 h-3 text-indigo-400" />
+                <span className="hidden sm:inline">Recalibrar</span>
+              </button>
             )}
-            title="Activar o desactivar visualización de puntos de malla facial"
-          >
-            <ScanFace className="w-3 h-3" />
-            <span>{showMeshOverlay ? "Malla 3D ON" : "Malla 3D"}</span>
-          </button>
+            <button
+              type="button"
+              onClick={onToggleMeshOverlay}
+              className={cn(
+                "px-2 py-1 rounded-lg text-[10px] font-medium flex items-center gap-1 transition border cursor-pointer",
+                showMeshOverlay
+                  ? "bg-indigo-600/30 text-indigo-200 border-indigo-500/40"
+                  : "bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200"
+              )}
+              title="Activar o desactivar visualización de puntos de malla facial"
+            >
+              <ScanFace className="w-3 h-3" />
+              <span>{showMeshOverlay ? "Malla 3D ON" : "Malla 3D"}</span>
+            </button>
+          </div>
         )}
       </div>
 

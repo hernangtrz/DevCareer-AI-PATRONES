@@ -1,0 +1,170 @@
+/*
+ * From Uiverse.io by SelfMadeSystem - https://uiverse.io/SelfMadeSystem/weak-mole-88
+ * MIT License, Copyright (c) SelfMadeSystem (SelfMadeSystem)
+ */
+
+.wrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+  isolation: isolate;
+  text-decoration: none;
+  border-radius: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.wrapper:focus-visible .buttonBorder {
+  outline: 2px solid #cac5fe;
+  outline-offset: 2px;
+}
+
+.svgFilters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.buttonContainer {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+}
+
+.buttonBorder {
+  position: relative;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.buttonFace {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 36px;
+  padding: 0 0.875rem;
+  border: none;
+  border-radius: 10px;
+  background: #111215;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.wrapper:hover .buttonFace {
+  background: #16181f;
+}
+
+.wrapper:active .buttonFace {
+  transform: scale(0.985);
+}
+
+.spin {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.spinOuterGlow {
+  inset: -1px;
+  border-radius: 13px;
+  z-index: -1;
+  opacity: 0.28;
+  filter: blur(7px);
+}
+
+.spinInside {
+  inset: -1px;
+  border-radius: inherit;
+  z-index: 0;
+  opacity: 0.85;
+}
+
+.wrapper:hover .spinOuterGlow,
+.wrapper:focus-visible .spinOuterGlow {
+  opacity: 0.55;
+}
+
+.wrapper:hover .spinInside,
+.wrapper:focus-visible .spinInside {
+  opacity: 1;
+}
+
+.wrapper:active .spinOuterGlow {
+  opacity: 0.75;
+}
+
+.spin::before {
+  content: "";
+  position: absolute;
+  inset: -260%;
+  animation:
+    speen 6s cubic-bezier(0.56, 0.15, 0.28, 0.86) infinite,
+    woah 4s infinite;
+  animation-play-state: paused;
+}
+
+.wrapper:hover .spin::before,
+.wrapper:focus-visible .spin::before {
+  animation-play-state: running;
+}
+
+.spinOuterGlow::before {
+  background: linear-gradient(90deg, #6366f1 25%, #0000 48% 52%, #d946ef 75%);
+}
+
+.spinInside::before {
+  background: linear-gradient(
+    90deg,
+    #cac5fe 18%,
+    #6366f1 34%,
+    #0000 47% 53%,
+    #a855f7 66%,
+    #f0abfc 82%
+  );
+}
+
+@keyframes speen {
+  0% {
+    rotate: 10deg;
+  }
+  50% {
+    rotate: 190deg;
+  }
+  to {
+    rotate: 370deg;
+  }
+}
+
+@keyframes woah {
+  0%,
+  to {
+    scale: 1;
+  }
+  50% {
+    scale: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin::before {
+    animation: none;
+  }
+
+  .wrapper:hover .spin::before,
+  .wrapper:focus-visible .spin::before {
+    animation-play-state: paused;
+  }
+}

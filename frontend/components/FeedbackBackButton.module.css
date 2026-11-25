@@ -1,0 +1,74 @@
+/*
+ * From Uiverse.io by andrew-demchenk0 - https://uiverse.io/andrew-demchenk0/soft-baboon-41
+ * MIT License, Copyright (c) andrew-demchenk0, andrew-demchenk0 (A), andrew-demchenk0 (A)
+ */
+
+.backButton {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.backIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.backTextWrap {
+  display: inline-grid;
+  grid-template-columns: 1fr;
+  margin-left: 0.5rem;
+  opacity: 1;
+  transition:
+    grid-template-columns 0.3s ease,
+    margin-left 0.3s ease,
+    opacity 0.22s ease;
+}
+
+.backText {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.backButton:hover .backTextWrap,
+.backButton:focus-visible .backTextWrap {
+  grid-template-columns: 0fr;
+  margin-left: 0;
+  opacity: 0;
+}
+
+.backButton:hover .backIcon,
+.backButton:focus-visible .backIcon {
+  transform: scale(1.22);
+}
+
+.backButton:active {
+  transform: translate(2px, 2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backButton,
+  .backIcon,
+  .backTextWrap {
+    transition: none;
+  }
+
+  .backButton:hover .backTextWrap,
+  .backButton:focus-visible .backTextWrap {
+    grid-template-columns: 1fr;
+    margin-left: 0.5rem;
+    opacity: 1;
+  }
+
+  .backButton:hover .backIcon,
+  .backButton:focus-visible .backIcon,
+  .backButton:active {
+    transform: none;
+  }
+}

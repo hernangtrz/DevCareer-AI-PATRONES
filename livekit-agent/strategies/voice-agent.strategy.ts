@@ -91,8 +91,8 @@ export class SpanishVoiceAgentStrategy implements VoiceAgentConfigStrategy {
       `Pautas de evaluación:\n` +
       `- Formula una sola pregunta a la vez. No las leas todas juntas.\n` +
       `- Mantén un tono profesional, empático, técnico y natural.\n` +
-      `- Habla SIEMPRE en español.\n` +
-      `- Despídete cuando el candidato pida finalizar o cuando haya terminado de responder o decidido pasar cada pregunta, incluida la última. Al completar la entrevista, agradécele su tiempo para ${role}${companyPart}, felicítalo y recuérdale que podrá consultar su análisis en el dashboard.`
+      `- Habla SIEMPRE en español y dirígete directamente al candidato en segunda persona ("tú"). NUNCA digas frases de instrucciones en tercera persona como "agradécele", "felicítalo" o "recuérdale".\n` +
+      `- Cierre y despedida: cuando el candidato pida terminar o haya respondido o pasado la última pregunta, despídete directamente sin hacer nuevas preguntas. Usa un cierre natural en primera y segunda persona como: "Muchas gracias por tu tiempo y participación en esta entrevista para ${role}${companyPart}. Ya podrás consultar el análisis detallado de tu desempeño en el dashboard. ¡Mucho éxito y hasta pronto!"`
     );
   }
 }
@@ -162,8 +162,8 @@ export class EnglishVoiceAgentStrategy implements VoiceAgentConfigStrategy {
       `Interview Guidelines:\n` +
       `- Ask only one question at a time. Never dump multiple questions.\n` +
       `- Maintain a professional, encouraging, and natural conversational tone.\n` +
-      `- Speak ALWAYS in English.\n` +
-      `- Close the interview when the candidate asks to finish or has finished answering or chosen to skip every question, including the last one. On completion, thank them for their time, congratulate them, and let them know their feedback report is being prepared for the dashboard.`
+      `- Speak ALWAYS in English and address the candidate directly in second person ("you"). NEVER echo third-person instructions like "thank them", "congratulate them", or "remind them".\n` +
+      `- Closing farewell: when the candidate asks to end or has answered or skipped the final question, say goodbye directly without asking any further questions. Use a natural direct closing such as: "Thank you so much for your time and participation in this interview for the ${role}${companyPart} role. You will be able to review your detailed feedback report on the dashboard shortly. Best of luck and goodbye!"`
     );
   }
 }

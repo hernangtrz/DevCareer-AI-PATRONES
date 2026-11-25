@@ -1,5 +1,6 @@
 import { APIStatusError, tts, voice } from '@livekit/agents';
 import { Room, RoomEvent } from '@livekit/rtc-node';
+import { isInterviewFarewellMessage } from './interview-turns.js';
 
 export interface WatchdogOptions {
   session: voice.AgentSession;
@@ -25,8 +26,13 @@ export class SessionWatchdog {
   private bvcEnabled: boolean;
 
   private thinkingTimer: NodeJS.Timeout | null = null;
+  private autoEndTimer: NodeJS.Timeout | null = null;
+  private shutdownFallbackTimer: NodeJS.Timeout | null = null;
   private currentAgentState: string = 'initializing';
   private lastAssistantMessage = '';
+  private hasUserTurn = false;
+  private pendingFarewellMessage: string | null = null;
+  private interviewCompleted = false;
   private voiceQuotaError = '';
   private lastRecoveryAt = 0;
   private consecutiveAwayPrompts = 0;
@@ -35,6 +41,8 @@ export class SessionWatchdog {
   private static readonly THINKING_STALL_TIMEOUT_MS = 15000;
   private static readonly RECOVERY_COOLDOWN_MS = 20000;
   private static readonly MAX_CONSECUTIVE_AWAY_PROMPTS = 2;
+  private static readonly FAREWELL_AUDIO_DRAIN_MS = 1500;
+  private static readonly SHUTDOWN_FALLBACK_MS = 3500;
 
   constructor(options: WatchdogOptions) {
     this.session = options.session;
@@ -54,6 +62,52 @@ export class SessionWatchdog {
     }
   }
 
+  private clearAutoEndTimers(): void {
+    if (this.autoEndTimer) {
+      clearTimeout(this.autoEndTimer);
+      this.autoEndTimer = null;
+    }
+    if (this.shutdownFallbackTimer) {
+      clearTimeout(this.shutdownFallbackTimer);
+      this.shutdownFallbackTimer = null;
+    }
+  }
+
+  private scheduleAutoEndAfterPlayout(): void {
+    if (this.disposed || this.interviewCompleted || !this.pendingFarewellMessage || this.autoEndTimer) {
+      return;
+    }
+    const finalMessage = this.pendingFarewellMessage;
+    console.log('[SessionWatchdog] 👋 Despedida final completada. Cerrando entrevista automáticamente...');
+    this.autoEndTimer = setTimeout(() => {
+      this.autoEndTimer = null;
+      if (this.disposed || this.interviewCompleted) return;
+      this.interviewCompleted = true;
+      this.broadcastControl({
+        action: 'interview_completed',
+        type: 'interview_completed',
+        reason: 'farewell',
+        finalMessage,
+        timestamp: Date.now(),
+      });
+      this.broadcastHealth(
+        'ok',
+        this.isEs ? 'Entrevista finalizada. Generando tu evaluación...' : 'Interview complete. Generating your report...'
+      );
+      this.shutdownFallbackTimer = setTimeout(() => {
+        this.shutdownFallbackTimer = null;
+        if (this.disposed) return;
+        try {
+          if (typeof this.session.shutdown === 'function') {
+            this.session.shutdown({ drain: true });
+          }
+        } catch (err) {
+          console.warn('[SessionWatchdog] Error cerrando sesión automáticamente:', err);
+        }
+      }, SessionWatchdog.SHUTDOWN_FALLBACK_MS);
+    }, SessionWatchdog.FAREWELL_AUDIO_DRAIN_MS);
+  }
+
   private attachSessionListeners(): void {
     // 1. Monitoreo de estado del agente y guarda no destructiva contra atasco en 'thinking'
     this.session.on(voice.AgentSessionEventTypes.AgentStateChanged, (ev) => {
@@ -69,6 +123,9 @@ export class SessionWatchdog {
       }
 
       if (ev.newState === 'speaking') this.voiceQuotaError = '';
+      if (ev.newState === 'listening' && this.pendingFarewellMessage) {
+        this.scheduleAutoEndAfterPlayout();
+      }
       if (!this.voiceQuotaError) this.broadcastHealth('ok', `Agent state: ${ev.newState}`);
     });
 
@@ -97,16 +154,28 @@ export class SessionWatchdog {
       }
     });
 
-    // 3. Registro del último mensaje del evaluador para soportar 'repeat_last'
+    // 3. Registro del último mensaje del evaluador para soportar 'repeat_last' y cierre automático tras despedida
     this.session.on(voice.AgentSessionEventTypes.ConversationItemAdded, (ev) => {
       if (this.disposed) return;
-      if ('role' in ev.item && ev.item.role === 'assistant') {
+      if (!('role' in ev.item)) return;
+      if (ev.item.role === 'user') {
+        this.hasUserTurn = true;
+        return;
+      }
+      if (ev.item.role === 'assistant') {
         const text = (ev.item.content || [])
           .map((c: any) => (typeof c === 'string' ? c : c?.text || ''))
           .join(' ')
           .trim();
         if (text) {
           this.lastAssistantMessage = text;
+          const wasInterrupted = Boolean((ev.item as any).interrupted);
+          if (!wasInterrupted && this.hasUserTurn && isInterviewFarewellMessage(text)) {
+            this.pendingFarewellMessage = text;
+            if (this.currentAgentState === 'listening') {
+              this.scheduleAutoEndAfterPlayout();
+            }
+          }
         }
       }
     });
@@ -203,7 +272,11 @@ export class SessionWatchdog {
             if (this.session.agentState !== 'listening') return;
             this.broadcastHealth('recovering', this.isEs ? 'Reanudando evaluación...' : 'Resuming interview...');
             console.log('[SessionWatchdog] Forzando reanudación inmediata del turno...');
-            this.session.generateReply();
+            this.session.generateReply({
+              instructions: this.isEs
+                ? 'El candidato pulsó el botón de reanudar. NO repitas textualmente tu última respuesta. En una sola frase natural y breve, indícale que sigues atento para escuchar su respuesta a la pregunta actual o pregúntale si prefiere pasar a la siguiente.'
+                : 'The candidate clicked resume. Do NOT repeat your last message verbatim. In one brief, natural sentence, let them know you are listening for their answer to the current question or ask if they would like to move on to the next one.',
+            });
           } else if (action === 'ping') {
             this.broadcastHealth('ok', 'Ping recibido');
           }
@@ -236,8 +309,23 @@ export class SessionWatchdog {
     }
   }
 
+  private broadcastControl(payloadObj: Record<string, unknown>): void {
+    if (this.disposed || !this.room || !this.room.localParticipant) return;
+
+    try {
+      const data = new TextEncoder().encode(JSON.stringify(payloadObj));
+      this.room.localParticipant.publishData(data, {
+        reliable: true,
+        topic: 'interview-control',
+      });
+    } catch (err) {
+      console.warn('[SessionWatchdog] Error enviando evento de control por DataChannel:', err);
+    }
+  }
+
   public dispose(): void {
     this.disposed = true;
     this.clearThinkingTimer();
+    this.clearAutoEndTimers();
   }
 }

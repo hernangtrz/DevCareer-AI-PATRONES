@@ -1,0 +1,94 @@
+/*
+ * From Uiverse.io by aaronross1 - https://uiverse.io/aaronross1/kind-bobcat-81
+ * MIT License, Copyright (c) aaronross1
+ */
+
+.editButton {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: rgb(20, 20, 20);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.164);
+  cursor: pointer;
+  transition-duration: 0.3s;
+  overflow: hidden;
+  position: relative;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.editSvgIcon {
+  width: 15px;
+  transition-duration: 0.3s;
+  flex-shrink: 0;
+}
+
+.editSvgIcon path {
+  fill: white;
+}
+
+.editButton:hover,
+.editButton:focus-visible {
+  width: 128px;
+  border-radius: 50px;
+  transition-duration: 0.3s;
+  background-color: rgb(255, 69, 69);
+  border-color: rgba(255, 69, 69, 0.6);
+  align-items: center;
+}
+
+.editButton:focus-visible {
+  outline: 2px solid #cac5fe;
+  outline-offset: 2px;
+}
+
+.editButton:hover .editSvgIcon,
+.editButton:focus-visible .editSvgIcon {
+  width: 19px;
+  transition-duration: 0.3s;
+  transform: rotate(360deg);
+}
+
+.editButton::before {
+  display: none;
+  /* Fallback for browsers without `/` alt-text syntax, silenced for screen readers where supported */
+  content: attr(data-label);
+  content: attr(data-label) / "";
+  color: white;
+  transition-duration: 0.3s;
+  font-size: 2px;
+  white-space: nowrap;
+}
+
+.editButton:hover::before,
+.editButton:focus-visible::before {
+  display: block;
+  padding-right: 10px;
+  font-size: 13px;
+  opacity: 1;
+  transform: translateY(0px);
+  transition-duration: 0.3s;
+}
+
+.editButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editButton,
+  .editSvgIcon,
+  .editButton::before {
+    transition-duration: 0s;
+  }
+
+  .editButton:hover .editSvgIcon,
+  .editButton:focus-visible .editSvgIcon {
+    transform: none;
+  }
+}

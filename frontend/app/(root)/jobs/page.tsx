@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import AiLoader from "@/components/AiLoader";
 import {
   getJobs,
   applyToJob,
@@ -310,6 +311,7 @@ export default function JobsPage() {
   const [expandedAppMaterials, setExpandedAppMaterials] = useState<{
     [appId: string]: "coverLetter" | "resume" | null;
   }>({});
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Profile data
   const profileData = {
@@ -475,6 +477,8 @@ export default function JobsPage() {
         }
       } catch (e) {
         console.error("Error cargando empleos en vivo:", e);
+      } finally {
+        if (isMounted) setIsInitialLoading(false);
       }
     }
 
@@ -1125,6 +1129,18 @@ export default function JobsPage() {
   const offeredCount = liveApplications.filter((a) => a.status === "offered").length;
   const appliedCount = liveApplications.filter((a) => a.status === "applied").length;
   const rejectedCount = liveApplications.filter((a) => a.status === "rejected").length;
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-[65vh] w-full flex items-center justify-center p-6">
+        <AiLoader
+          size={0.95}
+          label="Cargando Empleos & Match..."
+          sublabel="Sincronizando ofertas en vivo y compatibilidad con tu perfil"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8 min-h-screen pb-16">

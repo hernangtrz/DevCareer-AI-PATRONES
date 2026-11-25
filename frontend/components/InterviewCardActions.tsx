@@ -2,8 +2,10 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Loader2, Check, X } from "lucide-react";
+import { Trash2, Loader2, Check, X } from "lucide-react";
 import { deleteInterview, updateInterview } from "@/lib/api";
+import DeleteInterviewButton from "@/components/DeleteInterviewButton";
+import EditInterviewButton from "@/components/EditInterviewButton";
 
 interface Props {
   interviewId: string;
@@ -66,22 +68,22 @@ export default function InterviewCardActions({ interviewId, initialRole, initial
 
   return (
     <>
-      <div className="flex items-center gap-1.5">
-        <button
+      <div className="flex items-center gap-2">
+        <EditInterviewButton
           onClick={() => setIsEditing(true)}
+          disabled={isSaving || isDeleting}
+          label="Editar"
+          ariaLabel="Editar entrevista"
           title="Editar entrevista"
-          className="p-1.5 rounded-lg text-light-400 hover:text-white hover:bg-white/10 transition-colors"
-        >
-          <Pencil className="w-4 h-4" />
-        </button>
+        />
 
-        <button
+        <DeleteInterviewButton
           onClick={() => setShowConfirmDelete(true)}
+          disabled={isDeleting}
+          label="Eliminar"
+          ariaLabel="Eliminar entrevista"
           title="Eliminar entrevista"
-          className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        />
       </div>
 
       {/* Modal de Confirmación de Eliminación */}

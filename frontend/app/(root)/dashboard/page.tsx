@@ -1,4 +1,5 @@
 import DashboardExportActions from "@/components/DashboardExportActions";
+import VolumetricHeroBackdrop from "@/components/VolumetricHeroBackdrop";
 export const dynamic = "force-dynamic";
 
 import React from "react";
@@ -65,12 +66,9 @@ const Page = async () => {
   return (
     <>
       {/* ─── Premium Hero Section ─── */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#181635]/60 to-[#090A0E] border border-zinc-800/80 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl">
-        {/* Subtle grid pattern background */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#312e8112_1px,transparent_1px),linear-gradient(to_bottom,#312e8112_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
-        {/* Glowing gradient background effects */}
-        <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-72 h-72 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
+      <section className="relative overflow-hidden bg-[#010101] border border-zinc-800/80 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl">
+        {/* Interactive WebGL2 volumetric light typography backdrop */}
+        <VolumetricHeroBackdrop word="DEVCAREER" />
 
         <div className="relative flex flex-col gap-6 max-w-lg z-10 text-left">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium w-fit">
@@ -169,11 +167,13 @@ const Page = async () => {
               0%, 100% { height: 40px; }
               50% { height: 64px; }
             }
-            .animate-bar1 { animation: barAnimation1 1.2s ease-in-out infinite; }
-            .animate-bar2 { animation: barAnimation2 0.9s ease-in-out infinite; }
-            .animate-bar3 { animation: barAnimation3 1.5s ease-in-out infinite; }
-            .animate-bar4 { animation: barAnimation4 1.1s ease-in-out infinite; }
-            .animate-bar5 { animation: barAnimation5 1.3s ease-in-out infinite; }
+            @media (prefers-reduced-motion: no-preference) {
+              .animate-bar1 { animation: barAnimation1 1.2s ease-in-out infinite; }
+              .animate-bar2 { animation: barAnimation2 0.9s ease-in-out infinite; }
+              .animate-bar3 { animation: barAnimation3 1.5s ease-in-out infinite; }
+              .animate-bar4 { animation: barAnimation4 1.1s ease-in-out infinite; }
+              .animate-bar5 { animation: barAnimation5 1.3s ease-in-out infinite; }
+            }
           `}</style>
         </div>
       </section>

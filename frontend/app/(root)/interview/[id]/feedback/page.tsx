@@ -4,15 +4,19 @@ import "dayjs/locale/es";
 import "dayjs/locale/en";
 import dayjs from "dayjs";
 import Link from "next/link";
-import Image from "next/image";
 import { redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 import { getSessionCookie, getLanguageCookie } from "@/lib/api.server";
 import { getFeedbackByInterviewId, getInterviewById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { translations } from "@/lib/translations";
+import FeedbackInsightsDashboard from "@/components/FeedbackInsightsDashboard";
+import FeedbackPulseStage from "@/components/FeedbackPulseStage";
 import FeedbackExportButtons from "@/components/FeedbackExportButtons";
+import RetakeInterviewButton from "@/components/RetakeInterviewButton";
 import { FacialBehaviorFeedbackCard } from "@/components/FacialBehaviorFeedbackCard";
+import backBtnStyles from "@/components/FeedbackBackButton.module.css";
 
 const Page = async ({ params }: RouteParams) => {
   const { id } = await params;
@@ -26,142 +30,130 @@ const Page = async ({ params }: RouteParams) => {
 
   const feedback = await getFeedbackByInterviewId({ interviewId: id }, sessionCookie);
 
-  const formattedDate = lang === "es"
-    ? (feedback?.createdAt ? dayjs(feedback.createdAt).format("D [de] MMMM, YYYY h:mm A") : "N/A")
-    : (feedback?.createdAt ? dayjs(feedback.createdAt).format("MMMM D, YYYY h:mm A") : "N/A");
+  const formattedDate =
+    lang === "es"
+      ? feedback?.createdAt
+        ? dayjs(feedback.createdAt).format("D [de] MMMM, YYYY · h:mm A")
+        : "N/A"
+      : feedback?.createdAt
+      ? dayjs(feedback.createdAt).format("MMMM D, YYYY · h:mm A")
+      : "N/A";
 
   return (
-    <section className="section-feedback">
-      <div className="flex flex-row justify-center">
-        <h1 className="text-4xl font-semibold">
-          {t.feed_title}{" "}
-          <span className="capitalize">{interview.role}</span>
-        </h1>
-      </div>
+    <section className="section-feedback !gap-6 !max-w-6xl pb-12">
+      {/* Escena Interactiva PULSE (física 2D por velocidad de cursor + resorte) */}
+      <FeedbackPulseStage
+        role={interview.role}
+        level={interview.level}
+        formattedDate={formattedDate}
+        totalScore={feedback?.totalScore ?? 0}
+        categoryScores={feedback?.categoryScores ?? []}
+        strengthsCount={feedback?.strengths?.length ?? 0}
+        lang={lang === "en" ? "en" : "es"}
+      />
 
-      <div className="flex flex-row justify-center">
-        <div className="flex flex-row gap-5">
-          <div className="flex flex-row gap-2 items-center">
-            <Image src="/star.svg" width={22} height={22} alt="star" />
-            <p>{t.feed_general_impression}: <span className="text-primary-200 font-bold">{feedback?.totalScore}</span>/100</p>
-          </div>
-          <div className="flex flex-row gap-2">
-            <Image src="/calendar.svg" width={22} height={22} alt="calendar" />
-            <p>{formattedDate}</p>
-          </div>
-        </div>
-      </div>
-
-      <hr />
-      <p>{feedback?.finalAssessment}</p>
-
-      <div className="flex flex-col gap-4">
-        <h2>{t.feed_breakdown}</h2>
-        {feedback?.categoryScores?.map((category, index) => (
-          <div key={index} className="text-left">
-            <p className="font-bold">{index + 1}. {category.name} ({category.score}/100)</p>
-            <p>{category.comment}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-3 text-left">
-        <h3>{t.feed_strengths}</h3>
-        <ul>{feedback?.strengths?.map((s, i) => <li key={i}>{s}</li>)}</ul>
-      </div>
-
-      <div className="flex flex-col gap-3 text-left">
-        <h3>{t.feed_improvements}</h3>
-        <ul>{feedback?.areasForImprovement?.map((a, i) => <li key={i}>{a}</li>)}</ul>
-      </div>
+      {/* Panel Analítico Principal con Radar, Sentimiento, Temas y Fortalezas/Mejoras */}
+      <FeedbackInsightsDashboard
+        role={interview.role}
+        company={interview.company}
+        level={interview.level}
+        interviewType={interview.type}
+        techstack={interview.techstack || []}
+        formattedDate={formattedDate}
+        totalScore={feedback?.totalScore ?? 0}
+        finalAssessment={feedback?.finalAssessment ?? ""}
+        categoryScores={feedback?.categoryScores ?? []}
+        strengths={feedback?.strengths ?? []}
+        areasForImprovement={feedback?.areasForImprovement ?? []}
+        lang={lang === "en" ? "en" : "es"}
+      />
 
       {feedback?.englishFeedback && (
-        <div className="flex flex-col gap-6 mt-8 p-6 bg-dark-300 border border-primary-200/20 rounded-2xl text-left">
-          <div className="flex items-center justify-between border-b border-light-800 pb-4">
-            <h2 className="text-2xl font-semibold text-primary-200 flex items-center gap-2">
+        <div className="flex flex-col gap-6 p-6 md:p-7 bg-gradient-to-br from-[#0d101c] via-[#090b14] to-[#07080f] border border-indigo-500/20 rounded-3xl text-left shadow-2xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
+            <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
               🇺🇸 English Proficiency Evaluation
             </h2>
-            <div className="flex items-center gap-2 bg-primary-200 text-dark-100 font-bold px-4 py-1.5 rounded-full text-lg shadow-sm">
-              <span className="text-xs uppercase font-medium tracking-wider text-dark-200">CEFR:</span>
+            <div className="flex items-center gap-2 bg-primary-200 text-dark-100 font-bold px-4 py-1.5 rounded-full text-base shadow-sm w-fit">
+              <span className="text-[11px] uppercase font-semibold tracking-wider text-dark-200">
+                CEFR:
+              </span>
               {feedback.englishFeedback.overallLevel}
             </div>
           </div>
 
-          <p className="text-light-100 italic">
+          <p className="text-sm text-zinc-200 italic leading-relaxed p-4 rounded-2xl bg-zinc-950/60 border border-zinc-800/80">
             &ldquo;{feedback.englishFeedback.overallComment}&rdquo;
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-            <div className="bg-dark-200 p-4 rounded-xl border border-light-800 flex flex-col gap-1">
-              <span className="text-light-400 text-xs font-semibold uppercase tracking-wider">Grammar</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-bold text-white">{feedback.englishFeedback.grammarScore}</span>
-                <span className="text-light-400 text-sm">/100</span>
+            {[
+              { label: "Grammar", value: feedback.englishFeedback.grammarScore },
+              { label: "Vocabulary", value: feedback.englishFeedback.vocabularyScore },
+              { label: "Fluency", value: feedback.englishFeedback.fluencyScore },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="bg-zinc-950/70 p-4 rounded-2xl border border-zinc-800/80 flex flex-col gap-1"
+              >
+                <span className="text-zinc-400 text-[11px] font-semibold uppercase tracking-wider">
+                  {item.label}
+                </span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl font-extrabold text-white tabular-nums">
+                    {item.value}
+                  </span>
+                  <span className="text-zinc-500 text-xs">/100</span>
+                </div>
+                <div className="w-full bg-zinc-900 h-2 rounded-full mt-2 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 via-violet-400 to-emerald-400 h-full rounded-full"
+                    style={{ width: `${Math.max(0, Math.min(100, item.value))}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-dark-300 h-1.5 rounded-full mt-2 overflow-hidden">
-                <div 
-                  className="bg-success-100 h-full rounded-full" 
-                  style={{ width: `${feedback.englishFeedback.grammarScore}%` }} 
-                />
-              </div>
-            </div>
-
-            <div className="bg-dark-200 p-4 rounded-xl border border-light-800 flex flex-col gap-1">
-              <span className="text-light-400 text-xs font-semibold uppercase tracking-wider">Vocabulary</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-bold text-white">{feedback.englishFeedback.vocabularyScore}</span>
-                <span className="text-light-400 text-sm">/100</span>
-              </div>
-              <div className="w-full bg-dark-300 h-1.5 rounded-full mt-2 overflow-hidden">
-                <div 
-                  className="bg-success-100 h-full rounded-full" 
-                  style={{ width: `${feedback.englishFeedback.vocabularyScore}%` }} 
-                />
-              </div>
-            </div>
-
-            <div className="bg-dark-200 p-4 rounded-xl border border-light-800 flex flex-col gap-1">
-              <span className="text-light-400 text-xs font-semibold uppercase tracking-wider">Fluency</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-bold text-white">{feedback.englishFeedback.fluencyScore}</span>
-                <span className="text-light-400 text-sm">/100</span>
-              </div>
-              <div className="w-full bg-dark-300 h-1.5 rounded-full mt-2 overflow-hidden">
-                <div 
-                  className="bg-success-100 h-full rounded-full" 
-                  style={{ width: `${feedback.englishFeedback.fluencyScore}%` }} 
-                />
-              </div>
-            </div>
+            ))}
           </div>
 
-          {feedback.englishFeedback.grammarErrors && feedback.englishFeedback.grammarErrors.length > 0 && (
-            <div className="flex flex-col gap-2.5 text-left">
-              <h3 className="text-lg font-semibold text-destructive-100">Grammar Mistakes Identified</h3>
-              <ul className="list-none flex flex-col gap-2 pl-0">
-                {feedback.englishFeedback.grammarErrors.map((error, idx) => (
-                  <li key={idx} className="bg-destructive-100/10 border border-destructive-100/20 text-light-100 px-4 py-2.5 rounded-lg text-sm flex items-start gap-2.5">
-                    <span className="text-destructive-100 font-bold">✗</span>
-                    <span>{error}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {feedback.englishFeedback.grammarErrors &&
+            feedback.englishFeedback.grammarErrors.length > 0 && (
+              <div className="flex flex-col gap-2.5 text-left">
+                <h3 className="text-base font-bold text-rose-300">
+                  Grammar Mistakes Identified
+                </h3>
+                <ul className="list-none flex flex-col gap-2 pl-0">
+                  {feedback.englishFeedback.grammarErrors.map((error, idx) => (
+                    <li
+                      key={idx}
+                      className="bg-rose-500/10 border border-rose-500/20 text-zinc-200 px-4 py-2.5 rounded-xl text-sm flex items-start gap-2.5"
+                    >
+                      <span className="text-rose-400 font-bold">✗</span>
+                      <span>{error}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-          {feedback.englishFeedback.vocabularySuggestions && feedback.englishFeedback.vocabularySuggestions.length > 0 && (
-            <div className="flex flex-col gap-2.5 text-left">
-              <h3 className="text-lg font-semibold text-success-100">Vocabulary Suggestions</h3>
-              <ul className="list-none flex flex-col gap-2 pl-0">
-                {feedback.englishFeedback.vocabularySuggestions.map((suggestion, idx) => (
-                  <li key={idx} className="bg-success-100/10 border border-success-100/20 text-light-100 px-4 py-2.5 rounded-lg text-sm flex items-start gap-2.5">
-                    <span className="text-success-100 font-bold">✓</span>
-                    <span>{suggestion}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {feedback.englishFeedback.vocabularySuggestions &&
+            feedback.englishFeedback.vocabularySuggestions.length > 0 && (
+              <div className="flex flex-col gap-2.5 text-left">
+                <h3 className="text-base font-bold text-emerald-300">
+                  Vocabulary Suggestions
+                </h3>
+                <ul className="list-none flex flex-col gap-2 pl-0">
+                  {feedback.englishFeedback.vocabularySuggestions.map((suggestion, idx) => (
+                    <li
+                      key={idx}
+                      className="bg-emerald-500/10 border border-emerald-500/20 text-zinc-200 px-4 py-2.5 rounded-xl text-sm flex items-start gap-2.5"
+                    >
+                      <span className="text-emerald-400 font-bold">✓</span>
+                      <span>{suggestion}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
         </div>
       )}
 
@@ -177,17 +169,23 @@ const Page = async ({ params }: RouteParams) => {
         hasFacialFeedback={!!feedback?.facialFeedback}
       />
 
-      <div className="buttons">
-        <Button className="btn-secondary flex-1">
-          <Link href="/dashboard" className="flex w-full justify-center">
-            <p className="text-sm font-semibold text-primary-200 text-center">{t.feed_btn_home}</p>
+      <div className="buttons pt-2">
+        <Button asChild className={`btn-secondary flex-1 h-12 rounded-2xl ${backBtnStyles.backButton}`}>
+          <Link href="/dashboard" className="flex w-full items-center justify-center" aria-label={t.feed_btn_home}>
+            <span className={backBtnStyles.backIcon} aria-hidden="true">
+              <ArrowLeft className="w-4 h-4 text-primary-200" aria-hidden="true" />
+            </span>
+            <span className={backBtnStyles.backTextWrap}>
+              <span className={`text-sm font-semibold text-primary-200 text-center ${backBtnStyles.backText}`}>
+                {t.feed_btn_home}
+              </span>
+            </span>
           </Link>
         </Button>
-        <Button className="btn-primary flex-1">
-          <Link href={`/interview/${id}`} className="flex w-full justify-center">
-            <p className="text-sm font-semibold text-black text-center">{t.feed_btn_retake}</p>
-          </Link>
-        </Button>
+        <RetakeInterviewButton
+          href={`/interview/${id}`}
+          label={t.feed_btn_retake}
+        />
       </div>
     </section>
   );

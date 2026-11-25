@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { isAuthenticated, getCurrentUser } from "@/lib/api.server";
 import AppSidebar from "@/components/AppSidebar";
+import RouteTransitionLoader from "@/components/RouteTransitionLoader";
 
 const Layout = async ({ children }: { children: ReactNode }) => {
   let user = null;
@@ -20,6 +21,7 @@ const Layout = async ({ children }: { children: ReactNode }) => {
 
       {/* ── Main Content Area ── */}
       <div className="flex flex-col flex-1 min-w-0 md:pl-64">
+        <RouteTransitionLoader />
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-8 md:px-10 py-6 md:py-10 max-md:pt-20">
           {children}
         </main>

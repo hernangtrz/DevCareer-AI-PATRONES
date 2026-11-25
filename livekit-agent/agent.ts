@@ -11,16 +11,21 @@ dotenv.config();
 
 /**
  * Opciones de Silero VAD en MILISEGUNDOS (unidad oficial en @livekit/agents-plugin-silero Node.js).
- * - minSpeechDuration: 220ms evita disparos por clics, respiraciones o ecos breves.
- * - minSilenceDuration: 1200ms da tiempo al candidato para pensar entre cláusulas técnicas sin cortarlo.
- * - prefixPaddingDuration: 400ms preserva la primera sílaba del candidato.
+ * - activationThreshold: 0.38 asegura detección confiable incluso con voz suave o micrófono de laptop.
+ * - minSpeechDuration: 150ms captura de inmediato respuestas breves como "Sí, listo".
+ * - minSilenceDuration: 850ms evita cortar comas naturales sin añadir esperas muertas.
+ * - prefixPaddingDuration: 300ms preserva la primera sílaba del candidato.
  */
 const VAD_OPTIONS = {
-  activationThreshold: 0.55,
-  minSpeechDuration: 220,
-  minSilenceDuration: 1200,
-  prefixPaddingDuration: 400,
+  activationThreshold: 0.38,
+  minSpeechDuration: 150,
+  minSilenceDuration: 850,
+  prefixPaddingDuration: 300,
 };
+
+function logTs(): string {
+  return new Date().toISOString().slice(11, 23);
+}
 
 /**
  * Limpia y normaliza el título de la vacante para síntesis de voz natural,
@@ -156,26 +161,26 @@ export default defineAgent({
 
     // Logging de eventos para monitoreo y depuración en tiempo real
     session.on(voice.AgentSessionEventTypes.Error, (ev) => {
-      console.error('[Agent] Error en sesión de voz:', ev);
+      console.error(`[${logTs()}] [Agent] Error en sesión de voz:`, ev);
     });
 
     session.on(voice.AgentSessionEventTypes.UserInputTranscribed, (ev) => {
       if (ev.transcript?.trim()) {
-        console.log(`[Agent] Transcripción (${ev.isFinal ? 'FINAL' : 'parcial'}): "${ev.transcript.trim()}"`);
+        console.log(`[${logTs()}] [Agent] Transcripción (${ev.isFinal ? 'FINAL' : 'parcial'}): "${ev.transcript.trim()}"`);
       }
     });
 
     session.on(voice.AgentSessionEventTypes.UserStateChanged, (ev) => {
-      console.log(`[Agent] Estado del candidato: ${ev.oldState} -> ${ev.newState}`);
+      console.log(`[${logTs()}] [Agent] Estado del candidato: ${ev.oldState} -> ${ev.newState}`);
     });
 
     session.on(voice.AgentSessionEventTypes.AgentStateChanged, (ev) => {
-      console.log(`[Agent] Estado del agente: ${ev.oldState} -> ${ev.newState}`);
+      console.log(`[${logTs()}] [Agent] Estado del agente: ${ev.oldState} -> ${ev.newState}`);
     });
 
     session.on(voice.AgentSessionEventTypes.ConversationItemAdded, (ev) => {
       if ('role' in ev.item) {
-        console.log(`[Agent] Historial [${ev.item.role}]: ${(ev.item.content || []).map((c: any) => typeof c === 'string' ? c : c?.text || '').join(' ')}`);
+        console.log(`[${logTs()}] [Agent] Historial [${ev.item.role}]: ${(ev.item.content || []).map((c: any) => typeof c === 'string' ? c : c?.text || '').join(' ')}`);
       }
     });
 
@@ -198,19 +203,25 @@ export default defineAgent({
     }, detector);
 
     // Iniciar la sesión vinculada a la sala de LiveKit con cancelación de ruido BVC (según toggle)
+    // y cola de salida compacta (300ms en lugar de 1000ms) para pasar a 'listening' casi de inmediato.
     await session.start({
       agent,
       room: ctx.room,
       inputOptions: {
         noiseCancellation,
       },
+      outputOptions: {
+        queueSizeMs: 300,
+      },
     });
 
-    console.log('[Agent] Sesión iniciada. Enviando saludo inicial protegido...');
+    console.log('[Agent] Sesión iniciada. Enviando saludo inicial...');
 
-    // Breve pausa para estabilizar la suscripción WebRTC y emitir saludo protegido contra falsas interrupciones
-    await new Promise((r) => setTimeout(r, 350));
-    await session.say(greeting, { allowInterruptions: false });
+    // Breve pausa para estabilizar la suscripción WebRTC.
+    // allowInterruptions=true (resguardado por aecWarmupDuration y minWords=2) evita
+    // descartar la respuesta del candidato si contesta apenas finaliza el saludo.
+    await new Promise((r) => setTimeout(r, 200));
+    await session.say(greeting, { allowInterruptions: true });
   },
 });
 

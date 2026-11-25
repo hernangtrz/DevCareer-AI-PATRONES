@@ -4,12 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import AiLoader from "@/components/AiLoader";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[380px] flex items-center justify-center bg-[#141619] border-none text-white/40 font-mono text-sm">
-      Cargando editor de código...
+    <div className="w-full h-[380px] flex items-center justify-center bg-[#141619] border-none">
+      <AiLoader size={0.7} label="Cargando editor de código..." />
     </div>
   ),
 });

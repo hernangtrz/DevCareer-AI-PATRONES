@@ -21,6 +21,26 @@ const englishEndings = [
   /(?:^| )(?:uh+|um+|hm+)$/,
 ];
 
+const FAREWELL_DASHBOARD_PATTERN =
+  /(?:dashboard|panel de (?:anal[ií]tica|resultados)|reporte de (?:evaluaci[oó]n|feedback)|feedback report|an[aá]lisis (?:detallado )?de tu desempe[nñ]o)/i;
+const FAREWELL_CLOSING_CONTEXT_PATTERN =
+  /(?:gracias|conclu|finaliz|termina|pronto|[eé]xito|despedi|participaci[oó]n|thank|conclud|finish|luck|goodbye|see you)/i;
+const EXPLICIT_FAREWELL_PATTERN =
+  /(?:¡?\s*hasta pronto\s*!?|¡?\s*hasta luego\s*!?|¡?\s*nos vemos pronto\s*!?|con esto (?:concluimos|finalizamos|terminamos)|hemos (?:concluido|finalizado|terminado) (?:la|esta|tu) entrevista|damos por (?:finalizada|terminada|concluida) (?:la|esta|tu) entrevista|muchas gracias por tu tiempo(?: y participaci[oó]n)? en esta entrevista|gracias por tu tiempo dedicado a esta entrevista|that concludes (?:our|this|the) (?:technical )?interview|we(?:'ve| have) (?:completed|finished) (?:our|this|the) interview|thank you(?: so much)? for your time(?: and participation)?(?: today)? in this interview|best of luck and (?:goodbye|see you soon))/i;
+
+/**
+ * Detecta si la intervención final del evaluador corresponde a la despedida de cierre
+ * de la entrevista (sin preguntas pendientes), tanto en español como en inglés.
+ */
+export function isInterviewFarewellMessage(text: string): boolean {
+  const cleaned = text.trim();
+  if (!cleaned) return false;
+  // Si contiene una pregunta, la entrevista sigue activa.
+  if (/[¿?]/.test(cleaned)) return false;
+  if (EXPLICIT_FAREWELL_PATTERN.test(cleaned)) return true;
+  return FAREWELL_DASHBOARD_PATTERN.test(cleaned) && FAREWELL_CLOSING_CONTEXT_PATTERN.test(cleaned);
+}
+
 export class InterviewTurnDetector {
   readonly model = 'interview-turn-rules';
   readonly provider = 'DevCareer';

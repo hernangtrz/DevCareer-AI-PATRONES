@@ -1,0 +1,87 @@
+/*
+ * From Uiverse.io by vinodjangid07 - https://uiverse.io/vinodjangid07/smart-emu-83
+ * MIT License, Copyright (c) vinodjangid07 (Vinod Jangid)
+ */
+
+.deleteButton {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: rgb(20, 20, 20);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.164);
+  cursor: pointer;
+  transition-duration: 0.3s;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.svgIcon {
+  width: 13px;
+  transition-duration: 0.3s;
+}
+
+.svgIcon path {
+  fill: white;
+}
+
+.deleteButton:hover,
+.deleteButton:focus-visible {
+  width: 128px;
+  border-radius: 50px;
+  transition-duration: 0.3s;
+  background-color: rgb(255, 69, 69);
+  border-color: rgba(255, 69, 69, 0.6);
+  align-items: center;
+}
+
+.deleteButton:focus-visible {
+  outline: 2px solid #cac5fe;
+  outline-offset: 2px;
+}
+
+.deleteButton:hover .svgIcon,
+.deleteButton:focus-visible .svgIcon {
+  width: 44px;
+  transition-duration: 0.3s;
+  transform: translateY(60%);
+}
+
+.deleteButton::before {
+  position: absolute;
+  top: -20px;
+  /* Fallback for browsers without `/` alt-text syntax, silenced for screen readers where supported */
+  content: attr(data-label);
+  content: attr(data-label) / "";
+  color: white;
+  transition-duration: 0.3s;
+  font-size: 2px;
+  opacity: 0;
+  white-space: nowrap;
+}
+
+.deleteButton:hover::before,
+.deleteButton:focus-visible::before {
+  font-size: 13px;
+  opacity: 1;
+  transform: translateY(27px);
+  transition-duration: 0.3s;
+}
+
+.deleteButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deleteButton,
+  .svgIcon,
+  .deleteButton::before {
+    transition-duration: 0s;
+  }
+}

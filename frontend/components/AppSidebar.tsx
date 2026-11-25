@@ -10,13 +10,13 @@ import {
   Briefcase,
   BarChart3,
   Sparkles,
-  Plus,
   Menu,
   X,
   User,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import UserMenu from "@/components/UserMenu";
+import NewInterviewGlowButton from "@/components/NewInterviewGlowButton";
 
 interface AppSidebarProps {
   userName: string;
@@ -103,14 +103,11 @@ export default function AppSidebar({ userName, userEmail }: AppSidebarProps) {
         </Link>
 
         {/* Primary Action Button */}
-        <Link
+        <NewInterviewGlowButton
           href="/interview"
+          label="Nueva Entrevista"
           onClick={() => setMobileOpen(false)}
-          className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nueva Entrevista</span>
-        </Link>
+        />
 
         {/* ── Main Navigation Section ── */}
         <div className="flex flex-col gap-1.5">

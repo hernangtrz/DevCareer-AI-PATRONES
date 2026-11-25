@@ -3,10 +3,11 @@ import * as deepgram from '@livekit/agents-plugin-deepgram';
 import { InterviewTTS } from '../services/interview-tts.js';
 import { InterviewTurnDetector } from '../services/interview-turns.js';
 import * as openai from '@livekit/agents-plugin-openai';
-import { BackgroundVoiceCancellation } from '@livekit/noise-cancellation-node';
+import { BackgroundVoiceCancellation, NoiseCancellation } from '@livekit/noise-cancellation-node';
 import { VoiceConfig } from '../strategies/voice-agent.strategy.js';
 
-// Deepgram puede confirmar un segmento mientras LiveKit sigue esperando el resto del turno.
+// Deepgram puede confirmar un segmento mientras LiveKit sigue esperando el resto del turno,
+// o devolver un is_final vacío tras un interim corto y dejar el turno colgado en listening.
 export class InterviewSTT extends deepgram.STT {
   private activeStream?: deepgram.SpeechStream;
 
@@ -29,14 +30,38 @@ export class InterviewSTT extends deepgram.STT {
     let pendingInterim = false;
     let pendingReply: ReturnType<voice.AgentSession['generateReply']> | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    let commitFallback: ReturnType<typeof setTimeout> | undefined;
     const cancelRetry = () => {
       clearTimeout(retry);
       retry = undefined;
+      clearTimeout(commitFallback);
+      commitFallback = undefined;
     };
     const retryIfPending = () => {
       if (retry || !pendingInterim || session.userState === 'speaking') return;
       retry = setTimeout(() => {
-        if (pendingInterim && session.userState === 'listening') this.finalizeSegment();
+        if (!pendingInterim || session.userState !== 'listening') return;
+        this.finalizeSegment();
+        // Si Deepgram sigue sin emitir FINAL_TRANSCRIPT (p. ej. devolvió is_final vacío),
+        // promovemos el parcial pendiente con commitUserTurn() para no congelar la entrevista.
+        clearTimeout(commitFallback);
+        commitFallback = setTimeout(() => {
+          commitFallback = undefined;
+          if (
+            pendingInterim &&
+            session.userState === 'listening' &&
+            session.agentState === 'listening' &&
+            typeof session.commitUserTurn === 'function'
+          ) {
+            pendingInterim = false;
+            try {
+              console.warn('[InterviewSTT] Parcial sin confirmación FINAL de Deepgram; forzando commitUserTurn().');
+              session.commitUserTurn();
+            } catch (err) {
+              console.warn('[InterviewSTT] No se pudo ejecutar commitUserTurn():', err);
+            }
+          }
+        }, 800);
         // Se rearma cuando llega otra intervención o una confirmación.
       }, 1600);
     };
@@ -90,7 +115,7 @@ export class VoicePipelineFactory {
       stt: transcription,
       llm: this.createLLM(),
       tts: this.createTTS(config),
-      aecWarmupDuration: 1500,
+      aecWarmupDuration: 800,
       userAwayTimeout: 35,
       ttsReadIdleTimeout: 15000,
       forwardAudioIdleTimeout: 15000,
@@ -111,19 +136,20 @@ export class VoicePipelineFactory {
         turnDetection: detector,
         endpointing: {
           mode: 'fixed',
-          // LiveKit cuenta desde la última voz detectada, incluido el silencio de Silero.
-          minDelay: 5000,
-          maxDelay: 10000,
+          // LiveKit cuenta desde la última voz detectada, incluido el silencio de Silero (850ms).
+          // 1800ms ofrece respuesta ágil en turnos completos sin cortar comas naturales; 4500ms en frases abiertas.
+          minDelay: 1800,
+          maxDelay: 4500,
         },
         interruption: {
           enabled: true,
           mode: 'vad',
-          minDuration: 600,
-          minWords: 1,
+          minDuration: 550,
+          minWords: 2,
           // CRÍTICO: Mantener resumeFalseInterruption en false para evitar deadlock interno
           // de @livekit/agents@1.4.5 (audioOutput.pause() con pushedDuration=0 bloquea waitForPlayout() para siempre).
           resumeFalseInterruption: false,
-          discardAudioIfUninterruptible: true,
+          discardAudioIfUninterruptible: false,
         },
         preemptiveGeneration: {
           enabled: false,
@@ -135,21 +161,28 @@ export class VoicePipelineFactory {
   }
 
   /**
-   * Crea el procesador de cancelación de ruido y voces de fondo (BVC).
-   * Nota importante: @livekit/noise-cancellation-node se importa a nivel de módulo
-   * para registrar el AudioFilter en Rust FFI ANTES de ctx.connect() y evitar code=209.
+   * Crea el procesador de cancelación de ruido de LiveKit (Krisp AI).
+   * Usa NoiseCancellation estándar (NC) por defecto en lugar de BVC porque BVC intenta
+   * aislar un único hablante primario y en micrófonos de laptop con AEC puede clasificar
+   * la propia voz del candidato como voz secundaria y silenciarla antes de llegar al VAD.
+   * Si se requiere BVC explícitamente, configurar NOISE_CANCELLATION_MODE=bvc en .env.
    */
   public static async createNoiseCancellation(enabled: boolean = true) {
     if (!enabled || process.env.ENABLE_BVC === 'false') {
-      console.log('[VoicePipelineFactory] BVC desactivado por configuración o preferencia del candidato.');
+      console.log('[VoicePipelineFactory] Cancelación de ruido Krisp desactivada por configuración o preferencia del candidato.');
       return undefined;
     }
 
+    const useAggressiveBvc = (process.env.NOISE_CANCELLATION_MODE || '').toLowerCase() === 'bvc';
     try {
-      console.log('[VoicePipelineFactory] ✅ LiveKit Krisp BVC (Background Voice Cancellation) inicializado.');
-      return BackgroundVoiceCancellation();
+      if (useAggressiveBvc) {
+        console.log('[VoicePipelineFactory] ✅ LiveKit Krisp BVC (Background Voice Cancellation) inicializado.');
+        return BackgroundVoiceCancellation();
+      }
+      console.log('[VoicePipelineFactory] ✅ LiveKit Krisp NC (Noise Cancellation sin supresión de voz humana) inicializado.');
+      return NoiseCancellation();
     } catch (err) {
-      console.warn('[VoicePipelineFactory] ⚠️ No se pudo inicializar BVC nativo, usando audio estándar:', err);
+      console.warn('[VoicePipelineFactory] ⚠️ No se pudo inicializar cancelación de ruido nativa, usando audio estándar:', err);
       return undefined;
     }
   }
@@ -250,7 +283,8 @@ export class VoicePipelineFactory {
    * El adaptador conserva el orden del audio y sincroniza el texto por frase.
    */
   public static createTTS(config: VoiceConfig): tts.TTS {
-    const cartesiaKey = process.env.CARTESIA_API_KEY;
+    const preferDeepgram = (process.env.TTS_PROVIDER || '').toLowerCase() === 'deepgram';
+    const cartesiaKey = preferDeepgram ? undefined : process.env.CARTESIA_API_KEY;
     const deepgramKey = process.env.DEEPGRAM_API_KEY;
     if (!cartesiaKey && !deepgramKey) throw new Error('Faltan credenciales para la síntesis de voz.');
     return new tts.StreamAdapter(

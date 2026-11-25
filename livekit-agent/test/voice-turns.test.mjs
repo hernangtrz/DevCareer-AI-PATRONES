@@ -6,7 +6,8 @@ import { AudioFrame, dispose } from '@livekit/rtc-node';
 import { WebSocketServer } from 'ws';
 import { InterviewSTT } from '../factories/voice-pipeline.factory.ts';
 import { InterviewTTS } from '../services/interview-tts.ts';
-import { InterviewTurnDetector, InterviewVoiceAgent } from '../services/interview-turns.ts';
+import { InterviewTurnDetector, InterviewVoiceAgent, isInterviewFarewellMessage } from '../services/interview-turns.ts';
+import { SessionWatchdog } from '../services/session-watchdog.ts';
 
 initializeLogger({ level: 'error', pretty: false });
 test.after(() => dispose());
@@ -100,6 +101,28 @@ test('un parcial pendiente recibe un solo reintento durante el silencio', (t) =>
   session.emit(events.UserInputTranscribed, { transcript: 'y el patrón de diseño', isFinal: true });
   t.mock.timers.tick(3000);
   assert.equal(finalize.mock.callCount(), 4);
+  session.emit(events.Close);
+});
+
+test('un parcial huérfano sin FINAL de Deepgram fuerza commitUserTurn en vez de congelar el turno', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const session = new EventEmitter();
+  session.agentState = 'listening';
+  let committed = 0;
+  session.commitUserTurn = () => { committed += 1; };
+  const events = voice.AgentSessionEventTypes;
+  const recognizer = new InterviewSTT({ apiKey: 'prueba' });
+  t.mock.method(recognizer, 'finalizeSegment', () => {});
+  recognizer.attachTo(session);
+  session.userState = 'speaking';
+  session.emit(events.UserStateChanged, { oldState: 'listening', newState: 'speaking' });
+  session.emit(events.UserInputTranscribed, { transcript: 'La experiencia de que', isFinal: false });
+  session.userState = 'listening';
+  session.emit(events.UserStateChanged, { oldState: 'speaking', newState: 'listening' });
+  t.mock.timers.tick(1700);
+  assert.equal(committed, 0, 'Primero debe esperar un breve margen tras el segundo Finalize');
+  t.mock.timers.tick(800);
+  assert.equal(committed, 1, 'Si Deepgram no confirma el parcial, debe forzar commitUserTurn()');
   session.emit(events.Close);
 });
 
@@ -225,4 +248,70 @@ test('si ambos proveedores rechazan la síntesis, la sesión recibe el 402 y nin
   for await (const event of speech) assert.equal(event, tts.SynthesizeStream.END_OF_STREAM);
   speech.close();
   assert.deepEqual(errors, [402]);
+});
+
+test('isInterviewFarewellMessage distingue despedidas de cierre de saludos y preguntas intermedias', () => {
+  assert.equal(
+    isInterviewFarewellMessage(
+      'Muchas gracias por tu tiempo y participación en esta entrevista para Frontend Developer. Ya podrás consultar el análisis detallado de tu desempeño en el dashboard. ¡Mucho éxito y hasta pronto!'
+    ),
+    true
+  );
+  assert.equal(
+    isInterviewFarewellMessage(
+      'Thank you so much for your time and participation in this interview. You can review your detailed feedback report on the dashboard shortly. Best of luck and goodbye!'
+    ),
+    true
+  );
+  assert.equal(
+    isInterviewFarewellMessage(
+      '¡Hola! Te doy la bienvenida a tu entrevista técnica en DevCareer AI. ¿Cómo te encuentras hoy? ¿Listo para comenzar?'
+    ),
+    false
+  );
+  assert.equal(
+    isInterviewFarewellMessage(
+      'Excelente, muchas gracias. Pasemos a la siguiente pregunta: ¿Qué es el Virtual DOM en React?'
+    ),
+    false
+  );
+});
+
+test('SessionWatchdog emite interview_completed automáticamente tras finalizar la despedida', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const session = new EventEmitter();
+  let shutdownCalled = 0;
+  session.shutdown = () => { shutdownCalled += 1; };
+  const published = [];
+  const room = new EventEmitter();
+  room.localParticipant = {
+    publishData(data, opts) {
+      published.push({ topic: opts?.topic, body: JSON.parse(new TextDecoder().decode(data)) });
+    },
+  };
+  const watchdog = new SessionWatchdog({ session, room, isEs: true });
+  const events = voice.AgentSessionEventTypes;
+
+  // Turno del candidato + despedida del evaluador mientras habla
+  session.emit(events.ConversationItemAdded, { item: { role: 'user', content: ['Listo, esa fue mi última respuesta.'] } });
+  session.emit(events.AgentStateChanged, { oldState: 'thinking', newState: 'speaking' });
+  const farewell = 'Muchas gracias por tu tiempo y participación en esta entrevista. Ya podrás consultar tu análisis en el dashboard. ¡Hasta pronto!';
+  session.emit(events.ConversationItemAdded, { item: { role: 'assistant', content: [farewell], interrupted: false } });
+
+  // Aún está hablando -> todavía no debe emitir cierre
+  t.mock.timers.tick(2000);
+  assert.equal(published.filter((p) => p.topic === 'interview-control').length, 0);
+
+  // Termina de hablar -> tras 1500ms de drenaje WebRTC emite interview_completed
+  session.emit(events.AgentStateChanged, { oldState: 'speaking', newState: 'listening' });
+  t.mock.timers.tick(1500);
+  const controlEvents = published.filter((p) => p.topic === 'interview-control');
+  assert.equal(controlEvents.length, 1);
+  assert.equal(controlEvents[0].body.action, 'interview_completed');
+  assert.equal(controlEvents[0].body.finalMessage, farewell);
+
+  // Si el cliente no desconecta en 3500ms, activa shutdown de respaldo
+  t.mock.timers.tick(3500);
+  assert.equal(shutdownCalled, 1);
+  watchdog.dispose();
 });

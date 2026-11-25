@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   BarChart3,
   TrendingUp,
@@ -21,6 +22,9 @@ import {
   Calendar,
 } from "lucide-react";
 import DashboardExportActions from "@/components/DashboardExportActions";
+import AiLoader from "@/components/AiLoader";
+import SmoothLineGraph from "@/components/SmoothLineGraph";
+import AnalyticsRechartsPair from "@/components/AnalyticsRechartsPair";
 
 // ── Tipos de Datos ──
 interface PillarMetric {
@@ -175,15 +179,6 @@ const RADAR_AXES_METRICS = [
   { label: "Confianza & Fluidez", angle: 198, score: 84, benchmark: 75 },
 ];
 
-function getRadarCoord(angleDeg: number, score: number, cx: number, cy: number, maxR: number) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180;
-  const r = (Math.max(10, Math.min(100, score)) / 100) * maxR;
-  return {
-    x: cx + r * Math.cos(rad),
-    y: cy + r * Math.sin(rad),
-  };
-}
-
 // ── Datos para la Curva de Evolución Histórica (7 Sesiones) ──
 const HISTORICAL_TREND = [
   { session: "S1", date: "02 Nov", score: 65, tag: "Diagnóstico Inicial" },
@@ -239,10 +234,23 @@ const TECHNICAL_MASTERY_AREAS = [
   },
 ];
 
+const CHART_EASE = [0.22, 1, 0.36, 1] as const;
+
 export default function AnalyticsPage() {
+  const prefersReducedMotion = Boolean(useReducedMotion());
   const [data, setData] = useState<AnalyticsData>(DEFAULT_ANALYTICS);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"overview" | "activity">("overview");
+  const [chartAnimKey, setChartAnimKey] = useState<number>(0);
+
+  // Interactive chart inspection states
+  const [hoveredDonut, setHoveredDonut] = useState<"easy" | "medium" | "hard" | null>(null);
+  const [hoveredHeatCell, setHoveredHeatCell] = useState<{
+    week: number;
+    day: string;
+    level: number;
+  } | null>(null);
 
   const fetchAnalytics = async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) setIsRefreshing(true);
@@ -260,6 +268,7 @@ export default function AnalyticsPage() {
       console.warn("Usando datos de fallback amigable", err);
     } finally {
       setIsRefreshing(false);
+      if (showRefreshIndicator) setChartAnimKey((k) => k + 1);
     }
   };
 
@@ -278,6 +287,8 @@ export default function AnalyticsPage() {
         }
       } catch (err) {
         console.warn("Could not load dynamic analytics, using persistent fallback", err);
+      } finally {
+        if (active) setIsInitialLoading(false);
       }
     })();
     return () => {
@@ -285,69 +296,26 @@ export default function AnalyticsPage() {
     };
   }, []);
 
-  // ── Coordenadas Radar (Centrado y Limpio) ──
-  const cx = 150;
-  const cy = 140;
-  const maxR = 90;
-
+  // ── Datos del Radar de Habilidades para Recharts ──
   const radarAxes =
     data.pillars && data.pillars.length === 5
-      ? data.pillars.map((p, i) => ({
+      ? data.pillars.map((p) => ({
           label: p.name.replace(" en Entrevista", "").replace(" & Fluidez", ""),
-          angle: RADAR_AXES_METRICS[i]?.angle ?? -90 + i * 72,
           score: p.score,
           benchmark: p.benchmark,
         }))
-      : RADAR_AXES_METRICS;
+      : RADAR_AXES_METRICS.map((m) => ({
+          label: m.label,
+          score: m.score,
+          benchmark: m.benchmark,
+        }));
 
-  const userPolygon = radarAxes
-    .map((axis) => {
-      const pt = getRadarCoord(axis.angle, axis.score, cx, cy, maxR);
-      return `${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
-    })
-    .join(" ");
-
-  const benchmarkPolygon = radarAxes
-    .map((axis) => {
-      const pt = getRadarCoord(axis.angle, axis.benchmark, cx, cy, maxR);
-      return `${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
-    })
-    .join(" ");
-
-  // ── Promedio semanal ──
-  const weeklyAvg = Math.round(
-    data.weeklyProgress.reduce((acc, curr) => acc + curr.score, 0) /
-      Math.max(1, data.weeklyProgress.length)
-  );
-
-  // ── Coordenadas de la Curva de Evolución Histórica (SVG Bezier) ──
-  const trendSvgWidth = 520;
-  const trendSvgHeight = 220;
-  const trendPadX = 35;
-  const trendPadY = 30;
-  const trendPlotW = trendSvgWidth - trendPadX * 2;
-  const trendPlotH = trendSvgHeight - trendPadY * 2;
-
-  const trendCoords = HISTORICAL_TREND.map((pt, i) => {
-    const x = trendPadX + (i / (HISTORICAL_TREND.length - 1)) * trendPlotW;
-    // Escala de puntaje: 50 a 100
-    const normalizedScore = (Math.max(50, Math.min(100, pt.score)) - 50) / 50;
-    const y = trendPadY + (1 - normalizedScore) * trendPlotH;
-    return { x, y, ...pt };
-  });
-
-  // Generar comando SVG path suave (Smooth Bezier Spline)
-  const bezierPath = trendCoords.reduce((path, pt, i, arr) => {
-    if (i === 0) return `M ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
-    const prev = arr[i - 1];
-    const cpX1 = prev.x + (pt.x - prev.x) * 0.5;
-    const cpY1 = prev.y;
-    const cpX2 = prev.x + (pt.x - prev.x) * 0.5;
-    const cpY2 = pt.y;
-    return `${path} C ${cpX1.toFixed(1)},${cpY1.toFixed(1)} ${cpX2.toFixed(1)},${cpY2.toFixed(1)} ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
-  }, "");
-
-  const areaClosedPath = `${bezierPath} L ${trendCoords[trendCoords.length - 1].x.toFixed(1)},${(trendSvgHeight - trendPadY).toFixed(1)} L ${trendCoords[0].x.toFixed(1)},${(trendSvgHeight - trendPadY).toFixed(1)} Z`;
+  // ── Datos para SmoothLineGraph (Curva de Evolución Histórica) ──
+  const smoothTrendData = HISTORICAL_TREND.map((pt) => ({
+    label: pt.date,
+    value: pt.score,
+    sublabel: `${pt.date} · ${pt.tag || pt.session}`,
+  }));
 
   // ── Donut Chart (Desglose de Desafíos por Dificultad) ──
   const donutR = 64;
@@ -381,6 +349,18 @@ export default function AnalyticsPage() {
     [3, 2, 3, 2, 3, 1, 2],
     [3, 3, 2, 3, 3, 2, 3], // Última semana (Racha alta activa)
   ];
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-[65vh] w-full flex items-center justify-center p-6">
+        <AiLoader
+          size={0.95}
+          label="Cargando Progreso & Analytics..."
+          sublabel="Calculando tu radar de competencias, rachas y evolución histórica"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto pb-16 px-4 sm:px-6">
@@ -438,8 +418,12 @@ export default function AnalyticsPage() {
             </p>
           </div>
           <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-            <div
-              style={{ width: `${data.readinessScore}%` }}
+            <motion.div
+              key={`readiness-${chartAnimKey}`}
+              initial={prefersReducedMotion ? false : { scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 0.9, ease: CHART_EASE }}
+              style={{ width: `${data.readinessScore}%`, transformOrigin: "left" }}
               className="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full rounded-full"
             />
           </div>
@@ -542,219 +526,12 @@ export default function AnalyticsPage() {
       {/* ── VISTA PRINCIPAL: MÚLTIPLES GRÁFICAS VISUALES ── */}
       {activeTab === "overview" && (
         <div className="flex flex-col gap-6">
-          {/* ═════════ FILA 1: RENDIMIENTO SEMANAL + RADAR MULTIAXIAL ═════════ */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfica 1: Tu Progreso Semanal (Barras Lun-Dom) */}
-            <div className="p-6 rounded-3xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-emerald-400" />
-                    Puntaje Obtenido por Día
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Calificaciones obtenidas esta semana (escala 0 a 100).
-                  </p>
-                </div>
-                <div className="text-xs font-mono font-bold text-emerald-400 px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                  Promedio: {weeklyAvg} pts
-                </div>
-              </div>
-
-              {/* Bar Chart */}
-              <div className="h-56 pt-8 pb-3 px-2 flex items-end justify-between gap-3 relative">
-                {/* Línea horizontal de meta: 75 pts */}
-                <div className="absolute inset-x-0 bottom-[75%] border-b border-dashed border-zinc-600 pointer-events-none flex justify-between">
-                  <span className="text-[10px] text-zinc-400 -mt-4 pl-1 font-mono">
-                    Meta esperada (75 pts)
-                  </span>
-                </div>
-
-                {data.weeklyProgress.map((item, idx) => {
-                  const heightPercent = Math.min(100, Math.max(15, item.score));
-                  const passed = item.score >= 75;
-
-                  return (
-                    <div
-                      key={idx}
-                      className="flex-1 flex flex-col items-center h-full justify-end group"
-                    >
-                      <span className="text-xs font-bold font-mono text-white mb-1.5">
-                        {item.score}
-                      </span>
-                      <div className="w-full max-w-[42px] bg-zinc-800/90 rounded-t-xl overflow-hidden h-full flex flex-col justify-end">
-                        <div
-                          style={{ height: `${heightPercent}%` }}
-                          className={`w-full rounded-t-xl transition-all duration-500 ${
-                            passed
-                              ? "bg-gradient-to-t from-emerald-600 to-teal-400 group-hover:from-emerald-500 group-hover:to-teal-300"
-                              : "bg-gradient-to-t from-indigo-700 to-indigo-500 group-hover:from-indigo-600 group-hover:to-indigo-400"
-                          }`}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold text-zinc-400 mt-2.5">
-                        {item.day}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-zinc-800 text-xs">
-                <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
-                  <span className="text-zinc-400">Mejor resultado:</span>
-                  <span className="font-bold font-mono text-emerald-400">Sábado (88 pts)</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
-                  <span className="text-zinc-400">Días sobre la meta:</span>
-                  <span className="font-bold font-mono text-white">5 de 7 días</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Gráfica 2: Radar Multiaxial de Habilidades Clave */}
-            <div className="p-6 rounded-3xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Target className="w-5 h-5 text-indigo-400" />
-                    Radar de Habilidades Técnicas
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Tus 5 pilares evaluados en relación al estándar de la industria (80 pts).
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="flex items-center gap-1.5 text-zinc-400">
-                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                    Tú
-                  </span>
-                  <span className="flex items-center gap-1.5 text-zinc-500">
-                    <span className="w-2.5 h-2.5 rounded-full bg-zinc-600 border border-dashed border-zinc-400" />
-                    Meta
-                  </span>
-                </div>
-              </div>
-
-              {/* Spider Chart SVG */}
-              <div className="py-2 flex items-center justify-center">
-                <svg
-                  width="300"
-                  height="280"
-                  viewBox="0 0 300 280"
-                  className="overflow-visible select-none"
-                >
-                  <defs>
-                    <linearGradient id="userGradRadar" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#6366f1" stopOpacity="0.5" />
-                      <stop offset="100%" stopColor="#818cf8" stopOpacity="0.2" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Anillos concéntricos de referencia */}
-                  {[0.25, 0.5, 0.75, 1.0].map((level, ringIdx) => {
-                    const r = maxR * level;
-                    const ringPoints = radarAxes
-                      .map((axis) => {
-                        const rad = ((axis.angle - 90) * Math.PI) / 180;
-                        return `${(cx + r * Math.cos(rad)).toFixed(1)},${(cy + r * Math.sin(rad)).toFixed(1)}`;
-                      })
-                      .join(" ");
-
-                    return (
-                      <polygon
-                        key={ringIdx}
-                        points={ringPoints}
-                        fill="none"
-                        stroke="#27272a"
-                        strokeWidth="1"
-                        strokeDasharray={level === 0.75 ? "3 3" : undefined}
-                      />
-                    );
-                  })}
-
-                  {/* Líneas de Ejes y Etiquetas */}
-                  {radarAxes.map((axis, i) => {
-                    const rad = ((axis.angle - 90) * Math.PI) / 180;
-                    const x2 = cx + maxR * Math.cos(rad);
-                    const y2 = cy + maxR * Math.sin(rad);
-
-                    // Posición de etiqueta
-                    const labelR = maxR + 24;
-                    const labelX = cx + labelR * Math.cos(rad);
-                    const labelY = cy + labelR * Math.sin(rad) + 4;
-
-                    return (
-                      <g key={i}>
-                        <line
-                          x1={cx}
-                          y1={cy}
-                          x2={x2}
-                          y2={y2}
-                          stroke="#3f3f46"
-                          strokeWidth="1"
-                          strokeDasharray="2 2"
-                        />
-                        <text
-                          x={labelX}
-                          y={labelY}
-                          textAnchor="middle"
-                          fill="#a1a1aa"
-                          fontSize="10"
-                          fontWeight="600"
-                        >
-                          {axis.label}
-                        </text>
-                      </g>
-                    );
-                  })}
-
-                  {/* Polígono de Benchmark / Meta esperada */}
-                  <polygon
-                    points={benchmarkPolygon}
-                    fill="none"
-                    stroke="#71717a"
-                    strokeWidth="1.5"
-                    strokeDasharray="4 4"
-                  />
-
-                  {/* Polígono de Usuario */}
-                  <polygon
-                    points={userPolygon}
-                    fill="url(#userGradRadar)"
-                    stroke="#6366f1"
-                    strokeWidth="2.5"
-                  />
-
-                  {/* Puntos en Vértices */}
-                  {radarAxes.map((axis, i) => {
-                    const pt = getRadarCoord(axis.angle, axis.score, cx, cy, maxR);
-                    return (
-                      <circle
-                        key={i}
-                        cx={pt.x}
-                        cy={pt.y}
-                        r="4"
-                        fill="#818cf8"
-                        stroke="#11131c"
-                        strokeWidth="2"
-                      />
-                    );
-                  })}
-                </svg>
-              </div>
-
-              {/* Métricas individuales */}
-              <div className="grid grid-cols-5 gap-2 pt-3 border-t border-zinc-800 text-center">
-                {radarAxes.map((axis, i) => (
-                  <div key={i} className="p-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800">
-                    <p className="text-[9px] text-zinc-400 truncate">{axis.label}</p>
-                    <p className="text-xs font-bold font-mono text-white mt-0.5">{axis.score}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* ═════════ FILA 1: RENDIMIENTO SEMANAL + RADAR MULTIAXIAL (RECHARTS) ═════════ */}
+          <AnalyticsRechartsPair
+            weeklyProgress={data.weeklyProgress}
+            radarAxes={radarAxes}
+            chartAnimKey={chartAnimKey}
+          />
 
           {/* ═════════ FILA 2: CURVA DE EVOLUCIÓN HISTÓRICA + DONUT DE DESAFÍOS ═════════ */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -770,115 +547,21 @@ export default function AnalyticsPage() {
                     Progresión del puntaje global a través de tus últimas sesiones y retos.
                   </p>
                 </div>
-                <div className="text-xs font-mono font-bold text-emerald-400 px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5" />
+                <div className="text-xs font-mono font-bold text-emerald-400 px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                  <TrendingUp className="w-3.5 h-3.5 shrink-0" />
                   <span>+24 pts de ganancia</span>
                 </div>
               </div>
 
-              {/* Area & Bezier Curve SVG */}
-              <div className="py-2 flex flex-col items-center justify-center">
-                <svg
-                  viewBox={`0 0 ${trendSvgWidth} ${trendSvgHeight}`}
-                  className="w-full h-56 select-none overflow-visible"
-                >
-                  <defs>
-                    <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6366f1" stopOpacity="0.45" />
-                      <stop offset="70%" stopColor="#818cf8" stopOpacity="0.12" />
-                      <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
-                    </linearGradient>
-                    <linearGradient id="lineStrokeGrad" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#818cf8" />
-                      <stop offset="60%" stopColor="#a855f7" />
-                      <stop offset="100%" stopColor="#22c55e" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Líneas horizontales de fondo */}
-                  {[60, 70, 80, 90].map((val) => {
-                    const norm = (val - 50) / 50;
-                    const y = trendPadY + (1 - norm) * trendPlotH;
-                    return (
-                      <g key={val}>
-                        <line
-                          x1={trendPadX}
-                          y1={y}
-                          x2={trendSvgWidth - trendPadX}
-                          y2={y}
-                          stroke="#27272a"
-                          strokeWidth="1"
-                          strokeDasharray={val === 80 ? "4 4" : undefined}
-                        />
-                        <text
-                          x={trendPadX - 8}
-                          y={y + 3}
-                          textAnchor="end"
-                          fill="#71717a"
-                          fontSize="9"
-                          fontFamily="monospace"
-                        >
-                          {val}
-                        </text>
-                      </g>
-                    );
-                  })}
-
-                  {/* Relleno de Área Suave */}
-                  <path d={areaClosedPath} fill="url(#trendGradient)" />
-
-                  {/* Trazo Suave Bezier */}
-                  <path
-                    d={bezierPath}
-                    fill="none"
-                    stroke="url(#lineStrokeGrad)"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                  />
-
-                  {/* Puntos y Etiquetas */}
-                  {trendCoords.map((pt, i) => (
-                    <g key={i} className="group cursor-pointer">
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r="5"
-                        fill="#11131c"
-                        stroke="#a855f7"
-                        strokeWidth="2.5"
-                      />
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r="2.5"
-                        fill="#ffffff"
-                      />
-                      {/* Puntaje en la parte superior */}
-                      <text
-                        x={pt.x}
-                        y={pt.y - 10}
-                        textAnchor="middle"
-                        fill="#ffffff"
-                        fontSize="10"
-                        fontWeight="bold"
-                        fontFamily="monospace"
-                      >
-                        {pt.score}
-                      </text>
-                      {/* Fecha abajo */}
-                      <text
-                        x={pt.x}
-                        y={trendSvgHeight - trendPadY + 18}
-                        textAnchor="middle"
-                        fill="#a1a1aa"
-                        fontSize="9"
-                      >
-                        {pt.date}
-                      </text>
-                    </g>
-                  ))}
-                </svg>
-              </div>
+              {/* Smooth Animated Line Graph */}
+              <SmoothLineGraph
+                data={smoothTrendData}
+                minValue={50}
+                maxValue={100}
+                targetValue={80}
+                unit="pts"
+                animationKey={chartAnimKey}
+              />
 
               <div className="grid grid-cols-3 gap-2.5 pt-3 border-t border-zinc-800 text-xs">
                 <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center">
@@ -917,8 +600,12 @@ export default function AnalyticsPage() {
                 </Link>
               </div>
 
-              {/* Donut SVG y Leyenda */}
-              <div className="py-2 flex flex-col sm:flex-row items-center justify-around gap-6">
+              {/* Donut SVG y Leyenda Interactiva */}
+              <div
+                key={`donut-${chartAnimKey}`}
+                className="py-2 flex flex-col sm:flex-row items-center justify-around gap-6"
+                onMouseLeave={() => setHoveredDonut(null)}
+              >
                 <div className="relative flex items-center justify-center">
                   <svg
                     width="170"
@@ -937,68 +624,169 @@ export default function AnalyticsPage() {
                     />
 
                     {/* Segmento Fácil (Esmeralda) */}
-                    <circle
+                    <motion.circle
                       cx="85"
                       cy="85"
                       r={donutR}
                       fill="none"
                       stroke="#10b981"
-                      strokeWidth="16"
-                      strokeDasharray={`${easyStroke} ${donutCircumference}`}
+                      strokeWidth={hoveredDonut === "easy" ? 20 : 16}
                       strokeDashoffset={easyOffset}
                       strokeLinecap="round"
                       transform="rotate(-90 85 85)"
-                      className="transition-all duration-700"
+                      className="cursor-pointer transition-[stroke-width] duration-200"
+                      onMouseEnter={() => setHoveredDonut("easy")}
+                      initial={
+                        prefersReducedMotion
+                          ? { strokeDasharray: `${easyStroke} ${donutCircumference}` }
+                          : { strokeDasharray: `0 ${donutCircumference}` }
+                      }
+                      whileInView={{ strokeDasharray: `${easyStroke} ${donutCircumference}` }}
+                      viewport={{ once: true }}
+                      animate={{
+                        opacity: hoveredDonut && hoveredDonut !== "easy" ? 0.35 : 1,
+                      }}
+                      transition={{
+                        strokeDasharray: { duration: 0.75, delay: 0.1, ease: CHART_EASE },
+                        opacity: { duration: 0.2 },
+                      }}
                     />
 
                     {/* Segmento Medio (Ámbar) */}
-                    <circle
+                    <motion.circle
                       cx="85"
                       cy="85"
                       r={donutR}
                       fill="none"
                       stroke="#f59e0b"
-                      strokeWidth="16"
-                      strokeDasharray={`${medStroke} ${donutCircumference}`}
+                      strokeWidth={hoveredDonut === "medium" ? 20 : 16}
                       strokeDashoffset={medOffset}
                       strokeLinecap="round"
                       transform="rotate(-90 85 85)"
-                      className="transition-all duration-700"
+                      className="cursor-pointer transition-[stroke-width] duration-200"
+                      onMouseEnter={() => setHoveredDonut("medium")}
+                      initial={
+                        prefersReducedMotion
+                          ? { strokeDasharray: `${medStroke} ${donutCircumference}` }
+                          : { strokeDasharray: `0 ${donutCircumference}` }
+                      }
+                      whileInView={{ strokeDasharray: `${medStroke} ${donutCircumference}` }}
+                      viewport={{ once: true }}
+                      animate={{
+                        opacity: hoveredDonut && hoveredDonut !== "medium" ? 0.35 : 1,
+                      }}
+                      transition={{
+                        strokeDasharray: { duration: 0.75, delay: 0.32, ease: CHART_EASE },
+                        opacity: { duration: 0.2 },
+                      }}
                     />
 
                     {/* Segmento Difícil & Patrones GoF (Púrpura) */}
-                    <circle
+                    <motion.circle
                       cx="85"
                       cy="85"
                       r={donutR}
                       fill="none"
                       stroke="#8b5cf6"
-                      strokeWidth="16"
-                      strokeDasharray={`${hardStroke} ${donutCircumference}`}
+                      strokeWidth={hoveredDonut === "hard" ? 20 : 16}
                       strokeDashoffset={hardOffset}
                       strokeLinecap="round"
                       transform="rotate(-90 85 85)"
-                      className="transition-all duration-700"
+                      className="cursor-pointer transition-[stroke-width] duration-200"
+                      onMouseEnter={() => setHoveredDonut("hard")}
+                      initial={
+                        prefersReducedMotion
+                          ? { strokeDasharray: `${hardStroke} ${donutCircumference}` }
+                          : { strokeDasharray: `0 ${donutCircumference}` }
+                      }
+                      whileInView={{ strokeDasharray: `${hardStroke} ${donutCircumference}` }}
+                      viewport={{ once: true }}
+                      animate={{
+                        opacity: hoveredDonut && hoveredDonut !== "hard" ? 0.35 : 1,
+                      }}
+                      transition={{
+                        strokeDasharray: { duration: 0.75, delay: 0.54, ease: CHART_EASE },
+                        opacity: { duration: 0.2 },
+                      }}
                     />
                   </svg>
 
-                  {/* Centro del Donut */}
+                  {/* Centro dinámico del Donut */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-2xl font-black text-white font-mono leading-none">
-                      {data.metrics.challengesCompleted}
-                    </span>
-                    <span className="text-[10px] text-zinc-400 font-medium mt-0.5">
-                      Resueltos
-                    </span>
-                    <span className="text-[9px] text-emerald-400 font-bold font-mono">
-                      {data.metrics.challengeSuccessRate}% Éxito
-                    </span>
+                    <AnimatePresence mode="wait">
+                      {hoveredDonut === "easy" ? (
+                        <motion.div
+                          key="donut-easy"
+                          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
+                          transition={{ duration: 0.16 }}
+                          className="flex flex-col items-center"
+                        >
+                          <span className="text-2xl font-black text-emerald-400 font-mono leading-none">9</span>
+                          <span className="text-[10px] text-zinc-300 font-semibold mt-0.5">Fácil</span>
+                          <span className="text-[9px] text-emerald-400 font-bold font-mono">38%</span>
+                        </motion.div>
+                      ) : hoveredDonut === "medium" ? (
+                        <motion.div
+                          key="donut-medium"
+                          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
+                          transition={{ duration: 0.16 }}
+                          className="flex flex-col items-center"
+                        >
+                          <span className="text-2xl font-black text-amber-400 font-mono leading-none">10</span>
+                          <span className="text-[10px] text-zinc-300 font-semibold mt-0.5">Medio</span>
+                          <span className="text-[9px] text-amber-400 font-bold font-mono">42%</span>
+                        </motion.div>
+                      ) : hoveredDonut === "hard" ? (
+                        <motion.div
+                          key="donut-hard"
+                          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
+                          transition={{ duration: 0.16 }}
+                          className="flex flex-col items-center"
+                        >
+                          <span className="text-2xl font-black text-purple-400 font-mono leading-none">5</span>
+                          <span className="text-[10px] text-zinc-300 font-semibold mt-0.5">Difícil</span>
+                          <span className="text-[9px] text-purple-400 font-bold font-mono">20%</span>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="donut-all"
+                          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
+                          transition={{ duration: 0.16 }}
+                          className="flex flex-col items-center"
+                        >
+                          <span className="text-2xl font-black text-white font-mono leading-none">
+                            {data.metrics.challengesCompleted}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 font-medium mt-0.5">
+                            Resueltos
+                          </span>
+                          <span className="text-[9px] text-emerald-400 font-bold font-mono">
+                            {data.metrics.challengeSuccessRate}% Éxito
+                          </span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 
-                {/* Leyenda Detallada */}
+                {/* Leyenda Interactiva sincronizada */}
                 <div className="flex flex-col gap-2.5 w-full sm:w-auto">
-                  <div className="p-2.5 rounded-xl bg-zinc-900/70 border border-zinc-800 flex items-center justify-between gap-6 min-w-[200px]">
+                  <div
+                    onMouseEnter={() => setHoveredDonut("easy")}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-6 min-w-[200px] cursor-pointer transition-colors ${
+                      hoveredDonut === "easy"
+                        ? "bg-emerald-500/15 border-emerald-500/40"
+                        : "bg-zinc-900/70 border-zinc-800 hover:border-zinc-700"
+                    }`}
+                  >
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-md bg-emerald-500 shrink-0" />
                       <div>
@@ -1009,7 +797,14 @@ export default function AnalyticsPage() {
                     <span className="text-xs font-mono font-bold text-emerald-400">9 (38%)</span>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-zinc-900/70 border border-zinc-800 flex items-center justify-between gap-6 min-w-[200px]">
+                  <div
+                    onMouseEnter={() => setHoveredDonut("medium")}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-6 min-w-[200px] cursor-pointer transition-colors ${
+                      hoveredDonut === "medium"
+                        ? "bg-amber-500/15 border-amber-500/40"
+                        : "bg-zinc-900/70 border-zinc-800 hover:border-zinc-700"
+                    }`}
+                  >
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-md bg-amber-500 shrink-0" />
                       <div>
@@ -1020,7 +815,14 @@ export default function AnalyticsPage() {
                     <span className="text-xs font-mono font-bold text-amber-400">10 (42%)</span>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-zinc-900/70 border border-zinc-800 flex items-center justify-between gap-6 min-w-[200px]">
+                  <div
+                    onMouseEnter={() => setHoveredDonut("hard")}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-6 min-w-[200px] cursor-pointer transition-colors ${
+                      hoveredDonut === "hard"
+                        ? "bg-purple-500/15 border-purple-500/40"
+                        : "bg-zinc-900/70 border-zinc-800 hover:border-zinc-700"
+                    }`}
+                  >
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-md bg-purple-500 shrink-0" />
                       <div>
@@ -1057,11 +859,13 @@ export default function AnalyticsPage() {
                 <span className="text-xs text-zinc-500 font-mono">Meta: 75-80%</span>
               </div>
 
-              <div className="space-y-4 py-3">
+              <div key={`mastery-${chartAnimKey}`} className="space-y-4 py-3">
                 {TECHNICAL_MASTERY_AREAS.map((area, idx) => (
-                  <div key={idx} className="space-y-1.5">
+                  <div key={idx} className="space-y-1.5 group">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-zinc-200">{area.name}</span>
+                      <span className="font-semibold text-zinc-200 group-hover:text-white transition-colors">
+                        {area.name}
+                      </span>
                       <div className="flex items-center gap-2">
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${area.badgeColor}`}
@@ -1072,16 +876,24 @@ export default function AnalyticsPage() {
                       </div>
                     </div>
 
-                    {/* Barra de progreso con benchmark vertical */}
+                    {/* Barra de progreso animada con benchmark vertical */}
                     <div className="w-full bg-zinc-800/90 rounded-full h-2.5 relative overflow-hidden">
-                      <div
-                        style={{ width: `${area.score}%` }}
-                        className={`h-full rounded-full bg-gradient-to-r ${area.barColor} transition-all duration-500`}
+                      <motion.div
+                        initial={prefersReducedMotion ? false : { scaleX: 0 }}
+                        whileInView={{ scaleX: 1 }}
+                        viewport={{ once: true }}
+                        transition={{
+                          duration: 0.85,
+                          delay: 0.08 + idx * 0.09,
+                          ease: CHART_EASE,
+                        }}
+                        style={{ width: `${area.score}%`, transformOrigin: "left" }}
+                        className={`h-full rounded-full bg-gradient-to-r ${area.barColor}`}
                       />
-                      {/* Línea de benchmark a 75% */}
+                      {/* Línea de benchmark */}
                       <div
                         style={{ left: `${area.benchmark}%` }}
-                        className="absolute top-0 bottom-0 w-0.5 bg-white/40 pointer-events-none"
+                        className="absolute top-0 bottom-0 w-0.5 bg-white/50 group-hover:bg-white transition-colors pointer-events-none"
                       />
                     </div>
                   </div>
@@ -1112,8 +924,12 @@ export default function AnalyticsPage() {
                 </div>
               </div>
 
-              {/* Grid 12 semanas x 7 días */}
-              <div className="py-3 flex flex-col gap-2 overflow-x-auto">
+              {/* Grid 12 semanas x 7 días con ola diagonal animada */}
+              <div
+                key={`heatmap-${chartAnimKey}`}
+                className="py-3 flex flex-col gap-2 overflow-x-auto"
+                onMouseLeave={() => setHoveredHeatCell(null)}
+              >
                 <div className="flex items-start gap-1.5 justify-center">
                   <div className="flex flex-col gap-1 text-[9px] text-zinc-500 pr-1 select-none font-mono">
                     <span>L</span>
@@ -1134,12 +950,27 @@ export default function AnalyticsPage() {
                         if (level === 3) colorClass = "bg-emerald-400 shadow-sm shadow-emerald-400/30";
 
                         return (
-                          <div
+                          <motion.div
                             key={dIdx}
+                            initial={prefersReducedMotion ? false : { scale: 0.35, opacity: 0 }}
+                            whileInView={{ scale: 1, opacity: 1 }}
+                            viewport={{ once: true }}
+                            whileHover={prefersReducedMotion ? undefined : { scale: 1.38, zIndex: 10 }}
+                            transition={{
+                              scale: { duration: 0.25, delay: wIdx * 0.028 + dIdx * 0.015 },
+                              opacity: { duration: 0.25, delay: wIdx * 0.028 + dIdx * 0.015 },
+                            }}
+                            onMouseEnter={() =>
+                              setHoveredHeatCell({
+                                week: wIdx + 1,
+                                day: heatmapDays[dIdx],
+                                level,
+                              })
+                            }
                             title={`Semana ${wIdx + 1}, Día ${heatmapDays[dIdx]}: ${
                               level === 0 ? "Sin práctica" : `${level} actividades completadas`
                             }`}
-                            className={`w-3.5 h-3.5 rounded-[3px] transition-all cursor-pointer hover:scale-125 ${colorClass}`}
+                            className={`w-3.5 h-3.5 rounded-[3px] cursor-pointer ${colorClass}`}
                           />
                         );
                       })}
@@ -1147,9 +978,17 @@ export default function AnalyticsPage() {
                   ))}
                 </div>
 
-                {/* Leyenda Menos -> Más */}
-                <div className="flex items-center justify-between pt-2 text-[11px] text-zinc-400">
-                  <span className="font-mono">Total: 48 sesiones registradas</span>
+                {/* Leyenda + lectura en vivo de la celda */}
+                <div className="flex items-center justify-between pt-2 text-[11px] text-zinc-400 min-h-[24px]">
+                  <span className="font-mono text-zinc-300">
+                    {hoveredHeatCell
+                      ? `Sem ${hoveredHeatCell.week} · ${hoveredHeatCell.day}: ${
+                          hoveredHeatCell.level === 0
+                            ? "Sin práctica"
+                            : `${hoveredHeatCell.level} actividades`
+                        }`
+                      : "Total: 48 sesiones registradas"}
+                  </span>
                   <div className="flex items-center gap-1 text-[10px]">
                     <span className="text-zinc-500">Menos</span>
                     <span className="w-2.5 h-2.5 rounded-[2px] bg-zinc-800/60" />
@@ -1197,79 +1036,122 @@ export default function AnalyticsPage() {
                 </Link>
               </div>
 
-              {/* Stepper Funnel Visual */}
-              <div className="py-4 space-y-3">
-                {/* Paso 1: Postulaciones Enviadas */}
-                <div className="p-3.5 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-zinc-800 flex items-center justify-center text-xs font-bold font-mono text-zinc-300">
-                      1
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-white block">Postulaciones Enviadas</span>
-                      <span className="text-[10px] text-zinc-400">Currículum enviado a vacantes activas</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-lg font-black text-white font-mono">
-                      {data.metrics.totalApplications}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 block">100% inicio</span>
-                  </div>
-                </div>
-
-                {/* Paso 2: En Entrevista Técnica */}
-                <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold font-mono">
-                      2
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-white block">En Proceso de Entrevista</span>
-                      <span className="text-[10px] text-indigo-300/80">Evaluaciones técnicas y filtros activos</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-lg font-black text-indigo-400 font-mono">
-                      {data.metrics.interviewingApplications}
-                    </span>
-                    <span className="text-[10px] text-indigo-300 block font-mono">
-                      {data.metrics.totalApplications > 0
+              {/* Stepper Funnel Visual con barras de conversión animadas */}
+              <div key={`funnel-${chartAnimKey}`} className="py-4 space-y-3">
+                {[
+                  {
+                    step: 1,
+                    title: "Postulaciones Enviadas",
+                    desc: "Currículum enviado a vacantes activas",
+                    count: data.metrics.totalApplications,
+                    percent: 100,
+                    percentLabel: "100% inicio",
+                    boxClass: "bg-zinc-900/80 border-zinc-800",
+                    badgeClass: "bg-zinc-800 text-zinc-300",
+                    countClass: "text-white",
+                    subClass: "text-zinc-500",
+                    barClass: "from-zinc-400 to-zinc-300",
+                  },
+                  {
+                    step: 2,
+                    title: "En Proceso de Entrevista",
+                    desc: "Evaluaciones técnicas y filtros activos",
+                    count: data.metrics.interviewingApplications,
+                    percent:
+                      data.metrics.totalApplications > 0
                         ? Math.round(
-                            (data.metrics.interviewingApplications / data.metrics.totalApplications) *
+                            (data.metrics.interviewingApplications /
+                              data.metrics.totalApplications) *
                               100
                           )
-                        : 0}
-                      % avance
-                    </span>
-                  </div>
-                </div>
-
-                {/* Paso 3: Ofertas Laborales Obtenidas */}
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold font-mono">
-                      3
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-white block">Ofertas Finales Recibidas</span>
-                      <span className="text-[10px] text-emerald-300/80">Propuesta económica y técnica lista</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-lg font-black text-emerald-400 font-mono">
-                      {data.metrics.offeredApplications}
-                    </span>
-                    <span className="text-[10px] text-emerald-300 block font-mono">
-                      {data.metrics.totalApplications > 0
+                        : 0,
+                    percentLabel: `${
+                      data.metrics.totalApplications > 0
                         ? Math.round(
-                            (data.metrics.offeredApplications / data.metrics.totalApplications) * 100
+                            (data.metrics.interviewingApplications /
+                              data.metrics.totalApplications) *
+                              100
                           )
-                        : 0}
-                      % éxito final
-                    </span>
+                        : 0
+                    }% avance`,
+                    boxClass: "bg-indigo-500/10 border-indigo-500/30",
+                    badgeClass: "bg-indigo-500/20 text-indigo-400",
+                    countClass: "text-indigo-400",
+                    subClass: "text-indigo-300",
+                    barClass: "from-indigo-500 to-violet-400",
+                  },
+                  {
+                    step: 3,
+                    title: "Ofertas Finales Recibidas",
+                    desc: "Propuesta económica y técnica lista",
+                    count: data.metrics.offeredApplications,
+                    percent:
+                      data.metrics.totalApplications > 0
+                        ? Math.round(
+                            (data.metrics.offeredApplications / data.metrics.totalApplications) *
+                              100
+                          )
+                        : 0,
+                    percentLabel: `${
+                      data.metrics.totalApplications > 0
+                        ? Math.round(
+                            (data.metrics.offeredApplications / data.metrics.totalApplications) *
+                              100
+                          )
+                        : 0
+                    }% éxito final`,
+                    boxClass: "bg-emerald-500/10 border-emerald-500/30",
+                    badgeClass: "bg-emerald-500/20 text-emerald-400",
+                    countClass: "text-emerald-400",
+                    subClass: "text-emerald-300",
+                    barClass: "from-emerald-500 to-teal-400",
+                  },
+                ].map((stage, idx) => (
+                  <div
+                    key={stage.step}
+                    className={`p-3.5 rounded-2xl border flex flex-col gap-2.5 ${stage.boxClass}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold font-mono ${stage.badgeClass}`}
+                        >
+                          {stage.step}
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-white block">{stage.title}</span>
+                          <span className="text-[10px] text-zinc-400">{stage.desc}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-lg font-black font-mono ${stage.countClass}`}>
+                          {stage.count}
+                        </span>
+                        <span className={`text-[10px] block font-mono ${stage.subClass}`}>
+                          {stage.percentLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="w-full h-1.5 rounded-full bg-zinc-950/70 overflow-hidden">
+                      <motion.div
+                        initial={prefersReducedMotion ? false : { scaleX: 0 }}
+                        whileInView={{ scaleX: 1 }}
+                        viewport={{ once: true }}
+                        transition={{
+                          duration: 0.8,
+                          delay: 0.12 + idx * 0.14,
+                          ease: CHART_EASE,
+                        }}
+                        style={{
+                          width: `${Math.max(stage.percent, stage.count > 0 ? 6 : 0)}%`,
+                          transformOrigin: "left",
+                        }}
+                        className={`h-full rounded-full bg-gradient-to-r ${stage.barClass}`}
+                      />
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
 
               <div className="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between text-xs">

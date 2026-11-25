@@ -29,6 +29,7 @@ import { mapAuthError, type MappedAuthError } from "@/lib/auth-errors";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { FadeIn, ShakeOnError } from "@/components/ui/motion";
+import { useAuthShutter } from "@/components/DiagonalShutterTransition";
 import FormField from "./FormField";
 
 const authFormSchema = (type: FormType) => {
@@ -46,7 +47,25 @@ const authFormSchema = (type: FormType) => {
 
 const AuthForm = ({ type }: { type: FormType }) => {
   const router = useRouter();
+  const { navigateWithShutter, isTransitioning } = useAuthShutter();
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
+
+  const handleShutterLinkClick = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    href: string
+  ) => {
+    if (
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      event.button !== 0
+    ) {
+      return;
+    }
+    event.preventDefault();
+    navigateWithShutter(href);
+  };
   const [pendingEmail, setPendingEmail] = useState("");
   const [pendingName, setPendingName] = useState("");
   const [pendingSub, setPendingSub] = useState("");
@@ -239,7 +258,7 @@ const AuthForm = ({ type }: { type: FormType }) => {
         });
       }
 
-      router.push("/sign-in");
+      navigateWithShutter("/sign-in");
     } catch (error: unknown) {
       triggerErrorFeedback({
         title: "Código inválido o expirado",
@@ -347,6 +366,8 @@ const AuthForm = ({ type }: { type: FormType }) => {
               ¿Ya tienes cuenta activa?{" "}
               <Link
                 href="/sign-in"
+                onClick={(e) => handleShutterLinkClick(e, "/sign-in")}
+                aria-disabled={isTransitioning || undefined}
                 className="font-bold text-primary-200 hover:text-primary-100 underline-offset-4 hover:underline transition-colors"
               >
                 Inicia sesión
@@ -503,6 +524,10 @@ const AuthForm = ({ type }: { type: FormType }) => {
                 {isSignIn ? "¿Aún no tienes una cuenta?" : "¿Ya tienes una cuenta?"}
                 <Link
                   href={!isSignIn ? "/sign-in" : "/sign-up"}
+                  onClick={(e) =>
+                    handleShutterLinkClick(e, !isSignIn ? "/sign-in" : "/sign-up")
+                  }
+                  aria-disabled={isTransitioning || undefined}
                   className="font-bold text-primary-200 hover:text-primary-100 ml-1.5 underline-offset-4 hover:underline transition-colors"
                 >
                   {!isSignIn ? "Inicia sesión" : "Regístrate gratis"}

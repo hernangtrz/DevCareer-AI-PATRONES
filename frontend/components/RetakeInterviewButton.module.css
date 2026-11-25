@@ -1,0 +1,112 @@
+/*
+ * From Uiverse.io by andrew-demchenk0 - https://uiverse.io/andrew-demchenk0/soft-baboon-41
+ * MIT License, Copyright (c) andrew-demchenk0, andrew-demchenk0 (A), andrew-demchenk0 (A)
+ */
+
+.retakeButton {
+  --font-color: #090b14;
+  --bg-color: #cac5fe;
+  --main-color: #090b14;
+  --shadow-color: rgba(99, 102, 241, 0.32);
+
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: 48px;
+  padding: 0 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  box-shadow: 0 6px 20px var(--shadow-color);
+  background-color: var(--bg-color);
+  border-radius: 1rem;
+  overflow: hidden;
+  text-decoration: none;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.retakeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.retakeSvg {
+  width: 20px;
+  height: 20px;
+  fill: var(--main-color);
+  transition: transform 0.3s ease;
+}
+
+.retakeTextWrap {
+  display: inline-grid;
+  grid-template-columns: 1fr;
+  margin-left: 0.5rem;
+  opacity: 1;
+  transition:
+    grid-template-columns 0.3s ease,
+    margin-left 0.3s ease,
+    opacity 0.22s ease;
+}
+
+.retakeText {
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--font-color);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.retakeButton:hover,
+.retakeButton:focus-visible {
+  background-color: var(--bg-color);
+}
+
+.retakeButton:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.retakeButton:hover .retakeTextWrap,
+.retakeButton:focus-visible .retakeTextWrap {
+  grid-template-columns: 0fr;
+  margin-left: 0;
+  opacity: 0;
+}
+
+.retakeButton:hover .retakeSvg,
+.retakeButton:focus-visible .retakeSvg {
+  transform: scale(1.22);
+}
+
+.retakeButton:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retakeButton,
+  .retakeSvg,
+  .retakeTextWrap {
+    transition: none;
+  }
+
+  .retakeButton:hover .retakeTextWrap,
+  .retakeButton:focus-visible .retakeTextWrap {
+    grid-template-columns: 1fr;
+    margin-left: 0.5rem;
+    opacity: 1;
+  }
+
+  .retakeButton:hover .retakeSvg,
+  .retakeButton:focus-visible .retakeSvg,
+  .retakeButton:active {
+    transform: none;
+  }
+}

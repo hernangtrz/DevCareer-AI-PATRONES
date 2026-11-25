@@ -24,6 +24,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { FacialMonitorPanel } from "./FacialMonitorPanel";
+import VoiceAudioWave from "./VoiceAudioWave";
+import AiLoader from "./AiLoader";
 import { useFacialBehaviorAnalyzer } from "@/lib/facial/useFacialBehaviorAnalyzer";
 import {
   Room,
@@ -71,6 +73,9 @@ const Agent = ({
 }: AgentProps) => {
   const router = useRouter();
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [agentLiveState, setAgentLiveState] = useState<
+    "initializing" | "listening" | "thinking" | "speaking"
+  >("initializing");
   const [isCandidateSpeaking, setIsCandidateSpeaking] = useState(false);
   const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
   const [messages, setMessages] = useState<SavedMessage[]>([]);
@@ -85,6 +90,8 @@ const Agent = ({
   const [lkRoom, setLkRoom] = useState<Room | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [candidateAudioTrack, setCandidateAudioTrack] = useState<MediaStreamTrack | null>(null);
+  const [agentAudioTrack, setAgentAudioTrack] = useState<MediaStreamTrack | null>(null);
 
   // Aislamiento de voz inteligente (BVC - Krisp AI server-side)
   const [isVoiceIsolationEnabled, setIsVoiceIsolationEnabled] = useState(true);
@@ -97,11 +104,15 @@ const Agent = ({
 
   // Mapa de segmentos de transcripción deduplicados por segmentId (evita colisiones y pérdida de frases)
   const usingTextStreamRef = useRef<boolean>(false);
+  const hasAgentStateAttrRef = useRef<boolean>(false);
+  const autoEndingRef = useRef<boolean>(false);
   const lkRoomRef = useRef<Room | null>(null);
   const audioElementsRef = useRef<Set<HTMLMediaElement>>(new Set());
   const healthResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cleanupAudioElements = useCallback(() => {
+    setCandidateAudioTrack(null);
+    setAgentAudioTrack(null);
     audioElementsRef.current.forEach((el) => {
       try {
         el.pause();
@@ -166,6 +177,12 @@ const Agent = ({
       const nextMuted = !isMicMuted;
       await lkRoom.localParticipant.setMicrophoneEnabled(!nextMuted);
       setIsMicMuted(nextMuted);
+      if (nextMuted) {
+        setCandidateAudioTrack(null);
+      } else {
+        const micPub = lkRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
+        setCandidateAudioTrack(micPub?.track?.mediaStreamTrack ?? null);
+      }
     } catch (e) {
       console.warn("Could not toggle mic:", e);
     }
@@ -262,6 +279,10 @@ const Agent = ({
     setCallStatus(CallStatus.CONNECTING);
     setElapsedSeconds(0);
     setIsMicMuted(false);
+    setAgentLiveState("initializing");
+    hasAgentStateAttrRef.current = false;
+    autoEndingRef.current = false;
+    setIsSpeaking(false);
     setMessages([]);
     usingTextStreamRef.current = false;
     cleanupAudioElements();
@@ -314,6 +335,7 @@ const Agent = ({
           });
           setLkRoom(null);
           setIsSpeaking(false);
+          setAgentLiveState("initializing");
           setIsCandidateSpeaking(false);
         }
       });
@@ -343,15 +365,57 @@ const Agent = ({
             console.warn("[LiveKit] Audio element play failed, unlocking via room:", err);
             currentRoom.startAudio().catch(() => {});
           });
+          setAgentAudioTrack(track.mediaStreamTrack ?? null);
           console.log(`[Audio Subscribed] Reproduciendo audio de: ${participant.identity}`);
         }
       });
 
       currentRoom.on(RoomEvent.TrackUnsubscribed, (track) => {
+        if (track.kind === Track.Kind.Audio) {
+          setAgentAudioTrack(null);
+        }
         track.detach().forEach((element) => {
           audioElementsRef.current.delete(element);
           element.remove();
         });
+      });
+
+      currentRoom.on(RoomEvent.LocalTrackPublished, (publication) => {
+        if (publication.source === Track.Source.Microphone || publication.kind === Track.Kind.Audio) {
+          setCandidateAudioTrack(publication.track?.mediaStreamTrack ?? null);
+        }
+      });
+
+      currentRoom.on(RoomEvent.LocalTrackUnpublished, (publication) => {
+        if (publication.source === Track.Source.Microphone || publication.kind === Track.Kind.Audio) {
+          setCandidateAudioTrack(null);
+        }
+      });
+
+      // Estado real del agente publicado por LiveKit RoomIO ('initializing' | 'listening' | 'thinking' | 'speaking')
+      const syncAgentStateAttr = (participant: Participant) => {
+        if (participant instanceof LocalParticipant || participant.identity.startsWith("developer_")) {
+          return;
+        }
+        const rawState = participant.attributes?.["lk.agent.state"];
+        if (
+          rawState === "initializing" ||
+          rawState === "listening" ||
+          rawState === "thinking" ||
+          rawState === "speaking"
+        ) {
+          hasAgentStateAttrRef.current = true;
+          setAgentLiveState(rawState);
+          setIsSpeaking(rawState === "speaking");
+        }
+      };
+
+      currentRoom.on(RoomEvent.ParticipantConnected, (participant) => {
+        syncAgentStateAttr(participant);
+      });
+
+      currentRoom.on(RoomEvent.ParticipantAttributesChanged, (_changed, participant) => {
+        syncAgentStateAttr(participant);
       });
 
       // Detección de oradores para animación y supresión de falsos positivos gestuales
@@ -362,11 +426,13 @@ const Agent = ({
         const candidateActive = speakers.some(
           (s) => s instanceof LocalParticipant || s.identity.startsWith("developer_")
         );
-        setIsSpeaking(isAgentSpeaking);
         setIsCandidateSpeaking(candidateActive);
+        if (!hasAgentStateAttrRef.current) {
+          setIsSpeaking(isAgentSpeaking);
+        }
       });
 
-      // Monitor de salud y recuperación del agente por DataChannel
+      // Monitor de salud, recuperación y cierre automático del agente por DataChannel
       currentRoom.on(
         RoomEvent.DataReceived,
         (payload: Uint8Array, _participant?: Participant, _kind?: unknown, topic?: string) => {
@@ -386,6 +452,33 @@ const Agent = ({
               }
             } catch (err) {
               console.warn("[LiveKit] Error parsing agent health message:", err);
+            }
+          } else if (topic === "interview-control") {
+            try {
+              const str = new TextDecoder().decode(payload);
+              const data = JSON.parse(str);
+              const action = data.action || data.type;
+              if (action === "interview_completed" && !autoEndingRef.current) {
+                autoEndingRef.current = true;
+                if (typeof data.finalMessage === "string" && data.finalMessage.trim()) {
+                  const trimmed = data.finalMessage.trim();
+                  const alreadySaved = messagesRef.current.some(
+                    (m) => m.role === "assistant" && m.content.trim() === trimmed
+                  );
+                  if (!alreadySaved) {
+                    const updated: SavedMessage[] = [
+                      ...messagesRef.current,
+                      { id: `farewell-${Date.now()}`, role: "assistant", content: trimmed },
+                    ];
+                    messagesRef.current = updated;
+                    setMessages(updated);
+                  }
+                }
+                setCallStatus(CallStatus.FINISHED);
+                currentRoom.disconnect().catch(() => {});
+              }
+            } catch (err) {
+              console.warn("[LiveKit] Error parsing interview control message:", err);
             }
           }
         }
@@ -435,6 +528,11 @@ const Agent = ({
       }
 
       await currentRoom.connect(url, token);
+      currentRoom.remoteParticipants.forEach((participant) => {
+        syncAgentStateAttr(participant);
+      });
+      // Desbloquear salida de audio dentro del gesto de clic del botón "Iniciar Entrevista"
+      currentRoom.startAudio().catch(() => {});
       lkRoomRef.current = currentRoom;
       setLkRoom(currentRoom);
 
@@ -448,6 +546,10 @@ const Agent = ({
         };
 
         await currentRoom.localParticipant.setMicrophoneEnabled(true, audioConstraints);
+        const micPub = currentRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
+        if (micPub?.track?.mediaStreamTrack) {
+          setCandidateAudioTrack(micPub.track.mediaStreamTrack);
+        }
       } catch (micErr) {
         console.warn("[LiveKit] No se pudo habilitar el micrófono:", micErr);
       }
@@ -493,21 +595,16 @@ const Agent = ({
 
   if (callStatus === CallStatus.GENERATING_FEEDBACK) {
     return (
-      <div className="flex flex-col items-center justify-center gap-6 p-8 rounded-3xl bg-[#0c0d14]/90 border border-white/[0.08] max-w-lg mx-auto text-center shadow-2xl">
-        <div className="relative flex items-center justify-center w-20 h-20">
-          <div className="absolute inset-0 rounded-full bg-indigo-500/20 animate-ping [animation-duration:2s]" />
-          <div className="relative z-10 p-5 rounded-full bg-indigo-600/30 border border-indigo-500/40 text-indigo-400">
-            <Sparkles className="w-8 h-8 animate-pulse" />
-          </div>
-        </div>
-        <div>
-          <h3 className="text-xl font-bold text-white">Generando Evaluación Técnica</h3>
-          <p className="text-xs text-zinc-400 mt-2 max-w-sm">
-            {isEs
+      <div className="flex flex-col items-center justify-center gap-6 p-10 rounded-3xl bg-[#0c0d14]/90 border border-white/[0.08] max-w-lg mx-auto text-center shadow-2xl">
+        <AiLoader
+          size={1}
+          label="Generando Evaluación Técnica"
+          sublabel={
+            isEs
               ? "Procesando transcripción y calculando radar de competencias de arquitectura y comunicación..."
-              : "Analyzing technical answers and compiling detailed assessment report..."}
-          </p>
-        </div>
+              : "Analyzing technical answers and compiling detailed assessment report..."
+          }
+        />
         <div className="w-full max-w-xs h-1.5 rounded-full bg-zinc-800 overflow-hidden">
           <div className="h-full bg-indigo-500 rounded-full animate-pulse w-3/4" />
         </div>
@@ -760,9 +857,13 @@ const Agent = ({
                     {callStatus === CallStatus.ACTIVE
                       ? isSpeaking
                         ? `${currentVoiceObj.name} hablando...`
+                        : agentLiveState === "thinking"
+                        ? isEs
+                          ? `${currentVoiceObj.name} analizando tu respuesta...`
+                          : `${currentVoiceObj.name} analyzing your answer...`
                         : isEs
-                        ? "Escuchándote activamente..."
-                        : "Listening to your response..."
+                        ? "Tu turno — escuchándote activamente..."
+                        : "Your turn — listening to your response..."
                       : callStatus === CallStatus.CONNECTING
                       ? isEs
                         ? "Estableciendo enlace de audio..."
@@ -775,11 +876,36 @@ const Agent = ({
                     {callStatus === CallStatus.ACTIVE
                       ? isSpeaking
                         ? "Puedes hablar en cualquier momento para intervenir"
+                        : agentLiveState === "thinking"
+                        ? isEs
+                          ? "Preparando la siguiente intervención..."
+                          : "Preparing next prompt..."
                         : "Habla con claridad, tu micrófono está activo"
                       : isEs
                       ? "Haz clic en 'Iniciar Entrevista' para conectar"
                       : "Click 'Start Interview' below to connect"}
                   </p>
+                  {callStatus === CallStatus.ACTIVE && (
+                    <VoiceAudioWave
+                      audioTrack={agentAudioTrack}
+                      isActive={callStatus === CallStatus.ACTIVE}
+                      variant="agent"
+                      label={
+                        isSpeaking
+                          ? `${currentVoiceObj.name}`
+                          : agentLiveState === "thinking"
+                          ? isEs
+                            ? "Analizando..."
+                            : "Thinking..."
+                          : isEs
+                          ? "Escuchando"
+                          : "Listening"
+                      }
+                      width={190}
+                      height={28}
+                      className="mt-2.5 w-full max-w-[300px]"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -875,9 +1001,13 @@ const Agent = ({
                   {callStatus === CallStatus.ACTIVE
                     ? isSpeaking
                       ? `${currentVoiceObj.name} hablando...`
+                      : agentLiveState === "thinking"
+                      ? isEs
+                        ? `${currentVoiceObj.name} analizando tu respuesta...`
+                        : `${currentVoiceObj.name} analyzing your answer...`
                       : isEs
-                      ? "Escuchándote activamente..."
-                      : "Listening to your response..."
+                      ? "Tu turno — escuchándote activamente..."
+                      : "Your turn — listening to your response..."
                     : callStatus === CallStatus.CONNECTING
                     ? isEs
                       ? "Estableciendo enlace de audio..."
@@ -890,15 +1020,68 @@ const Agent = ({
                   {callStatus === CallStatus.ACTIVE
                     ? isSpeaking
                       ? "Puedes hablar en cualquier momento para intervenir"
+                      : agentLiveState === "thinking"
+                      ? isEs
+                        ? "Preparando la siguiente intervención..."
+                        : "Preparing next prompt..."
                       : "Habla con claridad, tu micrófono está activo"
                     : isEs
                     ? "Haz clic en 'Iniciar Entrevista' para conectar"
                     : "Click 'Start Interview' below to connect"}
                 </p>
+                {callStatus === CallStatus.ACTIVE && (
+                  <VoiceAudioWave
+                    audioTrack={agentAudioTrack}
+                    isActive={callStatus === CallStatus.ACTIVE}
+                    variant="agent"
+                    label={
+                      isSpeaking
+                        ? `${currentVoiceObj.name}`
+                        : agentLiveState === "thinking"
+                        ? isEs
+                          ? "Analizando..."
+                          : "Thinking..."
+                        : isEs
+                        ? "Escuchando"
+                        : "Listening"
+                    }
+                    width={240}
+                    height={30}
+                    className="mt-3 w-full max-w-[360px]"
+                  />
+                )}
               </div>
             </div>
           )}
         </div>
+
+        {/* Live Candidate Voice Waveform (react-audio-visualize) */}
+        {callStatus === CallStatus.ACTIVE && (
+          <div className="relative z-10 w-full mb-3">
+            <VoiceAudioWave
+              audioTrack={candidateAudioTrack}
+              isActive={callStatus === CallStatus.ACTIVE}
+              isMuted={isMicMuted}
+              variant="candidate"
+              label={
+                isMicMuted
+                  ? isEs
+                    ? "Micrófono silenciado"
+                    : "Microphone muted"
+                  : isCandidateSpeaking
+                  ? isEs
+                    ? "Tu voz — hablando..."
+                    : "Your voice — speaking..."
+                  : isEs
+                  ? "Tu micrófono en vivo"
+                  : "Your live microphone"
+              }
+              width={460}
+              height={32}
+              className="w-full"
+            />
+          </div>
+        )}
 
         {/* Closed Captions HUD / Live Subtitle Box */}
         <div className="relative w-full min-h-[76px] bg-zinc-950/70 border border-zinc-800/80 rounded-2xl p-3.5 flex items-center justify-center text-center z-10 max-h-24 overflow-y-auto no-scrollbar mb-5 backdrop-blur-md">
@@ -935,13 +1118,19 @@ const Agent = ({
                 "px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer border",
                 isMicMuted
                   ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                  : isCandidateSpeaking && callStatus === CallStatus.ACTIVE
+                  ? "bg-emerald-500/15 text-emerald-200 border-emerald-500/40 shadow-sm shadow-emerald-500/20"
                   : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 disabled:opacity-40"
               )}
               title={isMicMuted ? "Activar micrófono" : "Silenciar micrófono"}
             >
               {isMicMuted ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4 text-emerald-400" />}
               <span className="hidden sm:inline">
-                {isMicMuted ? "Micrófono Silenciado" : "Micrófono Activo"}
+                {isMicMuted
+                  ? "Micrófono Silenciado"
+                  : isCandidateSpeaking && callStatus === CallStatus.ACTIVE
+                  ? "Voz Detectada"
+                  : "Micrófono Activo"}
               </span>
             </button>
 

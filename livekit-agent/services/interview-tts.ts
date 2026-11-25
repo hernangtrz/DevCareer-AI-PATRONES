@@ -10,6 +10,8 @@ const SAMPLES_PER_FRAME = SAMPLE_RATE / 50;
 // y siguientes sin regenerar la pregunta ni volver a reproducir frases anteriores.
 export class InterviewTTS extends tts.TTS {
   label = 'InterviewTTS';
+  private cartesiaChecked = false;
+  private cartesiaCheckInFlight?: Promise<void>;
 
   constructor(
     private readonly config: VoiceConfig,
@@ -31,21 +33,41 @@ export class InterviewTTS extends tts.TTS {
     const headers = { 'Content-Type': 'application/json' };
     let response: Response | undefined;
     let provider = 'Cartesia';
+
+    // Evita que varias oraciones paralelas del saludo golpeen Cartesia a la vez cuando devuelve 402.
+    if (this.cartesiaKey && !this.cartesiaChecked && this.cartesiaCheckInFlight) {
+      await this.cartesiaCheckInFlight;
+    }
+
     if (this.cartesiaKey) {
-      response = await fetch('https://api.cartesia.ai/tts/bytes', {
-        method: 'POST', signal,
-        headers: { ...headers, 'X-API-Key': this.cartesiaKey, 'Cartesia-Version': '2025-04-16' },
-        body: JSON.stringify({
-          model_id: 'sonic-2', transcript: text, language: this.config.language,
-          voice: { mode: 'id', id: this.config.voice },
-          output_format: { container: 'raw', encoding: 'pcm_s16le', sample_rate: SAMPLE_RATE },
-        }),
-      });
-      if (response.status === 402 && this.deepgramKey) {
-        if (this.cartesiaKey) console.warn('[TTS] Cartesia sin créditos (402). Se usará Deepgram en esta entrevista.');
-        this.cartesiaKey = undefined;
-        await response.body?.cancel();
-        response = undefined;
+      let releaseCheck: (() => void) | undefined;
+      if (!this.cartesiaChecked && !this.cartesiaCheckInFlight) {
+        this.cartesiaCheckInFlight = new Promise<void>((resolve) => {
+          releaseCheck = resolve;
+        });
+      }
+      try {
+        response = await fetch('https://api.cartesia.ai/tts/bytes', {
+          method: 'POST', signal,
+          headers: { ...headers, 'X-API-Key': this.cartesiaKey, 'Cartesia-Version': '2025-04-16' },
+          body: JSON.stringify({
+            model_id: 'sonic-2', transcript: text, language: this.config.language,
+            voice: { mode: 'id', id: this.config.voice },
+            output_format: { container: 'raw', encoding: 'pcm_s16le', sample_rate: SAMPLE_RATE },
+          }),
+        });
+        if (response.status === 402 && this.deepgramKey) {
+          if (this.cartesiaKey) console.warn('[TTS] Cartesia sin créditos (402). Se usará Deepgram en esta entrevista.');
+          this.cartesiaKey = undefined;
+          await response.body?.cancel();
+          response = undefined;
+        }
+        this.cartesiaChecked = true;
+      } finally {
+        if (releaseCheck) {
+          this.cartesiaCheckInFlight = undefined;
+          releaseCheck();
+        }
       }
     }
 

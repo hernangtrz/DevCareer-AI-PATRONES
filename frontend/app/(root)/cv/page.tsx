@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Sparkles, FileText, Search, ShieldCheck } from "lucide-react";
 import CvCreatorForm from "@/components/CvCreatorForm";
 import CvAnalyzerUpload from "@/components/CvAnalyzerUpload";
+import AiLoader from "@/components/AiLoader";
 
 function CvHubContent() {
   const searchParams = useSearchParams();
@@ -100,7 +101,13 @@ function CvHubContent() {
 
 export default function CvHubPage() {
   return (
-    <Suspense fallback={<div className="text-zinc-400 text-sm py-12 text-center">Cargando CV Hub...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-[50vh] w-full flex items-center justify-center py-12">
+          <AiLoader size={0.8} label="Cargando CV Hub..." />
+        </div>
+      }
+    >
       <CvHubContent />
     </Suspense>
   );

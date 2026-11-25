@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import AiLoader from "@/components/AiLoader";
 import {
   User,
   FileText,
@@ -78,6 +79,18 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-8 min-h-screen pb-16">
+      {uploadingResume && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-6">
+          <div className="p-8 rounded-3xl bg-[#0c0d14]/95 border border-white/10 shadow-2xl">
+            <AiLoader
+              size={0.95}
+              label="Analizando CV con IA..."
+              sublabel="Extrayendo tus habilidades, experiencia y formación para completar el perfil"
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── Top Header ── */}
       <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-zinc-900 via-zinc-900 to-indigo-950/40 border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-2xl">
         <div className="flex items-center gap-4">

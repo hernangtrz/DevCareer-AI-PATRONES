@@ -9,7 +9,7 @@ const DisplayTechIcons = async ({ techStack }: TechIconProps) => {
     <div className="flex flex-row items-center">
       {techIcons.slice(0, 4).map(({ tech, url }, index) => (
         <div
-          key={tech}
+          key={`${tech}-${index}`}
           className={cn(
             "relative group/tech bg-dark-300 border border-white/10 rounded-full p-2 flex-center transition-transform duration-150 hover:scale-110 hover:z-20",
             index >= 1 && "-ml-2.5"

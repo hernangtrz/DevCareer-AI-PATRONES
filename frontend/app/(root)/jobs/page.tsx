@@ -3,7 +3,11 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "framer-motion";
 import AiLoader from "@/components/AiLoader";
+import BinaryOrbitsBackdrop from "@/components/BinaryOrbitsBackdrop";
+import JobOfferMinimalCard from "@/components/JobOfferMinimalCard";
+import { MOTION_SPRING, resolveMotionTransition } from "@/lib/motion-tokens";
 import {
   getJobs,
   applyToJob,
@@ -245,6 +249,7 @@ const MOCK_JOBS: JobOffer[] = [
 
 export default function JobsPage() {
   const router = useRouter();
+  const prefersReducedMotion = useReducedMotion();
 
   // Navigation tabs
   const [activeMainTab, setActiveMainTab] = useState<"feed" | "saved" | "applications" | "notifications">("feed");
@@ -1143,7 +1148,10 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 min-h-screen pb-16">
+    <div className="relative min-h-screen pb-16">
+      <BinaryOrbitsBackdrop />
+
+      <div className="relative z-10 flex flex-col gap-8">
       {/* Toast Feedback Banner */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl bg-zinc-900 border border-emerald-500/40 text-white text-xs font-semibold shadow-2xl shadow-emerald-500/20 flex items-center gap-2.5 animate-fadeIn">
@@ -1152,218 +1160,253 @@ export default function JobsPage() {
         </div>
       )}
 
-      {/* ── Top Header Banner with Nav Tabs ── */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-zinc-900 via-zinc-900 to-indigo-950/40 border border-zinc-800 flex flex-col gap-6 shadow-2xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex flex-col gap-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold w-fit">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>PORTAL DE EMPLEO & SEGUIMIENTO</span>
+      {/* ── Top Header Banner (Apple Minimal Dark Glass) ── */}
+      <section className="relative z-20 rounded-[28px] bg-[#0c0f17]/78 backdrop-blur-2xl border border-white/[0.08] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.85)] p-6 md:p-7 flex flex-col gap-6">
+        {/* Specular top hairline & ambient tint clipped cleanly inside its own layer so popovers never clip */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[28px] overflow-hidden"
+        >
+          <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          <div
+            className="absolute inset-0 opacity-70"
+            style={{
+              background:
+                "radial-gradient(48% 85% at 88% 35%, rgba(99, 102, 241, 0.14) 0%, transparent 72%), radial-gradient(40% 70% at 10% 15%, rgba(16, 185, 129, 0.08) 0%, transparent 68%)",
+            }}
+          />
+        </div>
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          {/* Left: Refined typography + quick actions */}
+          <div className="flex flex-col gap-4 min-w-0 flex-1">
+            <div className="flex flex-col gap-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/[0.09] ring-1 ring-inset ring-emerald-400/20 text-emerald-300 text-[11px] font-semibold tracking-wide w-fit">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>PORTAL DE EMPLEO &amp; SEGUIMIENTO</span>
+              </div>
+              <h1 className="text-2xl md:text-[30px] font-semibold text-white tracking-[-0.025em] leading-tight flex items-center gap-2.5">
+                <span>¡Bienvenido de vuelta, {profileData.fullName.split(" ")[0]}!</span>
+                <Sparkles className="w-5 h-5 text-indigo-300 shrink-0" aria-hidden="true" />
+              </h1>
+              <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed max-w-xl">
+                Explora vacantes verificadas en tiempo real de Greenhouse, Lever y RemoteOK, postúlate con materiales generados por IA y haz seguimiento a cada proceso.
+              </p>
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
-              <span>¡Bienvenido de vuelta, {profileData.fullName.split(" ")[0]}!</span>
-              <Sparkles className="w-6 h-6 text-indigo-400 shrink-0" aria-hidden="true" />
-            </h1>
-            <p className="text-zinc-400 text-xs md:text-sm max-w-xl">
-              Explora vacantes verificadas en tiempo real de Greenhouse, Lever y RemoteOK, postúlate directamente y gestiona cada proceso de selección en tu espacio de seguimiento.
-            </p>
-          </div>
 
-          <div className="flex items-center gap-3">
-            {/* Botón de Campana con Dropdown Flotante */}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
-                className="relative px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 border border-zinc-700/60"
-                title="Notificaciones y Alertas de Empleo"
-              >
-                {unreadNotificationsCount > 0 ? (
-                  <BellRing className="w-4 h-4 text-amber-400 animate-pulse" />
-                ) : (
-                  <Bell className="w-4 h-4 text-zinc-400" />
-                )}
-                <span className="hidden sm:inline">Alertas</span>
-                {unreadNotificationsCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold shadow-lg shadow-rose-500/50">
-                    {unreadNotificationsCount}
-                  </span>
-                )}
-              </button>
+            {/* Quick actions row */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Botón de Campana con Dropdown Flotante */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                  className="relative px-3.5 py-2 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-2 ring-1 ring-inset ring-white/[0.09] whitespace-nowrap"
+                  title="Notificaciones y Alertas de Empleo"
+                >
+                  {unreadNotificationsCount > 0 ? (
+                    <BellRing className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                  ) : (
+                    <Bell className="w-3.5 h-3.5 text-zinc-400" />
+                  )}
+                  <span>Alertas</span>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold leading-none shadow-md shadow-rose-500/40">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </button>
 
-              {/* Popover Flotante de Notificaciones */}
-              {showNotifDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowNotifDropdown(false)}
-                  />
+                {/* Popover Flotante de Notificaciones */}
+                {showNotifDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowNotifDropdown(false)}
+                    />
 
-                  <div className="absolute right-0 top-12 z-50 w-80 sm:w-96 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl p-4 flex flex-col gap-3 animate-fadeIn">
-                    <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <Bell className="w-4 h-4 text-purple-400" />
-                        <h4 className="text-xs font-bold text-white">Notificaciones</h4>
+                    <div className="absolute left-0 sm:left-auto sm:right-0 top-12 z-50 w-80 sm:w-96 rounded-2xl bg-[#0b0d17]/95 backdrop-blur-2xl border border-white/[0.1] shadow-2xl p-4 flex flex-col gap-3 animate-fadeIn">
+                      <div className="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <Bell className="w-4 h-4 text-indigo-300" />
+                          <h4 className="text-xs font-semibold text-white">Notificaciones</h4>
+                          {unreadNotificationsCount > 0 && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-[10px] text-white font-mono font-bold leading-none">
+                              {unreadNotificationsCount}
+                            </span>
+                          )}
+                        </div>
+
                         {unreadNotificationsCount > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-[10px] text-white font-mono font-bold">
-                            {unreadNotificationsCount}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={markAllNotificationsAsRead}
+                            className="text-[11px] text-zinc-400 hover:text-emerald-300 font-medium transition cursor-pointer flex items-center gap-1"
+                          >
+                            <CheckCheck className="w-3 h-3" />
+                            <span>Marcar leídas</span>
+                          </button>
                         )}
                       </div>
 
-                      {unreadNotificationsCount > 0 && (
-                        <button
-                          onClick={markAllNotificationsAsRead}
-                          className="text-[11px] text-zinc-400 hover:text-emerald-400 font-medium transition cursor-pointer flex items-center gap-1"
-                        >
-                          <CheckCheck className="w-3 h-3" />
-                          <span>Marcar leídas</span>
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
-                      {notifications.slice(0, 4).map((n) => (
-                        <div
-                          key={n.id}
-                          onClick={() => handleNotificationAction(n)}
-                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex flex-col gap-1 ${
-                            !n.read
-                              ? "bg-purple-950/20 border-purple-500/40 hover:bg-purple-950/30"
-                              : "bg-zinc-900/50 border-zinc-800/80 hover:bg-zinc-900"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-xs font-bold text-white truncate">
-                              {n.title}
+                      <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                        {notifications.slice(0, 4).map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => handleNotificationAction(n)}
+                            className={`p-3 rounded-xl border transition-colors cursor-pointer flex flex-col gap-1 ${
+                              !n.read
+                                ? "bg-indigo-500/10 border-indigo-400/25 hover:bg-indigo-500/15"
+                                : "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-semibold text-white truncate">
+                                {n.title}
+                              </span>
+                              {!n.read && (
+                                <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-[11px] text-zinc-300 line-clamp-2 leading-snug">
+                              {n.message}
+                            </p>
+                            <span className="text-[10px] text-zinc-500">
+                              {n.timeAgo} {n.company ? `· ${n.company}` : ""}
                             </span>
-                            {!n.read && (
-                              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                            )}
                           </div>
-                          <p className="text-[11px] text-zinc-300 line-clamp-2 leading-snug">
-                            {n.message}
+                        ))}
+
+                        {notifications.length === 0 && (
+                          <p className="text-xs text-zinc-500 text-center py-4">
+                            No tienes notificaciones por el momento
                           </p>
-                          <span className="text-[9px] text-zinc-500">
-                            {n.timeAgo} {n.company ? `· ${n.company}` : ""}
-                          </span>
-                        </div>
-                      ))}
+                        )}
+                      </div>
 
-                      {notifications.length === 0 && (
-                        <p className="text-xs text-zinc-500 text-center py-4">
-                          No tienes notificaciones por el momento
-                        </p>
-                      )}
+                      <div className="border-t border-white/[0.08] pt-2.5 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={handleSimulateNewNotification}
+                          className="text-[11px] text-violet-300 hover:text-violet-200 font-medium flex items-center gap-1 cursor-pointer"
+                        >
+                          <Sparkles className="w-3 h-3 text-amber-300" />
+                          <span>Simular alerta</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowNotifDropdown(false);
+                            setActiveMainTab("notifications");
+                          }}
+                          className="text-[11px] text-indigo-300 hover:text-indigo-200 font-semibold flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Ver todas ({notifications.length})</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
+                  </>
+                )}
+              </div>
 
-                    <div className="border-t border-zinc-800 pt-2 flex items-center justify-between">
-                      <button
-                        onClick={handleSimulateNewNotification}
-                        className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        <Sparkles className="w-3 h-3 text-yellow-300" />
-                        <span>Simular alerta</span>
-                      </button>
+              <button
+                type="button"
+                onClick={() => setShowCustomOfferModal(true)}
+                className="px-4 py-2 rounded-full bg-indigo-500/15 hover:bg-indigo-500/25 ring-1 ring-inset ring-indigo-400/30 text-indigo-200 hover:text-white text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
+                <span>Practicar con mi propia Oferta</span>
+              </button>
 
-                      <button
-                        onClick={() => {
-                          setShowNotifDropdown(false);
-                          setActiveMainTab("notifications");
-                        }}
-                        className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Ver todas ({notifications.length})</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+              <Link
+                href="/analytics"
+                className="px-4 py-2 rounded-full bg-white/[0.05] hover:bg-white/[0.1] ring-1 ring-inset ring-white/[0.09] text-zinc-200 hover:text-white text-xs font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Ver Métricas</span>
+              </Link>
             </div>
-
-            <button
-              onClick={() => setShowCustomOfferModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-2"
-            >
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              <span>Practicar con mi propia Oferta</span>
-            </button>
-            <Link
-              href="/analytics"
-              className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-all cursor-pointer flex items-center gap-2"
-            >
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
-              <span>Ver Métricas</span>
-            </Link>
           </div>
         </div>
 
-        {/* Navigation Tabs (Feed / Saved / Mis Postulaciones / Notificaciones) */}
-        <div className="flex items-center gap-2 border-t border-zinc-800/80 pt-4 flex-wrap">
-          <button
-            onClick={() => setActiveMainTab("feed")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeMainTab === "feed"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "bg-zinc-950/60 text-zinc-400 hover:text-white border border-zinc-800"
-            }`}
-          >
-            <Briefcase className="w-4 h-4" />
-            <span>Explorar Ofertas ({allCurrentJobs.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveMainTab("saved")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeMainTab === "saved"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                : "bg-zinc-950/60 text-zinc-400 hover:text-white border border-zinc-800"
-            }`}
-          >
-            <Bookmark className="w-4 h-4" />
-            <span>Ofertas Guardadas</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-zinc-800 text-[10px] text-zinc-300 font-mono">
-              {savedJobs.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveMainTab("applications")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeMainTab === "applications"
-                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/25 ring-2 ring-emerald-400/50"
-                : "bg-zinc-950/60 text-zinc-400 hover:text-white border border-zinc-800"
-            }`}
-          >
-            <Send className="w-4 h-4 text-emerald-300" />
-            <span>Mis Postulaciones & Seguimiento</span>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[10px] text-emerald-300 font-mono font-bold">
-              {liveApplications.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveMainTab("notifications")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer relative ${
-              activeMainTab === "notifications"
-                ? "bg-purple-600 text-white shadow-lg shadow-purple-600/25 ring-2 ring-purple-400/50"
-                : "bg-zinc-950/60 text-zinc-400 hover:text-white border border-zinc-800"
-            }`}
-          >
-            <Bell className="w-4 h-4 text-purple-300" />
-            <span>Notificaciones & Alertas</span>
-            {unreadNotificationsCount > 0 ? (
-              <span className="px-2 py-0.5 rounded-full bg-rose-500 text-[10px] text-white font-mono font-bold animate-pulse">
-                {unreadNotificationsCount}
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded-full bg-zinc-800 text-[10px] text-zinc-400 font-mono">
-                {notifications.length}
-              </span>
-            )}
-          </button>
+        {/* Apple Minimal Segmented Navigation Dock */}
+        <div className="relative z-10 flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/[0.03] ring-1 ring-inset ring-white/[0.07] flex-wrap">
+          {(
+            [
+              {
+                id: "feed" as const,
+                label: "Explorar Ofertas",
+                count: allCurrentJobs.length,
+                icon: <Briefcase className="w-3.5 h-3.5" />,
+                activePillClass: "bg-indigo-500/90 shadow-lg shadow-indigo-500/25",
+                badgeClass: "bg-white/15 text-white",
+                idleBadgeClass: "bg-white/[0.06] text-zinc-400",
+              },
+              {
+                id: "saved" as const,
+                label: "Ofertas Guardadas",
+                count: savedJobs.length,
+                icon: <Bookmark className="w-3.5 h-3.5" />,
+                activePillClass: "bg-indigo-500/90 shadow-lg shadow-indigo-500/25",
+                badgeClass: "bg-white/15 text-white",
+                idleBadgeClass: "bg-white/[0.06] text-zinc-400",
+              },
+              {
+                id: "applications" as const,
+                label: "Mis Postulaciones & Seguimiento",
+                count: liveApplications.length,
+                icon: <Send className="w-3.5 h-3.5" />,
+                activePillClass: "bg-emerald-500/90 shadow-lg shadow-emerald-500/25",
+                badgeClass: "bg-black/20 text-white",
+                idleBadgeClass: "bg-emerald-500/15 text-emerald-300",
+              },
+              {
+                id: "notifications" as const,
+                label: "Notificaciones & Alertas",
+                count: unreadNotificationsCount > 0 ? unreadNotificationsCount : notifications.length,
+                isAlert: unreadNotificationsCount > 0,
+                icon: <Bell className="w-3.5 h-3.5" />,
+                activePillClass: "bg-violet-500/90 shadow-lg shadow-violet-500/25",
+                badgeClass: unreadNotificationsCount > 0 ? "bg-rose-500 text-white" : "bg-white/15 text-white",
+                idleBadgeClass: unreadNotificationsCount > 0 ? "bg-rose-500 text-white animate-pulse" : "bg-white/[0.06] text-zinc-400",
+              },
+            ]
+          ).map((tab) => {
+            const isActive = activeMainTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveMainTab(tab.id)}
+                className={`relative px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  isActive ? "text-white" : "text-zinc-400 hover:text-zinc-100"
+                }`}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="jobsMainTabPill"
+                    transition={resolveMotionTransition(prefersReducedMotion, MOTION_SPRING.snappy)}
+                    className={`absolute inset-0 rounded-xl ${tab.activePillClass}`}
+                  />
+                )}
+                <span className="relative z-10 inline-flex items-center gap-2">
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold leading-none tabular-nums ${
+                      isActive ? tab.badgeClass : tab.idleBadgeClass
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
       {/* ────────────────────────────────────────────────────────── */}
       {/* VISTA 1 & 2: FEED DE OFERTAS & OFERTAS GUARDADAS            */}
@@ -1501,210 +1544,23 @@ export default function JobsPage() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {filteredJobs.map((job) => {
-                    const isSaved = savedJobs.includes(job.id);
-                    const isApplied = appliedJobIds.includes(job.id);
-                    const isApplying = applyingJobId === job.id;
-                    const isSimulating = simulatingJobId === job.id;
-
-                    return (
-                      <div
-                        key={job.id}
-                        className={`p-5 md:p-6 rounded-3xl bg-gradient-to-b from-[#181a20] to-[#0c0d10] border transition-all shadow-xl flex flex-col gap-4 group ${
-                          isApplied ? "border-emerald-500/40 bg-emerald-950/10" : "border-zinc-800/90 hover:border-indigo-500/40"
-                        }`}
-                      >
-                        {/* Fila Superior */}
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-3.5 min-w-0">
-                            <div
-                              className={`w-12 h-12 rounded-2xl bg-gradient-to-tr ${job.logoGradient} flex items-center justify-center text-white font-black text-sm shadow-md shrink-0`}
-                            >
-                              {job.companyInitials}
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-bold text-zinc-200">{job.company}</span>
-                                <span className={`px-2 py-0.2 rounded-md text-[10px] font-bold border ${job.platformBg}`}>
-                                  {job.platform}
-                                </span>
-                                <span className="text-zinc-600 text-xs">•</span>
-                                <span className="text-zinc-500 text-[11px] flex items-center gap-1">
-                                  <Clock className="w-3 h-3" /> {job.postedAgo}
-                                </span>
-                                {isApplied && (
-                                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold flex items-center gap-1">
-                                    <Check className="w-3 h-3" /> Ya te has postulado
-                                  </span>
-                                )}
-                              </div>
-                              <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors truncate mt-0.5">
-                                {job.title}
-                              </h3>
-                            </div>
-                          </div>
-
-                          {/* Match Score */}
-                          <div className="flex flex-col items-end shrink-0">
-                            <span className="text-base font-extrabold font-mono text-emerald-400">
-                              {job.matchScore}% Match
-                            </span>
-                            <span className="text-[10px] text-emerald-300/70 font-semibold">
-                              {job.matchLevel} afinidad
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Detalles */}
-                        <div className="flex items-center gap-4 text-xs text-zinc-400 flex-wrap">
-                          <span className="flex items-center gap-1.5 text-zinc-200 font-semibold">
-                            <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                            {job.salaryMonthlyUSD}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-zinc-500" />
-                            {job.location}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 text-[10px] font-bold border border-indigo-500/20">
-                            {job.seniority}
-                          </span>
-                        </div>
-
-                        {/* Tecnologías / Stack Requerido */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] text-zinc-500 uppercase font-bold mr-1">Tecnologías:</span>
-                          {job.matchedSkills.map((sk) => (
-                            <span
-                              key={sk}
-                              className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 text-[11px] font-medium border border-emerald-500/20"
-                            >
-                              ✓ {sk}
-                            </span>
-                          ))}
-                          {job.missingSkills.map((sk) => (
-                            <span
-                              key={sk}
-                              className="px-2 py-0.5 rounded-md bg-zinc-800/60 text-zinc-400 text-[11px] font-medium border border-zinc-700"
-                            >
-                              + {sk}
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* Botones de Acción */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-zinc-800/80">
-                          {/* Grupo de Práctica: Modal + Accesos Directos */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <button
-                              onClick={() => setPracticeModalJob(job)}
-                              disabled={isSimulating}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500/15 via-purple-500/15 to-cyan-500/15 hover:from-pink-500/25 hover:via-purple-500/25 hover:to-cyan-500/25 border border-pink-500/30 text-xs font-semibold text-pink-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-                              title="Elegir entre entrevista de voz, reto de código o ambos"
-                            >
-                              <Zap className="w-3.5 h-3.5 text-yellow-400" />
-                              <span>{isSimulating ? "Preparando..." : "Preparar prueba para esta oferta"}</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleSimulateInterviewForJob(job)}
-                              disabled={isSimulating}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-pink-400 hover:border-pink-500/30 text-[11px] font-medium transition cursor-pointer"
-                              title="Iniciar directamente entrevista simulada por voz"
-                            >
-                              <Mic className={`w-3.5 h-3.5 ${isSimulating ? "animate-spin text-pink-400" : ""}`} />
-                              <span>Voz</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleStartCodeChallenge(job)}
-                              disabled={isSimulating}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-cyan-400 hover:border-cyan-500/30 text-[11px] font-medium transition cursor-pointer"
-                              title="Iniciar directamente reto técnico de código en vivo"
-                            >
-                              <Code2 className="w-3.5 h-3.5" />
-                              <span>Código</span>
-                            </button>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {/* Guardar en Favoritos */}
-                            <button
-                              onClick={() => toggleSaveJob(job.id)}
-                              className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-                                isSaved
-                                  ? "bg-indigo-600/20 border-indigo-500/40 text-indigo-300"
-                                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
-                              }`}
-                              title={isSaved ? "Guardada en favoritos" : "Guardar oferta"}
-                            >
-                              <Bookmark className="w-4 h-4" />
-                            </button>
-
-                            {/* Botón de Postulación Normal */}
-                            {isApplied ? (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleOpenMaterials(job)}
-                                  disabled={isApplying}
-                                  className="px-3.5 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                  title="Ver carta de motivación y CV adaptado generados"
-                                >
-                                  {isApplying ? (
-                                    <>
-                                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-                                      <span>Cargando...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <FileText className="w-3.5 h-3.5 text-indigo-400" />
-                                      <span>Ver Carta & CV</span>
-                                    </>
-                                  )}
-                                </button>
-                                <a
-                                  href={job.externalUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-semibold transition-all flex items-center gap-1.5"
-                                  title="Abrir el formulario oficial nuevamente"
-                                >
-                                  <span>Formulario</span>
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                                <button
-                                  onClick={() => setActiveMainTab("applications")}
-                                  className="px-3.5 py-2 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                                >
-                                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                  <span>Seguimiento</span>
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => handleDirectApply(job)}
-                                disabled={isApplying}
-                                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                                title="Generar carta de motivación, CV adaptado y registrar postulación"
-                              >
-                                {isApplying ? (
-                                  <>
-                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Preparando postulación...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Send className="w-3.5 h-3.5" />
-                                    <span>Postularme a esta vacante</span>
-                                    <ArrowRight className="w-3.5 h-3.5 text-emerald-200" />
-                                  </>
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {filteredJobs.map((job) => (
+                    <JobOfferMinimalCard
+                      key={job.id}
+                      job={job}
+                      isSaved={savedJobs.includes(job.id)}
+                      isApplied={appliedJobIds.includes(job.id)}
+                      isApplying={applyingJobId === job.id}
+                      isSimulating={simulatingJobId === job.id}
+                      onOpenPracticeModal={() => setPracticeModalJob(job)}
+                      onStartVoiceInterview={() => handleSimulateInterviewForJob(job)}
+                      onStartCodeChallenge={() => handleStartCodeChallenge(job)}
+                      onToggleSave={() => toggleSaveJob(job.id)}
+                      onOpenMaterials={() => handleOpenMaterials(job)}
+                      onOpenTracking={() => setActiveMainTab("applications")}
+                      onDirectApply={() => handleDirectApply(job)}
+                    />
+                  ))}
                 </div>
               )}
             </div>
@@ -3058,6 +2914,7 @@ export default function JobsPage() {
         </div>
       )}
 
+      </div>
     </div>
   );
 }

@@ -2,6 +2,13 @@
 
 import React from "react";
 import { motion, useReducedMotion, type HTMLMotionProps } from "framer-motion";
+import {
+  MOTION_DURATION,
+  MOTION_EASE,
+  resolveMotionTransition,
+} from "@/lib/motion-tokens";
+
+export * from "@/lib/motion-tokens";
 
 interface FadeInProps extends HTMLMotionProps<"div"> {
   delay?: number;
@@ -16,7 +23,7 @@ interface FadeInProps extends HTMLMotionProps<"div"> {
  */
 export function FadeIn({
   delay = 0,
-  duration = 0.35,
+  duration = MOTION_DURATION.normal,
   y = 10,
   children,
   ...props
@@ -27,11 +34,11 @@ export function FadeIn({
     <motion.div
       initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y }}
       animate={{ opacity: 1, y: 0 }}
-      transition={
-        prefersReducedMotion
-          ? { duration: 0 }
-          : { duration, delay, ease: [0.16, 1, 0.3, 1] }
-      }
+      transition={resolveMotionTransition(prefersReducedMotion, {
+        duration,
+        delay,
+        ease: MOTION_EASE.snappy,
+      })}
       {...props}
     >
       {children}

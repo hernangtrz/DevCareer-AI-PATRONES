@@ -5,7 +5,7 @@ import { aiRateLimiter } from "../middleware/rate-limit.middleware";
 import { InterviewEvaluationFacade } from "../patterns/facade";
 import { getUserJobApplications } from "../services/jobs.service";
 import { calculateRealUserAnalytics } from "../services/analytics.service";
-import { getInterviewsByUserId } from "../services/interviews.service";
+import { getInterviewById, getInterviewsByUserId } from "../services/interviews.service";
 import {
   PerformanceReport,
   InterviewFeedbackReport,
@@ -313,12 +313,24 @@ router.get("/:interviewId/export", flexibleAuth, async (req: AuthRequest, res: R
   }
 
   try {
-    const feedback = await getFeedbackByInterviewId(interviewId, req.userId!);
+    const [feedback, interview] = await Promise.all([
+      getFeedbackByInterviewId(interviewId, req.userId!),
+      getInterviewById(interviewId).catch(() => null),
+    ]);
 
     if (!feedback) {
       res.status(404).json({ success: false, message: "Feedback no encontrado" });
       return;
     }
+
+    const reportContext = {
+      candidateName: req.userName || undefined,
+      role: interview?.role,
+      company: interview?.company,
+      level: interview?.level,
+      interviewType: interview?.type,
+      techstack: interview?.techstack,
+    };
 
     let report: PerformanceReport;
     if (reportType === "english") {
@@ -326,15 +338,15 @@ router.get("/:interviewId/export", flexibleAuth, async (req: AuthRequest, res: R
         res.status(404).json({ success: false, message: "Esta entrevista no tiene evaluación de inglés (CEFR)" });
         return;
       }
-      report = new EnglishProficiencyReport(interviewId, feedback.englishFeedback, renderer);
+      report = new EnglishProficiencyReport(interviewId, feedback.englishFeedback, renderer, reportContext);
     } else if (reportType === "nonverbal" || reportType === "facial") {
       if (!feedback.facialFeedback) {
         res.status(404).json({ success: false, message: "Esta entrevista no tiene evaluación no verbal registrada" });
         return;
       }
-      report = new NonVerbalBehaviorReport(interviewId, feedback.facialFeedback, renderer);
+      report = new NonVerbalBehaviorReport(interviewId, feedback.facialFeedback, renderer, reportContext);
     } else if (reportType === "interview") {
-      report = new InterviewFeedbackReport(feedback, renderer);
+      report = new InterviewFeedbackReport(feedback, renderer, reportContext);
     } else {
       res.status(400).json({ success: false, message: "Tipo de reporte no soportado. Usa: interview, english, nonverbal" });
       return;

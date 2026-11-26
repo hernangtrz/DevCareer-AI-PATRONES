@@ -92,7 +92,7 @@ export default defineAgent({
 
     const roomName = ctx.job.room?.name || '';
     const parts = roomName.split('_');
-    const voiceKey = parts[2] || 'jeronimo-es';
+    const voiceKey = parts[2] || 'catalina-es';
     const interviewId = parts[1] || 'interview_unknown';
 
     // SRP y OCP: Delegar la configuración de voz, diálogos y prompts a la estrategia

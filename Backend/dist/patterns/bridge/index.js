@@ -16,6 +16,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./renderers/excel.renderer"), exports);
 __exportStar(require("./report-renderer.interface"), exports);
+__exportStar(require("./report-schemas"), exports);
 __exportStar(require("./renderers/markdown.renderer"), exports);
 __exportStar(require("./renderers/html.renderer"), exports);
 __exportStar(require("./renderers/plain-text.renderer"), exports);

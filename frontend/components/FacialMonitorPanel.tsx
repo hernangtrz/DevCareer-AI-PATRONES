@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   Camera,
@@ -13,6 +14,10 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { LiveCoachingCue } from "@/lib/facial/types";
+import {
+  MOTION_TRANSITION,
+  resolveMotionTransition,
+} from "@/lib/motion-tokens";
 
 interface FacialMonitorPanelProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -49,76 +54,25 @@ export const FacialMonitorPanel: React.FC<FacialMonitorPanelProps> = ({
   onToggleMeshOverlay,
   onRecalibrate,
 }) => {
+  const prefersReducedMotion = useReducedMotion();
+  const hudTransition = resolveMotionTransition(
+    prefersReducedMotion,
+    MOTION_TRANSITION.smooth
+  );
+
   return (
-    <div className="relative w-full rounded-2xl bg-[#0b0d14] border border-white/[0.08] shadow-xl overflow-hidden flex flex-col justify-between min-h-[260px] md:min-h-[300px]">
-      {/* ── 1. Header de Cámara y Controles ── */}
-      <div className="relative z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
-        <div className="flex items-center gap-2">
-          <div
-            className={cn(
-              "p-1.5 rounded-lg border",
-              isEnabled && hasPermission
-                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                : "bg-zinc-800 border-zinc-700 text-zinc-400"
-            )}
-          >
-            {isEnabled && hasPermission ? (
-              <Camera className="w-3.5 h-3.5" />
-            ) : (
-              <CameraOff className="w-3.5 h-3.5" />
-            )}
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-white">Análisis Facial IA</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                Edge AI
-              </span>
-            </div>
-            <p className="text-[10px] text-zinc-400 flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-emerald-400" />
-              100% privado en navegador
-            </p>
-          </div>
-        </div>
+    <div className="relative w-full h-full min-h-[300px] md:min-h-[340px] rounded-[24px] bg-[#080a12] border border-white/[0.08] ring-1 ring-inset ring-white/[0.05] shadow-[0_20px_50px_-24px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col justify-between">
+      {/* Subtle 1px top specular hairline */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-6 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/[0.18] to-transparent"
+      />
 
-        {/* Botones de Control: Recalibrar y Toggle de Malla 3D */}
-        {isEnabled && hasPermission && (
-          <div className="flex items-center gap-1.5">
-            {onRecalibrate && (
-              <button
-                type="button"
-                onClick={onRecalibrate}
-                className="px-2 py-1 rounded-lg text-[10px] font-medium flex items-center gap-1 transition border cursor-pointer bg-zinc-900/80 text-zinc-300 border-zinc-800 hover:bg-zinc-850 hover:text-white"
-                title="Recalibrar expresión neutra y centro de mirada si cambiaste de postura"
-              >
-                <RotateCcw className="w-3 h-3 text-indigo-400" />
-                <span className="hidden sm:inline">Recalibrar</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onToggleMeshOverlay}
-              className={cn(
-                "px-2 py-1 rounded-lg text-[10px] font-medium flex items-center gap-1 transition border cursor-pointer",
-                showMeshOverlay
-                  ? "bg-indigo-600/30 text-indigo-200 border-indigo-500/40"
-                  : "bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200"
-              )}
-              title="Activar o desactivar visualización de puntos de malla facial"
-            >
-              <ScanFace className="w-3 h-3" />
-              <span>{showMeshOverlay ? "Malla 3D ON" : "Malla 3D"}</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── 2. Área de Video / Cámara ── */}
-      <div className="relative flex-1 w-full flex items-center justify-center bg-[#07080d] overflow-hidden">
+      {/* ── Edge-to-Edge Camera Viewport ── */}
+      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-b from-[#0b0e18] to-[#06070d]">
         {isEnabled ? (
           <>
-            {/* Video en espejo */}
+            {/* Mirrored Live Video */}
             <video
               ref={videoRef}
               playsInline
@@ -130,7 +84,7 @@ export const FacialMonitorPanel: React.FC<FacialMonitorPanelProps> = ({
               )}
             />
 
-            {/* Canvas de Malla Facial (si está activado) */}
+            {/* 3D Facial Mesh Canvas */}
             <canvas
               ref={canvasRef}
               width={640}
@@ -141,33 +95,60 @@ export const FacialMonitorPanel: React.FC<FacialMonitorPanelProps> = ({
               )}
             />
 
-            {/* Estado de Calibración inicial */}
-            {hasPermission && faceDetected && !isCalibrated && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-950/90 border border-indigo-500/40 text-indigo-200 text-[11px] shadow-lg backdrop-blur-md animate-pulse">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
-                <span>Calibrando expresión neutra...</span>
-              </div>
+            {/* Soft edge vignettes for legible floating glass HUD */}
+            {hasPermission && (
+              <>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/70 via-black/25 to-transparent"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/30 to-transparent"
+                />
+              </>
             )}
 
-            {/* Error o Sin Permiso */}
+            {/* Calibration Pill */}
+            <AnimatePresence>
+              {hasPermission && faceDetected && !isCalibrated && (
+                <motion.div
+                  key="calibrating"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={hudTransition}
+                  className="absolute top-14 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0e111d]/85 border border-indigo-400/30 text-indigo-100 text-[11px] font-medium shadow-lg backdrop-blur-xl whitespace-nowrap"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-300 animate-spin" />
+                  <span>Calibrando expresión neutra…</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Camera Error State */}
             {cameraError && (
-              <div className="relative z-10 flex flex-col items-center gap-2 p-4 text-center max-w-xs">
-                <AlertCircle className="w-8 h-8 text-amber-400" />
-                <p className="text-xs text-zinc-300">{cameraError}</p>
+              <div className="relative z-10 flex flex-col items-center gap-3 p-6 text-center max-w-xs">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-amber-400" />
+                </div>
+                <p className="text-xs leading-relaxed text-zinc-300">
+                  {cameraError}
+                </p>
                 <button
                   type="button"
                   onClick={onToggleEnabled}
-                  className="mt-1 px-3 py-1 rounded-lg text-xs font-semibold bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition cursor-pointer"
+                  className="px-4 py-1.5 rounded-full text-xs font-medium bg-white/[0.08] border border-white/[0.12] text-white hover:bg-white/[0.14] transition cursor-pointer"
                 >
                   Continuar solo audio
                 </button>
               </div>
             )}
 
-            {/* Rostro no visible */}
+            {/* Face Not Visible Hint */}
             {hasPermission && !faceDetected && !cameraError && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                <div className="px-3 py-1.5 rounded-xl bg-black/60 border border-white/10 text-zinc-300 text-xs backdrop-blur-sm flex items-center gap-2">
+                <div className="px-3.5 py-2 rounded-full bg-black/65 border border-white/[0.12] text-zinc-200 text-xs font-medium backdrop-blur-xl flex items-center gap-2 shadow-lg">
                   <Eye className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Centra tu rostro en la cámara</span>
                 </div>
@@ -175,70 +156,170 @@ export const FacialMonitorPanel: React.FC<FacialMonitorPanelProps> = ({
             )}
           </>
         ) : (
-          /* Cámara Desactivada (Modo Solo Audio) */
-          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center select-none">
-            <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500">
-              <CameraOff className="w-6 h-6" />
+          /* Camera Disabled State (Audio-Only) */
+          <div className="relative z-10 flex flex-col items-center justify-center gap-3.5 p-6 text-center select-none">
+            <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-400">
+              <CameraOff className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-zinc-300">Cámara Desactivada</p>
-              <p className="text-[11px] text-zinc-500 max-w-xs mt-0.5">
-                Activa la cámara para recibir evaluación de postura, serenidad y contacto visual con IA.
+            <div className="space-y-1">
+              <p className="text-sm font-medium tracking-[-0.01em] text-zinc-100">
+                Cámara desactivada
+              </p>
+              <p className="text-xs text-zinc-400 max-w-[240px] leading-relaxed">
+                Actívala para evaluar postura, serenidad y contacto visual en local.
               </p>
             </div>
             <button
               type="button"
               onClick={onToggleEnabled}
-              className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow cursor-pointer"
+              className="px-4 py-2 rounded-full text-xs font-medium bg-indigo-500/90 hover:bg-indigo-400 text-white transition shadow-lg shadow-indigo-500/20 cursor-pointer"
             >
-              Activar Cámara
+              Activar cámara
             </button>
           </div>
         )}
       </div>
 
-      {/* ── 3. Footer / Live HUD Nudges ── */}
-      {isEnabled && hasPermission && (
-        <div className="relative z-10 p-2.5 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-between gap-2 border-t border-white/[0.05]">
-          {/* Nudge / Alerta en vivo (con histéresis y cooldown) */}
-          {liveCue ? (
-            <div
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium backdrop-blur-md animate-fadeIn",
-                liveCue.severity === "warning"
-                  ? "bg-amber-500/20 border border-amber-500/40 text-amber-200"
-                  : "bg-indigo-500/20 border border-indigo-500/40 text-indigo-200"
-              )}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-              <span className="truncate">{liveCue.text}</span>
-            </div>
-          ) : faceDetected ? (
-            /* Indicador de estado sutil en reposo */
-            <div className="flex items-center gap-3 text-[10px] text-zinc-400 font-mono">
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span className="text-zinc-300">
-                  {liveScores.composure >= 75 ? "Expresión serena" : "Tensión moderada"}
-                </span>
-              </div>
-              <div className="hidden sm:flex items-center gap-1">
-                <span className="text-zinc-600">•</span>
-                <span>Contacto visual: {liveScores.eyeContact}%</span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-[10px] text-zinc-500 italic">Buscando rostro...</div>
-          )}
+      {/* ── 1. Floating Top Glass HUD ── */}
+      <div className="relative z-10 flex items-center justify-between gap-2 p-3">
+        {/* Privacy & Edge AI Pill */}
+        <div
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/55 border border-white/[0.10] backdrop-blur-xl"
+          title="Análisis facial Edge AI ejecutado 100% de forma privada en tu navegador"
+        >
+          <span
+            className={cn(
+              "w-2 h-2 rounded-full shrink-0",
+              isEnabled && hasPermission
+                ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.75)]"
+                : "bg-zinc-500"
+            )}
+          />
+          <span className="text-[11px] font-medium text-white tracking-[-0.01em] whitespace-nowrap">
+            Edge AI
+          </span>
+          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-zinc-300/90 border-l border-white/[0.12] pl-2 whitespace-nowrap">
+            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            Privado
+          </span>
+        </div>
 
-          {/* Botón rápido para apagar cámara */}
-          <button
-            type="button"
-            onClick={onToggleEnabled}
-            className="text-[10px] text-zinc-400 hover:text-rose-400 transition cursor-pointer shrink-0 ml-auto"
-          >
-            Desactivar
-          </button>
+        {/* Compact Top-Right Controls: Recalibrate & 3D Mesh */}
+        {isEnabled && hasPermission && (
+          <div className="flex items-center gap-1.5">
+            {onRecalibrate && (
+              <button
+                type="button"
+                onClick={onRecalibrate}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium bg-black/55 border border-white/[0.10] text-zinc-200 hover:bg-black/75 hover:text-white backdrop-blur-xl transition cursor-pointer whitespace-nowrap"
+                title="Recalibrar expresión neutra y centro de mirada si cambiaste de postura"
+              >
+                <RotateCcw className="w-3 h-3 text-indigo-300" />
+                <span className="hidden sm:inline">Recalibrar</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onToggleMeshOverlay}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium backdrop-blur-xl transition border cursor-pointer whitespace-nowrap",
+                showMeshOverlay
+                  ? "bg-indigo-500/30 text-indigo-100 border-indigo-400/45 shadow-[0_0_16px_-4px_rgba(99,102,241,0.6)]"
+                  : "bg-black/55 text-zinc-300 border-white/[0.10] hover:bg-black/75 hover:text-white"
+              )}
+              title="Activar o desactivar visualización de puntos de malla facial"
+            >
+              <ScanFace className="w-3.5 h-3.5" />
+              <span>{showMeshOverlay ? "Malla ON" : "Malla 3D"}</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── 2. Floating Bottom Telemetry Bar ── */}
+      {isEnabled && hasPermission && (
+        <div className="relative z-10 p-3 mt-auto">
+          <div className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-2xl bg-black/60 border border-white/[0.10] backdrop-blur-xl">
+            <AnimatePresence mode="wait">
+              {liveCue ? (
+                <motion.div
+                  key={`cue-${liveCue.text}`}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={hudTransition}
+                  className={cn(
+                    "flex items-center gap-2 text-[11px] font-medium min-w-0",
+                    liveCue.severity === "warning"
+                      ? "text-amber-200"
+                      : "text-indigo-200"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full animate-pulse shrink-0",
+                      liveCue.severity === "warning"
+                        ? "bg-amber-400"
+                        : "bg-indigo-400"
+                    )}
+                  />
+                  <span className="truncate">{liveCue.text}</span>
+                </motion.div>
+              ) : faceDetected ? (
+                <motion.div
+                  key="telemetry-live"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={hudTransition}
+                  className="flex items-center gap-2.5 text-[11px] text-zinc-300 min-w-0"
+                >
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        liveScores.composure >= 75
+                          ? "bg-emerald-400"
+                          : "bg-amber-400"
+                      )}
+                    />
+                    <span className="text-zinc-100 font-medium">
+                      {liveScores.composure >= 75
+                        ? "Expresión serena"
+                        : "Tensión moderada"}
+                    </span>
+                  </span>
+                  <span className="hidden sm:inline text-white/20">·</span>
+                  <span className="hidden sm:inline text-zinc-400 tabular-nums whitespace-nowrap">
+                    Mirada{" "}
+                    <strong className="font-semibold text-zinc-200">
+                      {liveScores.eyeContact}%
+                    </strong>
+                  </span>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="telemetry-searching"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={hudTransition}
+                  className="flex items-center gap-1.5 text-[11px] text-zinc-400"
+                >
+                  <Camera className="w-3 h-3 text-zinc-500" />
+                  <span>Buscando rostro…</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button
+              type="button"
+              onClick={onToggleEnabled}
+              className="text-[11px] font-medium text-zinc-400 hover:text-rose-300 transition cursor-pointer shrink-0 pl-2 border-l border-white/[0.10] whitespace-nowrap"
+            >
+              Ocultar
+            </button>
+          </div>
         </div>
       )}
     </div>

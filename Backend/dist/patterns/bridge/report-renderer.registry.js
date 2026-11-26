@@ -4,6 +4,7 @@ exports.SUPPORTED_REPORT_FORMATS = void 0;
 exports.resolveReportRenderer = resolveReportRenderer;
 const markdown_renderer_1 = require("./renderers/markdown.renderer");
 const html_renderer_1 = require("./renderers/html.renderer");
+const plain_text_renderer_1 = require("./renderers/plain-text.renderer");
 const excel_renderer_1 = require("./renderers/excel.renderer");
 /**
  * Catálogo / Selector de implementadores disponibles para el Patrón Bridge (GoF).
@@ -17,12 +18,12 @@ const renderers = {
     excel: () => new excel_renderer_1.ExcelRenderer(),
     csv: () => new excel_renderer_1.ExcelRenderer(),
     xlsx: () => new excel_renderer_1.ExcelRenderer(),
-    txt: () => new excel_renderer_1.ExcelRenderer(), // El usuario solicitó reemplazar texto plano por excel
-    text: () => new excel_renderer_1.ExcelRenderer(),
+    txt: () => new plain_text_renderer_1.PlainTextRenderer(),
+    text: () => new plain_text_renderer_1.PlainTextRenderer(),
 };
-exports.SUPPORTED_REPORT_FORMATS = ["html", "md", "excel", "txt"];
+exports.SUPPORTED_REPORT_FORMATS = ["html", "md", "txt", "excel"];
 function resolveReportRenderer(format) {
-    const key = (format || "html").toLowerCase();
+    const key = (format || "md").toLowerCase();
     const create = renderers[key];
     return create ? create() : null;
 }

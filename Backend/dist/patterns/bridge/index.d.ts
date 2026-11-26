@@ -1,5 +1,6 @@
 export * from "./renderers/excel.renderer";
 export * from "./report-renderer.interface";
+export * from "./report-schemas";
 export * from "./renderers/markdown.renderer";
 export * from "./renderers/html.renderer";
 export * from "./renderers/plain-text.renderer";

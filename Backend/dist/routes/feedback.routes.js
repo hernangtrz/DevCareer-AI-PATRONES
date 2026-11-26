@@ -7,6 +7,7 @@ const rate_limit_middleware_1 = require("../middleware/rate-limit.middleware");
 const facade_1 = require("../patterns/facade");
 const jobs_service_1 = require("../services/jobs.service");
 const analytics_service_1 = require("../services/analytics.service");
+const interviews_service_1 = require("../services/interviews.service");
 const bridge_1 = require("../patterns/bridge");
 const mediator_1 = require("../patterns/mediator");
 const visitor_1 = require("../patterns/visitor");
@@ -256,28 +257,39 @@ router.get("/:interviewId/export", auth_middleware_1.flexibleAuth, async (req, r
         return;
     }
     try {
-        const feedback = await (0, feedback_service_1.getFeedbackByInterviewId)(interviewId, req.userId);
+        const [feedback, interview] = await Promise.all([
+            (0, feedback_service_1.getFeedbackByInterviewId)(interviewId, req.userId),
+            (0, interviews_service_1.getInterviewById)(interviewId).catch(() => null),
+        ]);
         if (!feedback) {
             res.status(404).json({ success: false, message: "Feedback no encontrado" });
             return;
         }
+        const reportContext = {
+            candidateName: req.userName || undefined,
+            role: interview?.role,
+            company: interview?.company,
+            level: interview?.level,
+            interviewType: interview?.type,
+            techstack: interview?.techstack,
+        };
         let report;
         if (reportType === "english") {
             if (!feedback.englishFeedback) {
                 res.status(404).json({ success: false, message: "Esta entrevista no tiene evaluación de inglés (CEFR)" });
                 return;
             }
-            report = new bridge_1.EnglishProficiencyReport(interviewId, feedback.englishFeedback, renderer);
+            report = new bridge_1.EnglishProficiencyReport(interviewId, feedback.englishFeedback, renderer, reportContext);
         }
         else if (reportType === "nonverbal" || reportType === "facial") {
             if (!feedback.facialFeedback) {
                 res.status(404).json({ success: false, message: "Esta entrevista no tiene evaluación no verbal registrada" });
                 return;
             }
-            report = new bridge_1.NonVerbalBehaviorReport(interviewId, feedback.facialFeedback, renderer);
+            report = new bridge_1.NonVerbalBehaviorReport(interviewId, feedback.facialFeedback, renderer, reportContext);
         }
         else if (reportType === "interview") {
-            report = new bridge_1.InterviewFeedbackReport(feedback, renderer);
+            report = new bridge_1.InterviewFeedbackReport(feedback, renderer, reportContext);
         }
         else {
             res.status(400).json({ success: false, message: "Tipo de reporte no soportado. Usa: interview, english, nonverbal" });

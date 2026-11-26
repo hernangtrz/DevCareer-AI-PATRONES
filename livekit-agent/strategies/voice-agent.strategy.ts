@@ -46,7 +46,7 @@ export class SpanishVoiceAgentStrategy implements VoiceAgentConfigStrategy {
     if (voiceKey && SpanishVoiceAgentStrategy.VOICES[voiceKey]) {
       return SpanishVoiceAgentStrategy.VOICES[voiceKey];
     }
-    return SpanishVoiceAgentStrategy.VOICES['jeronimo-es'];
+    return SpanishVoiceAgentStrategy.VOICES['catalina-es'];
   }
 
   getGreeting(interviewerName: string, context?: GreetingContext): string {

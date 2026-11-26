@@ -16,14 +16,14 @@ const renderers: Record<string, () => IReportRenderer> = {
   excel: () => new ExcelRenderer(),
   csv: () => new ExcelRenderer(),
   xlsx: () => new ExcelRenderer(),
-  txt: () => new ExcelRenderer(), // El usuario solicitó reemplazar texto plano por excel
-  text: () => new ExcelRenderer(),
+  txt: () => new PlainTextRenderer(),
+  text: () => new PlainTextRenderer(),
 };
 
-export const SUPPORTED_REPORT_FORMATS = ["html", "md", "excel", "txt"] as const;
+export const SUPPORTED_REPORT_FORMATS = ["html", "md", "txt", "excel"] as const;
 
 export function resolveReportRenderer(format?: string): IReportRenderer | null {
-  const key = (format || "html").toLowerCase();
+  const key = (format || "md").toLowerCase();
   const create = renderers[key];
   return create ? create() : null;
 }

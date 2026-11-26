@@ -13,6 +13,8 @@ import {
   type PieSectorShapeProps,
 } from "recharts";
 import { PieChart as PieChartIcon, ArrowRight, BarChart2, Pin } from "lucide-react";
+import { MOTION_EASE } from "@/lib/motion-tokens";
+import { CHART_UI_CLASSES } from "@/lib/chart-registry";
 
 interface ChallengesDonutChartProps {
   challengesCompleted: number;
@@ -44,7 +46,7 @@ interface CustomTooltipPayload {
   payload?: DifficultySlice;
 }
 
-const CHART_EASE = [0.22, 1, 0.36, 1] as const;
+const CHART_EASE = MOTION_EASE.smooth;
 
 function DonutTooltip({
   active,
@@ -57,7 +59,7 @@ function DonutTooltip({
   const item = payload[0].payload;
 
   return (
-    <div className="px-3.5 py-2.5 rounded-xl bg-[#0b0d17]/95 border border-indigo-500/35 shadow-2xl shadow-black/60 backdrop-blur-md text-xs min-w-[180px]">
+    <div className={`${CHART_UI_CLASSES.tooltipCard} min-w-[180px]`}>
       <div className="flex items-center justify-between gap-3 mb-1">
         <span className="font-bold text-white flex items-center gap-1.5">
           <span

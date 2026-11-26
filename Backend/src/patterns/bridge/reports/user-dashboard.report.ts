@@ -1,5 +1,6 @@
 import { PerformanceReport } from "../performance-report.abstraction";
-import { IReportRenderer } from "../report-renderer.interface";
+import { IReportRenderer, ScoreMetricItem } from "../report-renderer.interface";
+import { UserDashboardReportSchema } from "../report-schemas";
 
 export interface DashboardStatsData {
   userId: string;
@@ -39,25 +40,85 @@ export class UserDashboardReport extends PerformanceReport {
 
   protected buildBlocks(): string[] {
     const r = this.renderer;
-    const s = this.stats;
+    const s = UserDashboardReportSchema.parse(this.stats);
 
-    return [
-      r.renderKeyValue("Desarrollador", s.userName),
-      r.renderKeyValue("Nivel CEFR de Inglés", s.cefrLevel || "B2"),
-      r.renderSection("Métricas Generales de Preparación"),
-      r.renderScore("Puntaje Promedio General", s.averageScore, 100),
-      r.renderScore("Habilidades Técnicas y Algoritmos", s.technicalScore, 100),
-      r.renderScore("Habilidades Blandas y Comunicación", s.communicationScore, 100),
-      r.renderKeyValue("Entrevistas Técnicas Completadas", s.totalInterviews.toString()),
-      r.renderKeyValue("Postulaciones Laborales Activas", s.totalApplications.toString()),
-      r.renderSection("Principales Fortalezas"),
-      r.renderList(s.topStrengths && s.topStrengths.length > 0 ? s.topStrengths : ["Dominio de TypeScript y React", "Diseño de APIs REST"]),
-      r.renderSection("Oportunidades de Crecimiento"),
-      r.renderList(s.keyImprovements && s.keyImprovements.length > 0 ? s.keyImprovements : ["Profundizar en patrones de concurrencia", "Optimizar complejidad Big-O en algoritmos"]),
-      r.renderSection("Dictamen del Mentor de IA"),
+    const metrics: ScoreMetricItem[] = [
+      { label: "Puntaje Promedio General", score: s.averageScore, max: 100 },
+      { label: "Habilidades Técnicas y Algoritmos", score: s.technicalScore, max: 100 },
+      { label: "Habilidades Blandas y Comunicación", score: s.communicationScore, max: 100 },
+    ];
+
+    const status: "high" | "mid" | "low" =
+      s.averageScore >= 75 ? "high" : s.averageScore >= 55 ? "mid" : "low";
+    const verdictLabel =
+      status === "high"
+        ? "Perfil Altamente Competitivo"
+        : status === "mid"
+        ? "Progreso Sólido en Consolidación"
+        : "En Etapa de Construcción";
+
+    const blocks: string[] = [];
+
+    if (r.renderExecutiveSummary) {
+      blocks.push(
+        r.renderExecutiveSummary({
+          score: s.averageScore,
+          max: 100,
+          verdictLabel,
+          verdictSummary: `El candidato ${s.userName} mantiene un promedio global de ${s.averageScore}/100 tras ${s.totalInterviews} sesiones de entrevista simulada y ${s.totalApplications} postulaciones activas.`,
+          status,
+          badges: [`CEFR ${s.cefrLevel}`, `${s.totalInterviews} entrevistas`, `${s.totalApplications} postulaciones`],
+        })
+      );
+    }
+
+    const meta = [
+      { key: "Desarrollador", value: s.userName },
+      { key: "Nivel CEFR de Inglés", value: s.cefrLevel },
+      { key: "Entrevistas Completadas", value: String(s.totalInterviews) },
+      { key: "Postulaciones Activas", value: String(s.totalApplications) },
+    ];
+
+    if (r.renderKeyValueGrid) {
+      blocks.push(r.renderKeyValueGrid(meta));
+    } else {
+      meta.forEach((m) => blocks.push(r.renderKeyValue(m.key, m.value)));
+    }
+
+    if (r.renderChartSummary) {
+      blocks.push(r.renderChartSummary("Métricas Generales de Preparación", metrics));
+    }
+
+    blocks.push(r.renderSection("Detalle de Pilares Evaluados"));
+    metrics.forEach((m) => blocks.push(r.renderScore(m.label, m.score, m.max)));
+
+    blocks.push(r.renderSection("Principales Fortalezas"));
+    const strengths =
+      s.topStrengths.length > 0
+        ? s.topStrengths
+        : ["Dominio de TypeScript y React", "Diseño de APIs REST"];
+    blocks.push(
+      r.renderListWithTone ? r.renderListWithTone(strengths, "positive") : r.renderList(strengths)
+    );
+
+    blocks.push(r.renderSection("Oportunidades de Crecimiento"));
+    const improvements =
+      s.keyImprovements.length > 0
+        ? s.keyImprovements
+        : ["Profundizar en patrones de concurrencia", "Optimizar complejidad Big-O en algoritmos"];
+    blocks.push(
+      r.renderListWithTone
+        ? r.renderListWithTone(improvements, "improvement")
+        : r.renderList(improvements)
+    );
+
+    blocks.push(r.renderSection("Dictamen del Mentor de IA"));
+    blocks.push(
       r.renderParagraph(
         `El candidato ha mantenido un desempeño del ${s.averageScore}% a través de ${s.totalInterviews} sesiones de entrevista simulada. Su perfil presenta alta competitividad para posiciones de desarrollo de software internacional.`
-      ),
-    ];
+      )
+    );
+
+    return blocks;
   }
 }

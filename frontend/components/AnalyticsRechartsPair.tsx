@@ -20,6 +20,7 @@ import {
   Radar,
 } from "recharts";
 import { TrendingUp, Target, Eye, EyeOff } from "lucide-react";
+import { CHART_UI_CLASSES } from "@/lib/chart-registry";
 
 export interface WeeklyPointItem {
   day: string;
@@ -79,7 +80,7 @@ function WeeklyBarTooltip({
   const passed = item.score >= target;
 
   return (
-    <div className="px-3.5 py-2.5 rounded-xl bg-[#0b0d17]/95 border border-indigo-500/35 shadow-2xl shadow-black/60 backdrop-blur-md text-xs">
+    <div className={CHART_UI_CLASSES.tooltipCard}>
       <p className="font-bold text-white mb-1">{item.displayLabel}</p>
       <div className="flex items-center justify-between gap-4">
         <span className="text-zinc-400">Puntaje:</span>

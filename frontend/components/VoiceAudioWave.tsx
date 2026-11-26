@@ -215,12 +215,12 @@ export default function VoiceAudioWave({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-3 px-3.5 py-2 rounded-2xl border backdrop-blur-md transition-colors",
+        "flex items-center justify-between gap-3 px-4 py-2 rounded-full border backdrop-blur-xl transition-colors",
         isMuted
-          ? "bg-rose-950/20 border-rose-500/25"
+          ? "bg-rose-500/[0.06] border-rose-500/20"
           : isAgent
-          ? "bg-indigo-950/30 border-indigo-500/25"
-          : "bg-emerald-950/20 border-emerald-500/25",
+          ? "bg-white/[0.03] border-white/[0.08]"
+          : "bg-emerald-500/[0.05] border-emerald-500/20",
         className
       )}
     >
@@ -228,7 +228,7 @@ export default function VoiceAudioWave({
         <div className="flex items-center gap-2 shrink-0">
           <span
             className={cn(
-              "w-2 h-2 rounded-full shrink-0",
+              "w-1.5 h-1.5 rounded-full shrink-0",
               isMuted
                 ? "bg-rose-400"
                 : isAgent
@@ -236,7 +236,7 @@ export default function VoiceAudioWave({
                 : "bg-emerald-400 animate-pulse"
             )}
           />
-          <span className="text-[11px] font-medium text-zinc-300 whitespace-nowrap">
+          <span className="text-[11px] font-medium tracking-[-0.01em] text-zinc-300 whitespace-nowrap">
             {label}
           </span>
         </div>
@@ -259,11 +259,11 @@ export default function VoiceAudioWave({
           <div className="w-full flex items-center justify-center">
             <div
               className={cn(
-                "h-[2px] w-full max-w-[220px] rounded-full transition-colors",
+                "h-[1.5px] w-full max-w-[220px] rounded-full transition-colors",
                 isMuted
-                  ? "bg-rose-500/35"
+                  ? "bg-rose-400/35"
                   : isAgent
-                  ? "bg-indigo-400/30"
+                  ? "bg-indigo-300/25"
                   : "bg-emerald-400/30"
               )}
             />

@@ -3,8 +3,14 @@
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { createFeedback } from "@/lib/api";
 import { getCognitoIdToken } from "@/lib/cognito";
+import {
+  MOTION_SPRING,
+  MOTION_TRANSITION,
+  resolveMotionTransition,
+} from "@/lib/motion-tokens";
 import {
   Phone,
   PhoneOff,
@@ -72,6 +78,7 @@ const Agent = ({
   techstack = [],
 }: AgentProps) => {
   const router = useRouter();
+  const prefersReducedMotion = useReducedMotion();
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [agentLiveState, setAgentLiveState] = useState<
     "initializing" | "listening" | "thinking" | "speaking"
@@ -86,7 +93,7 @@ const Agent = ({
     messagesRef.current = messages;
   }, [messages]);
 
-  const [selectedVoice, setSelectedVoice] = useState("jeronimo-es");
+  const [selectedVoice, setSelectedVoice] = useState("catalina-es");
   const [lkRoom, setLkRoom] = useState<Room | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -593,165 +600,281 @@ const Agent = ({
       ? techstack
       : ["Java", "Go", "Docker", "Microservicios", "SOLID"];
 
+  const smoothTransition = resolveMotionTransition(
+    prefersReducedMotion,
+    MOTION_TRANSITION.smooth
+  );
+  const orbSpring = resolveMotionTransition(
+    prefersReducedMotion,
+    MOTION_SPRING.gentle
+  );
+
+  const aiStageHeading =
+    callStatus === CallStatus.ACTIVE
+      ? isSpeaking
+        ? `${currentVoiceObj.name} hablando`
+        : agentLiveState === "thinking"
+        ? isEs
+          ? `${currentVoiceObj.name} analizando tu respuesta`
+          : `${currentVoiceObj.name} analyzing your answer`
+        : isEs
+        ? "Tu turno · Escuchando"
+        : "Your turn · Listening"
+      : callStatus === CallStatus.CONNECTING
+      ? isEs
+        ? "Estableciendo enlace de audio…"
+        : "Establishing secure audio link…"
+      : isEs
+      ? "Listo para comenzar"
+      : "Ready to begin";
+
+  const aiStageHint =
+    callStatus === CallStatus.ACTIVE
+      ? isSpeaking
+        ? isEs
+          ? "Puedes hablar en cualquier momento para intervenir"
+          : "You can speak at any moment to interrupt"
+        : agentLiveState === "thinking"
+        ? isEs
+          ? "Preparando la siguiente intervención…"
+          : "Preparing next prompt…"
+        : isEs
+        ? "Habla con claridad, tu micrófono está activo"
+        : "Speak clearly, your microphone is active"
+      : isEs
+      ? "Pulsa «Iniciar entrevista» para conectar la sala"
+      : "Click «Start interview» below to connect";
+
+  const aiPresenceBadge =
+    callStatus === CallStatus.ACTIVE
+      ? isSpeaking
+        ? isEs
+          ? "Hablando"
+          : "Speaking"
+        : agentLiveState === "thinking"
+        ? isEs
+          ? "Analizando"
+          : "Thinking"
+        : isEs
+        ? "Escuchando"
+        : "Listening"
+      : callStatus === CallStatus.CONNECTING
+      ? isEs
+        ? "Conectando"
+        : "Connecting"
+      : isEs
+      ? "En espera"
+      : "Standby";
+
   if (callStatus === CallStatus.GENERATING_FEEDBACK) {
     return (
-      <div className="flex flex-col items-center justify-center gap-6 p-10 rounded-3xl bg-[#0c0d14]/90 border border-white/[0.08] max-w-lg mx-auto text-center shadow-2xl">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={smoothTransition}
+        className="relative flex flex-col items-center justify-center gap-6 p-10 rounded-[28px] bg-[#0c0f19]/90 border border-white/[0.08] backdrop-blur-2xl max-w-lg mx-auto text-center shadow-[0_30px_90px_-30px_rgba(0,0,0,0.9)] overflow-hidden"
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.20] to-transparent"
+        />
         <AiLoader
           size={1}
-          label="Generando Evaluación Técnica"
+          label="Generando evaluación técnica"
           sublabel={
             isEs
-              ? "Procesando transcripción y calculando radar de competencias de arquitectura y comunicación..."
-              : "Analyzing technical answers and compiling detailed assessment report..."
+              ? "Procesando transcripción y calculando radar de competencias de arquitectura y comunicación…"
+              : "Analyzing technical answers and compiling detailed assessment report…"
           }
         />
-        <div className="w-full max-w-xs h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-          <div className="h-full bg-indigo-500 rounded-full animate-pulse w-3/4" />
+        <div className="w-full max-w-xs h-1 rounded-full bg-white/[0.08] overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-indigo-500 via-violet-400 to-cyan-400 rounded-full animate-pulse w-3/4" />
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col gap-4 select-none">
-      {/* ── 1. Top Context Bar: Role, Company & Live Badges ── */}
-      <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:px-5 rounded-2xl bg-[#0f111a]/90 border border-white/[0.08] shadow-lg backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
-            <Briefcase className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm sm:text-base font-bold text-white capitalize">
-                Entrevista de {displayRole}
-              </h2>
-              {displayCompany && (
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
-                  {displayCompany}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400 font-medium">
-              <span className="text-indigo-400">{level}</span>
-              <span>•</span>
-              <span className="text-zinc-300">{interviewType}</span>
-              <span>•</span>
-              <span className="text-zinc-400">{questions?.length || 5} preguntas</span>
-            </div>
-          </div>
-        </div>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={smoothTransition}
+      className="w-full max-w-5xl mx-auto flex flex-col gap-4 select-none"
+    >
+      {/* ── 1. Unified Apple Minimal Studio Context Header ── */}
+      <header className="relative w-full rounded-[24px] bg-[#0c0f19]/80 border border-white/[0.08] shadow-[0_20px_50px_-30px_rgba(0,0,0,0.85)] backdrop-blur-2xl overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.18] to-transparent"
+        />
 
-        {/* Live Status Beacon & Stopwatch */}
-        <div className="flex items-center gap-2.5 self-end sm:self-auto">
-          {callStatus === CallStatus.ACTIVE ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>EN VIVO</span>
-              <span className="text-zinc-500 font-normal">|</span>
-              <div className="flex items-center gap-1 text-white">
-                <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{formatTimer(elapsedSeconds)}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.08] ring-1 ring-inset ring-white/[0.04] flex items-center justify-center text-indigo-300 shrink-0">
+              <Briefcase className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-[17px] font-semibold tracking-[-0.02em] text-white capitalize truncate">
+                  Entrevista de {displayRole}
+                </h2>
+                {displayCompany && (
+                  <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-white/[0.05] text-zinc-200 border border-white/[0.09]">
+                    {displayCompany}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-400">
+                <span className="text-indigo-300 font-medium">{level}</span>
+                <span className="text-white/20">·</span>
+                <span className="text-zinc-300">{interviewType}</span>
+                <span className="text-white/20">·</span>
+                <span className="tabular-nums">
+                  {questions?.length || 5} preguntas
+                </span>
               </div>
             </div>
-          ) : callStatus === CallStatus.CONNECTING ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>Conectando...</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs font-medium">
-              <span className="w-2 h-2 rounded-full bg-zinc-500" />
-              <span>Sala Preparada</span>
-            </div>
+          </div>
+
+          {/* Live Session Beacon & Tabular Stopwatch */}
+          <div className="flex items-center self-start sm:self-auto shrink-0">
+            {callStatus === CallStatus.ACTIVE ? (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/[0.10] border border-emerald-400/25 text-emerald-300 text-xs font-medium backdrop-blur-xl">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.85)] animate-pulse" />
+                <span className="tracking-[0.04em] text-[11px] font-semibold">
+                  EN VIVO
+                </span>
+                <span className="h-3 w-px bg-emerald-400/25" />
+                <span className="inline-flex items-center gap-1.5 text-white font-mono tabular-nums text-xs">
+                  <Clock className="w-3.5 h-3.5 text-emerald-300" />
+                  {formatTimer(elapsedSeconds)}
+                </span>
+              </div>
+            ) : callStatus === CallStatus.CONNECTING ? (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/[0.10] border border-amber-400/25 text-amber-200 text-xs font-medium">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
+                <span>Conectando…</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-zinc-300 text-xs font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                <span>Sala preparada</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Integrated Evaluated Tech Stack Strip */}
+        <div className="flex items-center gap-2 flex-wrap px-5 py-2.5 border-t border-white/[0.06] bg-white/[0.015]">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-400 mr-1">
+            <Code2 className="w-3.5 h-3.5 text-indigo-300" />
+            <span>Stack evaluado</span>
+          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {displayTechs.map((tech, idx) => (
+              <span
+                key={idx}
+                className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-white/[0.04] text-zinc-200 border border-white/[0.08] tracking-[-0.01em]"
+              >
+                {tech}
+              </span>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* ── 2. Main Apple Minimal Virtual Conference Studio ── */}
+      <section className="relative w-full rounded-[30px] bg-gradient-to-b from-[#0e111d]/92 via-[#090b14]/96 to-[#05070d]/98 border border-white/[0.08] shadow-[0_32px_90px_-32px_rgba(0,0,0,0.92)] p-5 sm:p-6 md:p-7 flex flex-col gap-5 overflow-hidden backdrop-blur-2xl">
+        {/* Top 1px specular glass sheen */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.20] to-transparent"
+        />
+
+        {/* Adaptive serene radial ambient glow */}
+        <div
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[520px] h-[280px] rounded-full blur-[120px] transition-colors duration-700",
+            callStatus === CallStatus.ACTIVE && isSpeaking
+              ? "bg-indigo-500/20"
+              : callStatus === CallStatus.ACTIVE && isCandidateSpeaking
+              ? "bg-emerald-500/15"
+              : callStatus === CallStatus.CONNECTING
+              ? "bg-amber-500/15"
+              : "bg-indigo-500/[0.08]"
           )}
-        </div>
-      </div>
+        />
 
-      {/* ── 2. Evaluated Tech Stack Chips Banner ── */}
-      <div className="flex items-center gap-2 px-1 flex-wrap">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
-          <Code2 className="w-3.5 h-3.5 text-indigo-400" />
-          Stack Evaluado:
-        </span>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {displayTechs.map((tech, idx) => (
-            <span
-              key={idx}
-              className="text-xs font-mono font-medium px-2.5 py-1 rounded-lg bg-zinc-900/90 text-zinc-200 border border-zinc-800/80 hover:border-indigo-500/40 transition shadow-sm"
-            >
-              {tech}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* ── 3. Main Realistic Virtual Conference Room ── */}
-      <div className="relative w-full min-h-[460px] md:min-h-[500px] rounded-3xl bg-gradient-to-b from-[#0e101a] via-[#090a10] to-[#05060a] border border-white/[0.08] shadow-2xl p-6 md:p-8 flex flex-col justify-between overflow-hidden relative">
-        {/* Subtle Room Grid & Ambient Glow */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#312e8108_1px,transparent_1px),linear-gradient(to_bottom,#312e8108_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
-
-        {/* Room Header: Interviewer Identity & Audio Settings */}
-        <div className="relative w-full flex flex-col sm:flex-row items-center justify-between gap-3 pb-4 border-b border-zinc-800/70 z-10">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-xs font-bold shadow-md">
+        {/* ── Studio Toolbar: Evaluator Identity & Audio Settings ── */}
+        <div className="relative z-10 w-full flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-600 via-violet-500 to-indigo-400 ring-1 ring-inset ring-white/25 flex items-center justify-center text-white text-xs font-semibold shadow-[0_8px_20px_-6px_rgba(99,102,241,0.7)] shrink-0">
               AI
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-white">
+                <span className="text-sm font-semibold tracking-[-0.015em] text-white">
                   {currentVoiceObj.name}
                 </span>
-                <span className="text-[10px] text-zinc-400">• Evaluador Técnico DevCareer</span>
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-xs text-zinc-400 truncate">
+                  · Evaluador técnico
+                </span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               </div>
-              <p className="text-[10px] text-zinc-400">
-                {callStatus === CallStatus.ACTIVE ? "Enlace de audio WebRTC activo (48kHz)" : "Listo para sesión de voz"}
+              <p className="text-[11px] text-zinc-400">
+                {callStatus === CallStatus.ACTIVE
+                  ? "Enlace de audio WebRTC activo · 48 kHz"
+                  : "Listo para iniciar sesión de voz"}
               </p>
             </div>
           </div>
 
-          {/* Voice Selector as Audio Output Setting & Voice Isolation (BVC) */}
+          {/* Right Audio Settings: Health Banner, Voice Isolation, Voice Select */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Indicador de recuperación o alerta de salud del agente */}
-            {(agentHealth.status === "recovering" || agentHealth.status === "error") && (
+            {(agentHealth.status === "recovering" ||
+              agentHealth.status === "error") && (
               <div
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs border",
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border backdrop-blur-xl",
                   agentHealth.status === "recovering"
-                    ? "bg-amber-500/20 border-amber-500/40 text-amber-200 animate-pulse"
-                    : "bg-rose-500/20 border-rose-500/40 text-rose-200"
+                    ? "bg-amber-500/15 border-amber-400/30 text-amber-200 animate-pulse"
+                    : "bg-rose-500/15 border-rose-400/30 text-rose-200"
                 )}
               >
                 <RotateCcw
                   className={cn(
                     "w-3 h-3",
                     agentHealth.status === "recovering"
-                      ? "animate-spin text-amber-400"
-                      : "text-rose-400"
+                      ? "animate-spin text-amber-300"
+                      : "text-rose-300"
                   )}
                 />
                 <span>
                   {agentHealth.message ||
                     (agentHealth.status === "recovering"
-                      ? "Reanudando agente..."
-                      : "Pulsa 'Reanudar IA' para continuar")}
+                      ? "Reanudando agente…"
+                      : "Pulsa «Reanudar IA» para continuar")}
                 </span>
               </div>
             )}
 
-            {/* Toggle de Aislamiento de Voz Inteligente (Krisp BVC) */}
+            {/* Krisp BVC Voice Isolation Toggle */}
             <button
               type="button"
               onClick={() => setIsVoiceIsolationEnabled((prev) => !prev)}
-              disabled={callStatus === CallStatus.CONNECTING || callStatus === CallStatus.ACTIVE}
+              disabled={
+                callStatus === CallStatus.CONNECTING ||
+                callStatus === CallStatus.ACTIVE
+              }
               className={cn(
-                "px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition border cursor-pointer",
+                "px-3 py-1.5 rounded-full text-[11px] font-medium inline-flex items-center gap-1.5 transition border cursor-pointer whitespace-nowrap",
                 isVoiceIsolationEnabled
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200",
-                (callStatus === CallStatus.CONNECTING || callStatus === CallStatus.ACTIVE) &&
-                  "opacity-80 cursor-default"
+                  ? "bg-emerald-500/[0.10] border-emerald-400/25 text-emerald-200"
+                  : "bg-white/[0.04] border-white/[0.08] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.07]",
+                (callStatus === CallStatus.CONNECTING ||
+                  callStatus === CallStatus.ACTIVE) &&
+                  "opacity-75 cursor-default"
               )}
               title={
                 isVoiceIsolationEnabled
@@ -759,20 +882,36 @@ const Agent = ({
                   : "Aislamiento de voz desactivado: usa supresión de ruido estándar"
               }
             >
-              <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Aislamiento Voz {isVoiceIsolationEnabled ? "ON" : "OFF"}</span>
+              <Volume2
+                className={cn(
+                  "w-3.5 h-3.5",
+                  isVoiceIsolationEnabled ? "text-emerald-400" : "text-zinc-500"
+                )}
+              />
+              <span>
+                Aislamiento {isVoiceIsolationEnabled ? "ON" : "OFF"}
+              </span>
             </button>
 
-            <div className="flex items-center gap-1.5 bg-zinc-900/90 border border-zinc-800 rounded-xl px-2.5 py-1">
+            {/* Voice Profile Selector */}
+            <div className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-full px-3 py-1.5 hover:border-white/[0.14] transition">
               <Globe className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <select
                 value={selectedVoice}
                 onChange={(e) => setSelectedVoice(e.target.value)}
-                disabled={callStatus === CallStatus.CONNECTING || callStatus === CallStatus.ACTIVE}
-                className="bg-transparent text-zinc-200 text-xs outline-none disabled:opacity-50 transition cursor-pointer font-medium"
+                disabled={
+                  callStatus === CallStatus.CONNECTING ||
+                  callStatus === CallStatus.ACTIVE
+                }
+                aria-label="Seleccionar voz del evaluador"
+                className="bg-transparent text-zinc-200 text-[11px] outline-none disabled:opacity-55 transition cursor-pointer font-medium"
               >
                 {VOICE_OPTIONS.map((opt) => (
-                  <option key={opt.key} value={opt.key} className="bg-zinc-950 text-zinc-200">
+                  <option
+                    key={opt.key}
+                    value={opt.key}
+                    className="bg-[#0e111d] text-zinc-100"
+                  >
                     {opt.label}
                   </option>
                 ))}
@@ -781,63 +920,143 @@ const Agent = ({
           </div>
         </div>
 
-        {/* Center Visualizer: Dynamic Audio Orb & Facial Monitor Panel */}
-        <div className="relative w-full my-auto py-4 z-10 select-none">
-          {isCameraActive ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-center">
-              {/* Columna Izquierda: Orbe del Evaluador IA */}
-              <div className="flex flex-col items-center justify-center p-3">
-                <div className="relative flex items-center justify-center">
-                  <div
+        {/* ── Balanced Two-Card Studio Stage / Centered Audio Stage ── */}
+        <div className="relative z-10 w-full">
+          <div
+            className={cn(
+              "grid gap-4 items-stretch",
+              isCameraActive ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+            )}
+          >
+            {/* AI Evaluator Presence Card */}
+            <div
+              className={cn(
+                "relative rounded-[24px] bg-white/[0.02] border border-white/[0.07] ring-1 ring-inset ring-white/[0.03] p-6 flex flex-col justify-between overflow-hidden",
+                isCameraActive
+                  ? "min-h-[300px] md:min-h-[340px]"
+                  : "min-h-[320px] py-8"
+              )}
+            >
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.14] to-transparent"
+              />
+
+              {/* Subtle Top Presence Pill */}
+              <div className="flex items-center justify-between">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-medium text-zinc-300">
+                  <span
                     className={cn(
-                      "absolute rounded-full border border-indigo-500/20 pointer-events-none transition-all duration-700",
+                      "w-1.5 h-1.5 rounded-full",
                       callStatus === CallStatus.ACTIVE && isSpeaking
-                        ? "w-44 h-44 opacity-100 animate-pulse"
-                        : "w-32 h-32 opacity-20"
+                        ? "bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.85)] animate-pulse"
+                        : callStatus === CallStatus.ACTIVE
+                        ? "bg-emerald-400 animate-pulse"
+                        : callStatus === CallStatus.CONNECTING
+                        ? "bg-amber-400 animate-pulse"
+                        : "bg-zinc-500"
                     )}
                   />
-                  <div
+                  <span>{aiPresenceBadge}</span>
+                </div>
+                <span className="text-[11px] text-zinc-500 font-medium">
+                  {currentVoiceObj.lang === "es" ? "ES · LatAm" : "EN · US"}
+                </span>
+              </div>
+
+              {/* Acoustic Presence Orb */}
+              <div className="flex flex-col items-center justify-center my-auto py-4">
+                <div className="relative flex items-center justify-center">
+                  {/* Outer breathing halo */}
+                  <motion.div
+                    aria-hidden="true"
+                    animate={{
+                      scale:
+                        callStatus === CallStatus.ACTIVE && isSpeaking
+                          ? 1.18
+                          : callStatus === CallStatus.ACTIVE
+                          ? 1.04
+                          : 0.96,
+                      opacity:
+                        callStatus === CallStatus.ACTIVE && isSpeaking
+                          ? 0.9
+                          : callStatus === CallStatus.ACTIVE
+                          ? 0.45
+                          : 0.2,
+                    }}
+                    transition={orbSpring}
                     className={cn(
-                      "absolute rounded-full border border-indigo-500/10 pointer-events-none transition-all duration-700",
+                      "absolute rounded-full border pointer-events-none",
+                      isCameraActive ? "w-40 h-40" : "w-44 h-44",
                       callStatus === CallStatus.ACTIVE && isSpeaking
-                        ? "w-52 h-52 opacity-100 animate-ping [animation-duration:2.5s]"
-                        : "w-36 h-36 opacity-0"
+                        ? "border-indigo-400/25 bg-indigo-500/[0.06]"
+                        : callStatus === CallStatus.ACTIVE
+                        ? "border-emerald-400/20 bg-emerald-500/[0.03]"
+                        : "border-white/[0.06]"
+                    )}
+                  />
+                  <motion.div
+                    aria-hidden="true"
+                    animate={{
+                      scale:
+                        callStatus === CallStatus.ACTIVE && isSpeaking
+                          ? 1.36
+                          : 1,
+                      opacity:
+                        callStatus === CallStatus.ACTIVE && isSpeaking
+                          ? 0.45
+                          : 0,
+                    }}
+                    transition={orbSpring}
+                    className={cn(
+                      "absolute rounded-full border border-violet-400/20 pointer-events-none",
+                      isCameraActive ? "w-44 h-44" : "w-48 h-48"
                     )}
                   />
 
-                  <div
+                  {/* Precision Core Orb */}
+                  <motion.div
+                    animate={{
+                      scale:
+                        callStatus === CallStatus.ACTIVE && isSpeaking
+                          ? 1.05
+                          : 1,
+                    }}
+                    transition={orbSpring}
                     className={cn(
-                      "z-10 flex items-center justify-center rounded-full transition-all duration-500 shadow-2xl relative overflow-hidden",
+                      "relative z-10 flex items-center justify-center rounded-full shadow-2xl overflow-hidden transition-colors duration-500",
+                      isCameraActive ? "w-24 h-24" : "w-28 h-28",
                       callStatus === CallStatus.ACTIVE && isSpeaking
-                        ? "w-28 h-28 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 scale-105 shadow-indigo-500/30 ring-4 ring-indigo-500/20"
-                        : "",
-                      callStatus === CallStatus.ACTIVE && !isSpeaking
-                        ? "w-24 h-24 bg-gradient-to-tr from-zinc-900 to-indigo-950/80 scale-100 shadow-indigo-500/10 border border-indigo-500/30"
-                        : "",
-                      callStatus === CallStatus.CONNECTING
-                        ? "w-24 h-24 bg-zinc-900 border border-amber-500/50 scale-100 shadow-amber-500/10 animate-pulse"
-                        : "",
-                      isCallInactiveOrFinished
-                        ? "w-24 h-24 bg-zinc-900/90 border border-zinc-800 scale-100 shadow-black/60"
-                        : ""
+                        ? "bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-400 shadow-[0_18px_45px_-10px_rgba(99,102,241,0.65)] ring-1 ring-inset ring-white/30"
+                        : callStatus === CallStatus.ACTIVE
+                        ? "bg-gradient-to-b from-[#161b2e] to-[#0d111d] border border-indigo-400/30 shadow-[0_14px_34px_-12px_rgba(99,102,241,0.3)]"
+                        : callStatus === CallStatus.CONNECTING
+                        ? "bg-[#121521] border border-amber-400/40 shadow-[0_12px_30px_-12px_rgba(245,158,11,0.3)]"
+                        : "bg-gradient-to-b from-white/[0.07] to-white/[0.02] border border-white/[0.10] shadow-[0_18px_36px_-18px_rgba(0,0,0,0.9)]"
                     )}
                   >
+                    {/* Subtle specular glass reflection */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-3 top-1 h-6 rounded-full bg-gradient-to-b from-white/20 to-transparent"
+                    />
+
                     {callStatus === CallStatus.CONNECTING && (
-                      <Loader2 className="w-7 h-7 text-amber-400 animate-spin" />
+                      <Loader2 className="w-7 h-7 text-amber-300 animate-spin" />
                     )}
 
                     {callStatus === CallStatus.ACTIVE && (
                       <div className="flex items-center gap-1.5">
                         {isSpeaking ? (
                           <>
-                            <div className="w-1 bg-white rounded-full animate-vocalBar1 h-7" />
+                            <div className="w-1 bg-white/95 rounded-full animate-vocalBar1 h-7" />
                             <div className="w-1 bg-white rounded-full animate-vocalBar2 h-10" />
-                            <div className="w-1 bg-white rounded-full animate-vocalBar3 h-5" />
+                            <div className="w-1 bg-white/90 rounded-full animate-vocalBar3 h-5" />
                             <div className="w-1 bg-white rounded-full animate-vocalBar2 h-9" />
-                            <div className="w-1 bg-white rounded-full animate-vocalBar1 h-7" />
+                            <div className="w-1 bg-white/95 rounded-full animate-vocalBar1 h-7" />
                           </>
                         ) : (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:200ms]" />
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:400ms]" />
@@ -847,69 +1066,53 @@ const Agent = ({
                     )}
 
                     {isCallInactiveOrFinished && (
-                      <Headphones className="w-7 h-7 text-zinc-500" />
+                      <Headphones className="w-7 h-7 text-zinc-400" />
                     )}
-                  </div>
+                  </motion.div>
                 </div>
 
-                <div className="mt-4 flex flex-col items-center gap-1 text-center">
-                  <h4 className="text-white font-bold text-sm tracking-wide">
-                    {callStatus === CallStatus.ACTIVE
-                      ? isSpeaking
-                        ? `${currentVoiceObj.name} hablando...`
-                        : agentLiveState === "thinking"
-                        ? isEs
-                          ? `${currentVoiceObj.name} analizando tu respuesta...`
-                          : `${currentVoiceObj.name} analyzing your answer...`
-                        : isEs
-                        ? "Tu turno — escuchándote activamente..."
-                        : "Your turn — listening to your response..."
-                      : callStatus === CallStatus.CONNECTING
-                      ? isEs
-                        ? "Estableciendo enlace de audio..."
-                        : "Establishing secure audio link..."
-                      : isEs
-                      ? "Listo para comenzar la entrevista"
-                      : "Ready to begin technical interview"}
+                {/* Calm Typographic Hierarchy */}
+                <div className="mt-5 flex flex-col items-center gap-1 text-center max-w-xs">
+                  <h4 className="text-white font-semibold text-sm sm:text-[15px] tracking-[-0.015em]">
+                    {aiStageHeading}
                   </h4>
-                  <p className="text-[11px] text-zinc-400 font-mono">
-                    {callStatus === CallStatus.ACTIVE
-                      ? isSpeaking
-                        ? "Puedes hablar en cualquier momento para intervenir"
-                        : agentLiveState === "thinking"
-                        ? isEs
-                          ? "Preparando la siguiente intervención..."
-                          : "Preparing next prompt..."
-                        : "Habla con claridad, tu micrófono está activo"
-                      : isEs
-                      ? "Haz clic en 'Iniciar Entrevista' para conectar"
-                      : "Click 'Start Interview' below to connect"}
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    {aiStageHint}
                   </p>
-                  {callStatus === CallStatus.ACTIVE && (
-                    <VoiceAudioWave
-                      audioTrack={agentAudioTrack}
-                      isActive={callStatus === CallStatus.ACTIVE}
-                      variant="agent"
-                      label={
-                        isSpeaking
-                          ? `${currentVoiceObj.name}`
-                          : agentLiveState === "thinking"
-                          ? isEs
-                            ? "Analizando..."
-                            : "Thinking..."
-                          : isEs
-                          ? "Escuchando"
-                          : "Listening"
-                      }
-                      width={190}
-                      height={28}
-                      className="mt-2.5 w-full max-w-[300px]"
-                    />
-                  )}
                 </div>
               </div>
 
-              {/* Columna Derecha: Tarjeta de Cámara del Candidato con Edge AI */}
+              {/* Integrated Agent Waveform */}
+              {callStatus === CallStatus.ACTIVE ? (
+                <VoiceAudioWave
+                  audioTrack={agentAudioTrack}
+                  isActive={callStatus === CallStatus.ACTIVE}
+                  variant="agent"
+                  label={
+                    isSpeaking
+                      ? currentVoiceObj.name
+                      : agentLiveState === "thinking"
+                      ? isEs
+                        ? "Analizando…"
+                        : "Thinking…"
+                      : isEs
+                      ? "Escuchando"
+                      : "Listening"
+                  }
+                  width={isCameraActive ? 190 : 260}
+                  height={26}
+                  className={cn(
+                    "w-full mx-auto",
+                    isCameraActive ? "max-w-[300px]" : "max-w-[380px]"
+                  )}
+                />
+              ) : (
+                <div className="h-2" />
+              )}
+            </div>
+
+            {/* Candidate Facial Monitor Card (Camera Active) */}
+            {isCameraActive && (
               <div className="w-full">
                 <FacialMonitorPanel
                   videoRef={facial.videoRef}
@@ -923,141 +1126,19 @@ const Agent = ({
                   liveCue={facial.liveCue}
                   liveScores={facial.liveScores}
                   showMeshOverlay={showMeshOverlay}
-                  onToggleMeshOverlay={() => setShowMeshOverlay((prev) => !prev)}
+                  onToggleMeshOverlay={() =>
+                    setShowMeshOverlay((prev) => !prev)
+                  }
                   onRecalibrate={facial.triggerRecalibration}
                 />
               </div>
-            </div>
-          ) : (
-            /* Modo Solo Audio Centrado */
-            <div className="relative flex flex-col items-center justify-center my-auto py-8">
-              <div className="relative flex items-center justify-center">
-                <div
-                  className={cn(
-                    "absolute rounded-full border border-indigo-500/20 pointer-events-none transition-all duration-700",
-                    callStatus === CallStatus.ACTIVE && isSpeaking
-                      ? "w-52 h-52 opacity-100 animate-pulse"
-                      : "w-36 h-36 opacity-20"
-                  )}
-                />
-                <div
-                  className={cn(
-                    "absolute rounded-full border border-indigo-500/10 pointer-events-none transition-all duration-700",
-                    callStatus === CallStatus.ACTIVE && isSpeaking
-                      ? "w-64 h-64 opacity-100 animate-ping [animation-duration:2.5s]"
-                      : "w-44 h-44 opacity-0"
-                  )}
-                />
-
-                <div
-                  className={cn(
-                    "z-10 flex items-center justify-center rounded-full transition-all duration-500 shadow-2xl relative overflow-hidden",
-                    callStatus === CallStatus.ACTIVE && isSpeaking
-                      ? "w-32 h-32 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 scale-105 shadow-indigo-500/30 ring-4 ring-indigo-500/20"
-                      : "",
-                    callStatus === CallStatus.ACTIVE && !isSpeaking
-                      ? "w-28 h-28 bg-gradient-to-tr from-zinc-900 to-indigo-950/80 scale-100 shadow-indigo-500/10 border border-indigo-500/30"
-                      : "",
-                    callStatus === CallStatus.CONNECTING
-                      ? "w-28 h-28 bg-zinc-900 border border-amber-500/50 scale-100 shadow-amber-500/10 animate-pulse"
-                      : "",
-                    isCallInactiveOrFinished
-                      ? "w-28 h-28 bg-zinc-900/90 border border-zinc-800 scale-100 shadow-black/60"
-                      : ""
-                  )}
-                >
-                  {callStatus === CallStatus.CONNECTING && (
-                    <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
-                  )}
-
-                  {callStatus === CallStatus.ACTIVE && (
-                    <div className="flex items-center gap-1.5">
-                      {isSpeaking ? (
-                        <>
-                          <div className="w-1 bg-white rounded-full animate-vocalBar1 h-8" />
-                          <div className="w-1 bg-white rounded-full animate-vocalBar2 h-12" />
-                          <div className="w-1 bg-white rounded-full animate-vocalBar3 h-6" />
-                          <div className="w-1 bg-white rounded-full animate-vocalBar2 h-10" />
-                          <div className="w-1 bg-white rounded-full animate-vocalBar1 h-8" />
-                        </>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:200ms]" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse [animation-delay:400ms]" />
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {isCallInactiveOrFinished && (
-                    <Headphones className="w-8 h-8 text-zinc-500" />
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-5 flex flex-col items-center gap-1 text-center">
-                <h4 className="text-white font-bold text-sm tracking-wide">
-                  {callStatus === CallStatus.ACTIVE
-                    ? isSpeaking
-                      ? `${currentVoiceObj.name} hablando...`
-                      : agentLiveState === "thinking"
-                      ? isEs
-                        ? `${currentVoiceObj.name} analizando tu respuesta...`
-                        : `${currentVoiceObj.name} analyzing your answer...`
-                      : isEs
-                      ? "Tu turno — escuchándote activamente..."
-                      : "Your turn — listening to your response..."
-                    : callStatus === CallStatus.CONNECTING
-                    ? isEs
-                      ? "Estableciendo enlace de audio..."
-                      : "Establishing secure audio link..."
-                    : isEs
-                    ? "Listo para comenzar la entrevista"
-                    : "Ready to begin technical interview"}
-                </h4>
-                <p className="text-[11px] text-zinc-400 font-mono">
-                  {callStatus === CallStatus.ACTIVE
-                    ? isSpeaking
-                      ? "Puedes hablar en cualquier momento para intervenir"
-                      : agentLiveState === "thinking"
-                      ? isEs
-                        ? "Preparando la siguiente intervención..."
-                        : "Preparing next prompt..."
-                      : "Habla con claridad, tu micrófono está activo"
-                    : isEs
-                    ? "Haz clic en 'Iniciar Entrevista' para conectar"
-                    : "Click 'Start Interview' below to connect"}
-                </p>
-                {callStatus === CallStatus.ACTIVE && (
-                  <VoiceAudioWave
-                    audioTrack={agentAudioTrack}
-                    isActive={callStatus === CallStatus.ACTIVE}
-                    variant="agent"
-                    label={
-                      isSpeaking
-                        ? `${currentVoiceObj.name}`
-                        : agentLiveState === "thinking"
-                        ? isEs
-                          ? "Analizando..."
-                          : "Thinking..."
-                        : isEs
-                        ? "Escuchando"
-                        : "Listening"
-                    }
-                    width={240}
-                    height={30}
-                    className="mt-3 w-full max-w-[360px]"
-                  />
-                )}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Live Candidate Voice Waveform (react-audio-visualize) */}
-        {callStatus === CallStatus.ACTIVE && (
-          <div className="relative z-10 w-full mb-3">
+        {/* ── 3. Live Candidate Mic Strip & Closed Captions ── */}
+        <div className="relative z-10 flex flex-col gap-3">
+          {callStatus === CallStatus.ACTIVE && (
             <VoiceAudioWave
               audioTrack={candidateAudioTrack}
               isActive={callStatus === CallStatus.ACTIVE}
@@ -1070,171 +1151,231 @@ const Agent = ({
                     : "Microphone muted"
                   : isCandidateSpeaking
                   ? isEs
-                    ? "Tu voz — hablando..."
-                    : "Your voice — speaking..."
+                    ? "Tu voz · Hablando"
+                    : "Your voice · Speaking"
                   : isEs
                   ? "Tu micrófono en vivo"
                   : "Your live microphone"
               }
               width={460}
-              height={32}
+              height={28}
               className="w-full"
             />
-          </div>
-        )}
-
-        {/* Closed Captions HUD / Live Subtitle Box */}
-        <div className="relative w-full min-h-[76px] bg-zinc-950/70 border border-zinc-800/80 rounded-2xl p-3.5 flex items-center justify-center text-center z-10 max-h-24 overflow-y-auto no-scrollbar mb-5 backdrop-blur-md">
-          {latestMessage ? (
-            <div className="flex items-center gap-2 max-w-2xl text-left">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 shrink-0">
-                {latestSpeaker === "user" ? "Tú" : currentVoiceObj.name}
-              </span>
-              <p className="text-xs md:text-sm text-zinc-200 leading-relaxed font-light">
-                {latestMessage}
-              </p>
-            </div>
-          ) : (
-            <p className="text-xs text-zinc-500 italic">
-              {callStatus === CallStatus.ACTIVE
-                ? isEs
-                  ? "La transcripción en vivo aparecerá aquí en tiempo real..."
-                  : "Live speech transcript will appear here in real time..."
-                : isEs
-                ? "Esperando inicio de la sesión..."
-                : "Waiting for interview to begin..."}
-            </p>
           )}
+
+          {/* Frosted Live Subtitle Bar */}
+          <div className="w-full min-h-[68px] max-h-24 overflow-y-auto no-scrollbar rounded-2xl bg-white/[0.025] border border-white/[0.07] px-4 sm:px-5 py-3.5 flex items-center justify-center text-center backdrop-blur-xl">
+            <AnimatePresence mode="wait">
+              {latestMessage ? (
+                <motion.div
+                  key={`${latestSpeaker}-${latestMessage.slice(0, 32)}`}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={smoothTransition}
+                  className="flex items-baseline gap-2.5 max-w-3xl text-left"
+                >
+                  <span
+                    className={cn(
+                      "text-[10px] font-semibold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full border shrink-0",
+                      latestSpeaker === "user"
+                        ? "bg-emerald-500/15 border-emerald-400/25 text-emerald-200"
+                        : "bg-indigo-500/15 border-indigo-400/25 text-indigo-200"
+                    )}
+                  >
+                    {latestSpeaker === "user" ? "Tú" : currentVoiceObj.name}
+                  </span>
+                  <p className="text-[13px] sm:text-sm text-zinc-100/95 leading-relaxed">
+                    {latestMessage}
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.p
+                  key="caption-idle"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={smoothTransition}
+                  className="text-xs text-zinc-500"
+                >
+                  {callStatus === CallStatus.ACTIVE
+                    ? isEs
+                      ? "La transcripción en vivo aparecerá aquí en tiempo real…"
+                      : "Live speech transcript will appear here in real time…"
+                    : isEs
+                    ? "Esperando inicio de la sesión…"
+                    : "Waiting for interview to begin…"}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
-        {/* Meeting Controls Bar / Floating Dock */}
-        <div className="relative w-full flex items-center justify-between gap-3 pt-3 border-t border-zinc-800/70 z-10">
-          <div className="flex items-center gap-2">
-            {/* Candidate Mic Toggle Button */}
+        {/* ── 4. FaceTime-Style Single-Line Floating Control Dock ── */}
+        <div className="relative z-10 w-full flex flex-col lg:flex-row items-center justify-between gap-3 pt-4 border-t border-white/[0.06]">
+          {/* Subtle Left Spacer on Large Screens to Balance Dock Centering */}
+          <div className="hidden lg:flex items-center w-[150px]" aria-hidden="true" />
+
+          {/* Centered Frosted Pill Control Dock */}
+          <div className="inline-flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 p-1.5 rounded-full bg-white/[0.035] border border-white/[0.09] backdrop-blur-2xl shadow-[0_14px_40px_-18px_rgba(0,0,0,0.9)] max-w-full">
+            {/* Candidate Mic Toggle */}
             <button
+              type="button"
               onClick={toggleMic}
               disabled={callStatus !== CallStatus.ACTIVE}
               className={cn(
-                "px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer border",
+                "h-10 px-3.5 sm:px-4 rounded-full text-xs font-medium inline-flex items-center gap-2 transition cursor-pointer border whitespace-nowrap shrink-0",
                 isMicMuted
-                  ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                  ? "bg-rose-500/20 text-rose-200 border-rose-400/35"
                   : isCandidateSpeaking && callStatus === CallStatus.ACTIVE
-                  ? "bg-emerald-500/15 text-emerald-200 border-emerald-500/40 shadow-sm shadow-emerald-500/20"
-                  : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 disabled:opacity-40"
+                  ? "bg-emerald-500/20 text-emerald-100 border-emerald-400/35 shadow-[0_0_20px_-6px_rgba(16,185,129,0.6)]"
+                  : "bg-white/[0.04] text-zinc-200 border-white/[0.07] hover:bg-white/[0.09] disabled:opacity-40 disabled:cursor-not-allowed"
               )}
-              title={isMicMuted ? "Activar micrófono" : "Silenciar micrófono"}
+              title={
+                isMicMuted
+                  ? "Activar micrófono"
+                  : isCandidateSpeaking && callStatus === CallStatus.ACTIVE
+                  ? "Voz detectada — clic para silenciar"
+                  : "Silenciar micrófono"
+              }
+              aria-label={isMicMuted ? "Activar micrófono" : "Silenciar micrófono"}
             >
-              {isMicMuted ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4 text-emerald-400" />}
+              {isMicMuted ? (
+                <MicOff className="w-4 h-4 text-rose-400 shrink-0" />
+              ) : (
+                <Mic className="w-4 h-4 text-emerald-400 shrink-0" />
+              )}
               <span className="hidden sm:inline">
                 {isMicMuted
-                  ? "Micrófono Silenciado"
+                  ? "Silenciado"
                   : isCandidateSpeaking && callStatus === CallStatus.ACTIVE
-                  ? "Voz Detectada"
-                  : "Micrófono Activo"}
+                  ? "Hablando"
+                  : "Micrófono"}
               </span>
             </button>
 
-            {/* Candidate Camera Toggle Button */}
+            {/* Candidate Camera Toggle */}
             <button
+              type="button"
               onClick={() => setIsCameraActive((prev) => !prev)}
               className={cn(
-                "px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer border",
+                "h-10 px-3.5 sm:px-4 rounded-full text-xs font-medium inline-flex items-center gap-2 transition cursor-pointer border whitespace-nowrap shrink-0",
                 isCameraActive
-                  ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40"
-                  : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800"
+                  ? "bg-indigo-500/20 text-indigo-100 border-indigo-400/35"
+                  : "bg-white/[0.04] text-zinc-400 border-white/[0.07] hover:bg-white/[0.09] hover:text-zinc-200"
               )}
               title={isCameraActive ? "Desactivar cámara" : "Activar cámara"}
+              aria-label={isCameraActive ? "Desactivar cámara" : "Activar cámara"}
             >
-              {isCameraActive ? <Camera className="w-4 h-4 text-indigo-400" /> : <CameraOff className="w-4 h-4 text-zinc-500" />}
-              <span className="hidden sm:inline">
-                {isCameraActive ? "Cámara Activa" : "Cámara Desactivada"}
-              </span>
+              {isCameraActive ? (
+                <Camera className="w-4 h-4 text-indigo-300 shrink-0" />
+              ) : (
+                <CameraOff className="w-4 h-4 text-zinc-500 shrink-0" />
+              )}
+              <span className="hidden sm:inline">Cámara</span>
             </button>
 
-            {/* Controles de resiliencia durante la llamada activa */}
+            {/* Active Session Resilience Controls */}
             {callStatus === CallStatus.ACTIVE && (
-              <div className="flex items-center gap-1.5 ml-1 border-l border-zinc-800/80 pl-2">
+              <>
+                <span
+                  aria-hidden="true"
+                  className="hidden sm:inline-block h-5 w-px bg-white/[0.10] mx-0.5 shrink-0"
+                />
                 <button
                   type="button"
                   onClick={() => sendInterviewControl("repeat_last")}
-                  className="px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-zinc-900 text-zinc-300 border border-zinc-800 hover:bg-zinc-800 hover:text-white transition cursor-pointer"
+                  className="h-10 px-3.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 bg-white/[0.04] text-zinc-200 border border-white/[0.07] hover:bg-white/[0.09] hover:text-white transition cursor-pointer whitespace-nowrap shrink-0"
                   title="Pedir a la IA que repita la última intervención"
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-indigo-400" />
+                  <RotateCcw className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
                   <span className="hidden md:inline">Repetir</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => sendInterviewControl("resume_turn")}
-                  className="px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-zinc-900 text-zinc-300 border border-zinc-800 hover:bg-zinc-800 hover:text-white transition cursor-pointer"
+                  className="h-10 px-3.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 bg-white/[0.04] text-zinc-200 border border-white/[0.07] hover:bg-white/[0.09] hover:text-white transition cursor-pointer whitespace-nowrap shrink-0"
                   title="Reactivar a la IA si se quedó en silencio esperando"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
                   <span className="hidden md:inline">Reanudar IA</span>
                 </button>
-              </div>
+              </>
+            )}
+
+            <span
+              aria-hidden="true"
+              className="hidden sm:inline-block h-5 w-px bg-white/[0.10] mx-0.5 shrink-0"
+            />
+
+            {/* Main Action CTA: Start or End Interview */}
+            {callStatus !== CallStatus.ACTIVE ? (
+              <button
+                type="button"
+                onClick={handleCall}
+                disabled={callStatus === CallStatus.CONNECTING}
+                className={cn(
+                  "h-10 px-5 sm:px-6 rounded-full inline-flex items-center justify-center gap-2 font-semibold text-xs sm:text-[13px] text-white transition-all cursor-pointer whitespace-nowrap shrink-0",
+                  callStatus === CallStatus.CONNECTING
+                    ? "bg-amber-500/80 cursor-not-allowed opacity-85"
+                    : "bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 hover:brightness-110 shadow-[0_10px_28px_-8px_rgba(99,102,241,0.65)] ring-1 ring-inset ring-white/20"
+                )}
+              >
+                {callStatus === CallStatus.CONNECTING ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    <span>{isEs ? "Conectando…" : "Connecting…"}</span>
+                  </>
+                ) : (
+                  <>
+                    <Phone className="w-3.5 h-3.5 fill-white shrink-0" />
+                    <span>
+                      {isEs ? "Iniciar entrevista" : "Start interview"}
+                    </span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                title={isEs ? "Finalizar entrevista" : "End interview"}
+                aria-label={isEs ? "Finalizar entrevista" : "End interview"}
+                className="h-10 px-5 rounded-full inline-flex items-center justify-center gap-2 font-semibold text-xs sm:text-[13px] bg-rose-600 hover:bg-rose-500 text-white transition-all cursor-pointer shadow-[0_10px_28px_-8px_rgba(225,29,72,0.65)] ring-1 ring-inset ring-white/20 whitespace-nowrap shrink-0"
+              >
+                <PhoneOff className="w-3.5 h-3.5 fill-white shrink-0" />
+                <span>{isEs ? "Finalizar" : "End call"}</span>
+              </button>
             )}
           </div>
 
-          {/* Main Action Button: Start or End Meeting */}
-          {callStatus !== CallStatus.ACTIVE ? (
-            <button
-              onClick={handleCall}
-              disabled={callStatus === CallStatus.CONNECTING}
-              className={cn(
-                "flex items-center justify-center gap-2.5 px-7 py-3 rounded-2xl font-bold text-xs sm:text-sm text-white transition-all duration-300 cursor-pointer shadow-lg",
-                callStatus === CallStatus.CONNECTING
-                  ? "bg-amber-600 cursor-not-allowed opacity-80"
-                  : "bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 hover:shadow-indigo-500/25 hover:scale-[1.02]"
-              )}
-            >
-              {callStatus === CallStatus.CONNECTING ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{isEs ? "Conectando Sala..." : "Connecting..."}</span>
-                </>
-              ) : (
-                <>
-                  <Phone className="w-4 h-4 fill-white" />
-                  <span>{isEs ? "Iniciar Entrevista" : "Start Interview"}</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={handleDisconnect}
-              className="flex items-center justify-center gap-2 px-7 py-3 rounded-2xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-lg shadow-rose-600/20"
-            >
-              <PhoneOff className="w-4 h-4 fill-white" />
-              <span>{isEs ? "Finalizar Entrevista" : "End Interview"}</span>
-            </button>
-          )}
-
-          {/* Candidate Profile Avatar */}
-          <div className="flex items-center gap-2 text-xs text-zinc-400">
-            <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white text-[11px] font-bold">
-              {userName ? userName.slice(0, 1).toUpperCase() : "U"}
+          {/* Candidate Identity Pill */}
+          <div className="flex items-center justify-end lg:w-[150px]">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.07]">
+              <div className="w-6 h-6 rounded-full bg-white/[0.08] border border-white/[0.12] flex items-center justify-center text-white text-[11px] font-semibold shrink-0">
+                {userName ? userName.slice(0, 1).toUpperCase() : "U"}
+              </div>
+              <span className="text-xs font-medium text-zinc-300 truncate max-w-[96px]">
+                {userName || "Candidato"}
+              </span>
             </div>
-            <span className="hidden md:inline font-medium text-zinc-300 truncate max-w-[100px]">
-              {userName || "Candidato"}
-            </span>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Local keyframes style block */}
       <style>{`
         @keyframes vocalBarAnim1 {
-          0%, 100% { height: 16px; }
-          50% { height: 32px; }
+          0%, 100% { height: 14px; }
+          50% { height: 30px; }
         }
         @keyframes vocalBarAnim2 {
-          0%, 100% { height: 24px; }
-          50% { height: 44px; }
+          0%, 100% { height: 22px; }
+          50% { height: 40px; }
         }
         @keyframes vocalBarAnim3 {
-          0%, 100% { height: 12px; }
-          50% { height: 28px; }
+          0%, 100% { height: 10px; }
+          50% { height: 26px; }
         }
         .animate-vocalBar1 { animation: vocalBarAnim1 1s ease-in-out infinite; }
         .animate-vocalBar2 { animation: vocalBarAnim2 0.8s ease-in-out infinite; }
@@ -1247,7 +1388,7 @@ const Agent = ({
           scrollbar-width: none;
         }
       `}</style>
-    </div>
+    </motion.div>
   );
 };
 

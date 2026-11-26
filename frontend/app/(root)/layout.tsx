@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { isAuthenticated, getCurrentUser } from "@/lib/api.server";
 import AppSidebar from "@/components/AppSidebar";
 import RouteTransitionLoader from "@/components/RouteTransitionLoader";
+import SessionTokenSync from "@/components/SessionTokenSync";
 
 const Layout = async ({ children }: { children: ReactNode }) => {
   let user = null;
@@ -16,6 +17,7 @@ const Layout = async ({ children }: { children: ReactNode }) => {
 
   return (
     <div className="flex min-h-screen bg-[#020408] text-white print:block print:min-h-0 print:bg-white print:text-black">
+      <SessionTokenSync />
       {/* ── Left Modern Sidebar ── */}
       <AppSidebar userName={user?.name ?? "Usuario"} userEmail={user?.email} />
 

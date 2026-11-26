@@ -11,7 +11,8 @@ import {
   Loader2,
   Check,
 } from "lucide-react";
-import { getCognitoIdToken } from "@/lib/cognito";
+import { getFreshAuthToken } from "@/lib/cognito";
+import { MOTION_TRANSITION, resolveMotionTransition } from "@/lib/motion-tokens";
 
 interface FeedbackExportButtonsProps {
   interviewId: string;
@@ -21,8 +22,6 @@ interface FeedbackExportButtonsProps {
 
 type ReportType = "interview" | "english" | "nonverbal";
 type FormatType = "html" | "md" | "txt";
-
-const SMOOTH_EASE = [0.22, 1, 0.36, 1] as const;
 
 export default function FeedbackExportButtons({
   interviewId,
@@ -38,19 +37,26 @@ export default function FeedbackExportButtons({
     setDownloading(key);
 
     try {
-      const token = getCognitoIdToken();
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
+      let token = await getFreshAuthToken();
+      const buildHeaders = (authToken: string): Record<string, string> =>
+        authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
-      const res = await fetch(
-        `/api/proxy/feedback/${interviewId}/export?report=${report}&format=${format}`,
-        {
-          method: "GET",
-          headers,
+      const endpoint = `/api/proxy/feedback/${interviewId}/export?report=${report}&format=${format}`;
+      let res = await fetch(endpoint, {
+        method: "GET",
+        headers: buildHeaders(token),
+      });
+
+      if (res.status === 401) {
+        const refreshed = await getFreshAuthToken(true);
+        if (refreshed && refreshed !== token) {
+          token = refreshed;
+          res = await fetch(endpoint, {
+            method: "GET",
+            headers: buildHeaders(token),
+          });
         }
-      );
+      }
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => null);
@@ -167,7 +173,7 @@ export default function FeedbackExportButtons({
       initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
-      transition={{ duration: 0.5, ease: SMOOTH_EASE }}
+      transition={resolveMotionTransition(prefersReducedMotion, MOTION_TRANSITION.panel)}
       className="relative overflow-hidden w-full rounded-3xl bg-gradient-to-br from-[#0e1120] via-[#090b14] to-[#07080f] border border-indigo-500/20 p-6 md:p-7 shadow-2xl text-left"
     >
       {/* Resplandores sutiles de marca */}

@@ -4,8 +4,9 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { toast } from "sonner";
 import { createFeedback } from "@/lib/api";
-import { getCognitoIdToken } from "@/lib/cognito";
+import { getFreshAuthToken } from "@/lib/cognito";
 import {
   MOTION_SPRING,
   MOTION_TRANSITION,
@@ -131,17 +132,25 @@ const Agent = ({
     audioElementsRef.current.clear();
   }, []);
 
+  const disconnectRoomSafely = useCallback((roomToClose?: Room | null) => {
+    const targetRoom = roomToClose ?? lkRoomRef.current;
+    if (lkRoomRef.current === targetRoom) {
+      lkRoomRef.current = null;
+    }
+    setLkRoom((prev) => (prev === targetRoom ? null : prev));
+    if (targetRoom && targetRoom.state !== ConnectionState.Disconnected) {
+      targetRoom.disconnect(true).catch(() => {});
+    }
+  }, []);
+
   // Limpieza segura de WebRTC y elementos <audio> al desmontar
   useEffect(() => {
     return () => {
       if (healthResetTimerRef.current) clearTimeout(healthResetTimerRef.current);
       cleanupAudioElements();
-      if (lkRoomRef.current) {
-        lkRoomRef.current.disconnect().catch(() => {});
-        lkRoomRef.current = null;
-      }
+      disconnectRoomSafely();
     };
-  }, [cleanupAudioElements]);
+  }, [cleanupAudioElements, disconnectRoomSafely]);
 
   // Estado de análisis facial (Edge AI)
   const [isCameraActive, setIsCameraActive] = useState(true);
@@ -220,7 +229,7 @@ const Agent = ({
       setCallStatus(CallStatus.GENERATING_FEEDBACK);
 
       try {
-        const idToken = getCognitoIdToken();
+        const idToken = await getFreshAuthToken();
         const cleanMsgs = msgs.map(({ role, content }) => ({ role, content }));
         const voiceOpt = VOICE_OPTIONS.find((opt) => opt.key === selectedVoice);
         const language = voiceOpt ? voiceOpt.lang : "es";
@@ -236,16 +245,27 @@ const Agent = ({
                 ? facialSummary
                 : undefined,
           },
-          idToken
+          idToken || undefined
         );
 
         if (res && res.success) {
           router.push(`/interview/${interviewId}/feedback`);
+        } else if (res?.unauthorized) {
+          toast.error("Tu sesión expiró", {
+            description:
+              "Vuelve a iniciar sesión para guardar tu evaluación de entrevista.",
+          });
+          router.push("/sign-in");
         } else {
+          toast.error("No se pudo generar el feedback", {
+            description:
+              "Ocurrió un error al procesar la evaluación. Inténtalo nuevamente.",
+          });
           router.push("/dashboard");
         }
       } catch (e) {
         console.error(e);
+        toast.error("Error al generar el feedback");
         router.push("/dashboard");
       }
     },
@@ -482,7 +502,7 @@ const Agent = ({
                   }
                 }
                 setCallStatus(CallStatus.FINISHED);
-                currentRoom.disconnect().catch(() => {});
+                disconnectRoomSafely(currentRoom);
               }
             } catch (err) {
               console.warn("[LiveKit] Error parsing interview control message:", err);
@@ -522,11 +542,15 @@ const Agent = ({
               `stream-${sender}-${Date.now()}`;
 
             let accumulated = "";
-            for await (const chunk of reader) {
-              accumulated += chunk;
-              if (accumulated.trim()) {
-                upsertTranscriptSegment(segmentId, sender, accumulated);
+            try {
+              for await (const chunk of reader) {
+                accumulated += chunk;
+                if (accumulated.trim()) {
+                  upsertTranscriptSegment(segmentId, sender, accumulated);
+                }
               }
+            } catch {
+              // Ignorar cierre/abort esperado del TextStream al finalizar la sala
             }
           }
         );
@@ -561,6 +585,10 @@ const Agent = ({
         console.warn("[LiveKit] No se pudo habilitar el micrófono:", micErr);
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? "");
+      if (msg.includes("Abort handler called") || msg.toLowerCase().includes("cancelled")) {
+        return;
+      }
       console.error("Error al iniciar llamada con LiveKit:", err);
       cleanupAudioElements();
       setCallStatus(CallStatus.INACTIVE);
@@ -569,9 +597,7 @@ const Agent = ({
 
   const handleDisconnect = async () => {
     setCallStatus(CallStatus.FINISHED);
-    if (lkRoom) {
-      lkRoom.disconnect();
-    }
+    disconnectRoomSafely(lkRoom);
   };
 
   const latestMessage = messages[messages.length - 1]?.content;

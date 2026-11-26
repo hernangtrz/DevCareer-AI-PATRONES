@@ -164,10 +164,13 @@ const AuthForm = ({ type }: { type: FormType }) => {
         const { email, password } = data;
 
         // 1. Autenticar en Cognito / Supabase y obtener ID Token
-        const { idToken } = await signInCognito(email, password);
+        const { idToken, refreshToken } = await signInCognito(email, password);
 
         // 2. Guardar token en localStorage para Client Components
         localStorage.setItem("cognitoIdToken", idToken);
+        if (refreshToken) {
+          localStorage.setItem("cognitoRefreshToken", refreshToken);
+        }
 
         // 3. Pedir sessionCookie al backend
         const result = await signIn({ idToken });

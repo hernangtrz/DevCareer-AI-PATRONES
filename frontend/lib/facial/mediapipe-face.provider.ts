@@ -35,6 +35,7 @@ if (
       text.includes("face_landmarker_graph") ||
       text.includes("gl_context") ||
       text.includes("vision_wasm_internal") ||
+      text.includes("Abort handler called") ||
       /^[IWE]\d{4}\s/i.test(text.trim())
     );
   };

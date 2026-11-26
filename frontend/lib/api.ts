@@ -4,6 +4,8 @@
  * No importa "next/headers" — es seguro usarlo en el browser.
  */
 
+import { getFreshAuthToken, isJwtExpiringSoon } from "./cognito";
+
 const API_URL = typeof window !== "undefined"
   ? "/api/proxy"
   : process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -16,20 +18,45 @@ async function apiFetch<T>(
   options: RequestInit = {},
   bearerToken?: string,
 ): Promise<T> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
+  const isBrowser = typeof window !== "undefined";
+  const isPublicAuthRoute = path.startsWith("/auth/signin") || path.startsWith("/auth/signup");
 
-  if (bearerToken) {
-    headers["Authorization"] = `Bearer ${bearerToken}`;
+  let effectiveToken = bearerToken;
+  if (isBrowser && !isPublicAuthRoute && effectiveToken && isJwtExpiringSoon(effectiveToken, 60)) {
+    const refreshed = await getFreshAuthToken(false);
+    if (refreshed) {
+      effectiveToken = refreshed;
+    }
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const buildHeaders = (token?: string): Record<string, string> => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
+  let res = await fetch(`${API_URL}${path}`, {
     ...options,
-    headers,
+    headers: buildHeaders(effectiveToken),
     cache: "no-store",
   });
+
+  // Si el token expiró justo durante la sesión, intentar 1 renovación silenciosa y reintentar
+  if (res.status === 401 && isBrowser && !isPublicAuthRoute) {
+    const refreshedToken = await getFreshAuthToken(true);
+    if (refreshedToken && refreshedToken !== effectiveToken) {
+      res = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers: buildHeaders(refreshedToken),
+        cache: "no-store",
+      });
+    }
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -183,8 +210,14 @@ export async function createFeedback(
     language?: string;
     facialMetrics?: import("./facial/types").FacialTelemetrySummary;
   },
-  bearerToken: string,
-): Promise<{ success: boolean; feedbackId?: string; feedback?: { id: string } }> {
+  bearerToken?: string,
+): Promise<{
+  success: boolean;
+  feedbackId?: string;
+  feedback?: { id: string };
+  unauthorized?: boolean;
+  message?: string;
+}> {
   try {
     const res = await apiFetch<{ success: boolean; feedbackId?: string; feedback?: { id: string } }>(
       "/feedback",
@@ -200,8 +233,10 @@ export async function createFeedback(
       feedback: res.feedback,
     };
   } catch (err) {
+    const message = getErrorMessage(err, "Error al generar el feedback");
+    const unauthorized = message.includes("API error 401");
     console.error("[api.createFeedback] Error:", err);
-    return { success: false };
+    return { success: false, unauthorized, message };
   }
 }
 

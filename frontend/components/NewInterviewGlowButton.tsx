@@ -50,7 +50,9 @@ export default function NewInterviewGlowButton({
             style={{ filter: `blur(1.5px) url(#${unopaqId})` }}
           />
           <div className={styles.buttonFace}>
-            <Plus className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span className="w-5 h-5 rounded-full bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-200 shrink-0">
+              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+            </span>
             <span>{label}</span>
           </div>
         </div>

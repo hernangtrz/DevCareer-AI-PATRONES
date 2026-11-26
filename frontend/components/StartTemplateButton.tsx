@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createInterviewFromTemplate } from "@/lib/api";
 import { Button } from "./ui/button";
-import { getCognitoIdToken } from "@/lib/cognito";
+import { getFreshAuthToken } from "@/lib/cognito";
 
 interface StartTemplateButtonProps {
   templateId: string;
@@ -20,8 +20,8 @@ const StartTemplateButton = ({ templateId }: StartTemplateButtonProps) => {
     setLoading(true);
 
     try {
-      // Obtener idToken del usuario autenticado en Cognito
-      const idToken = getCognitoIdToken();
+      // Obtener token vigente (renovando automáticamente si expiró)
+      const idToken = await getFreshAuthToken();
 
       const newInterviewId = await createInterviewFromTemplate(templateId, idToken);
       if (newInterviewId) {

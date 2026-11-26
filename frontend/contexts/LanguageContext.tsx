@@ -22,6 +22,7 @@ if (typeof window !== "undefined" && !(window as unknown as { __wasm_diag_filter
       text.includes("OpenGL error checking") ||
       text.includes("gl_context") ||
       text.includes("vision_wasm_internal") ||
+      text.includes("Abort handler called") ||
       /^[IWE]\d{4}\s/i.test(text.trim())
     );
   };

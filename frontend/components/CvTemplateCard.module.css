@@ -1,0 +1,97 @@
+/*
+ * From Uiverse.io by Tiagoadag - https://uiverse.io/Tiagoadag/cuddly-catfish-6
+ * MIT License, Copyright (c) Tiagoadag
+ *
+ * Adapted for DevCareer AI CV template cards with scoped CSS Modules,
+ * preserving existing card content/selection styling at rest and adding the
+ * signature scale(0.98) inner card + #00ff75 -> #3700ff gradient rim & glow on hover.
+ */
+
+.outerCard {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  isolation: isolate;
+  transition: box-shadow 0.3s ease;
+}
+
+.outerCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 20px;
+  background-image: linear-gradient(163deg, #00ff75 0%, #3700ff 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.outerCard:hover,
+.outerCard:focus-visible {
+  box-shadow: 0px 0px 30px 1px rgba(0, 255, 117, 0.3);
+}
+
+.outerCard:hover::before,
+.outerCard:focus-visible::before {
+  opacity: 1;
+}
+
+.outerCard:focus-visible {
+  outline: 2px solid #c7d2fe;
+  outline-offset: 3px;
+}
+
+.innerCard {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--color-dark-200, #27282f);
+  transition:
+    border-radius 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.innerCardSelected {
+  border-color: #6366f1;
+  background-color: #212438;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.25);
+}
+
+.outerCard:hover .innerCard,
+.outerCard:focus-visible .innerCard {
+  border-radius: 20px;
+  border-color: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .innerCard {
+    will-change: transform;
+    transition:
+      transform 0.2s ease,
+      border-radius 0.2s ease,
+      border-color 0.2s ease,
+      background-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .outerCard:hover .innerCard,
+  .outerCard:focus-visible .innerCard {
+    transform: scale(0.98);
+  }
+}

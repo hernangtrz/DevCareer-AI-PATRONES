@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { HeroGeometric } from "@/components/ui/shape-landing-hero";
+import TileRevealSection from "@/components/TileRevealSection";
+import GlidingFooter from "@/components/GlidingFooter";
 import { isAuthenticated } from "@/lib/api.server";
 import {
   Mic,
@@ -102,7 +104,7 @@ export default async function LandingPage() {
   const userAuthenticated = await isAuthenticated();
 
   return (
-    <div className="min-h-screen bg-[#030303] text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#030303] text-white overflow-x-clip">
       {/* ─── Navbar ─── */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-[#030303]/80 backdrop-blur-md border-b border-white/[0.06]">
         <Link href="/" className="flex items-center gap-2.5">
@@ -186,6 +188,9 @@ export default async function LandingPage() {
           </p>
         </HeroGeometric>
       </section>
+
+      {/* ─── Tile Reveal on Scroll ─── */}
+      <TileRevealSection userAuthenticated={userAuthenticated} />
 
       {/* ─── Features / Modules ─── */}
       <section id="features" className="py-24 px-6 md:px-12 max-w-7xl mx-auto">
@@ -345,17 +350,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ─── Footer ─── */}
-      <footer className="border-t border-white/[0.06] py-8 px-6 md:px-12">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Image src="/logo.svg" alt="DevCareer AI" width={28} height={28} />
-            <span className="text-sm font-semibold text-white/70">DevCareer AI</span>
-          </div>
-          <p className="text-white/30 text-sm">
-            © {new Date().getFullYear()} DevCareer AI. Todos los derechos reservados.
-          </p>
-        </div>
-      </footer>
+      <GlidingFooter userAuthenticated={userAuthenticated} />
     </div>
   );
 }

@@ -1,30 +1,27 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   BarChart3,
   TrendingUp,
-  Target,
   Flame,
   Mic,
   Code2,
-  ArrowRight,
   Activity,
   Briefcase,
-  ArrowUpRight,
   RefreshCw,
-  Sparkles,
-  PieChart,
-  Award,
   Trophy,
-  Calendar,
 } from "lucide-react";
 import DashboardExportActions from "@/components/DashboardExportActions";
 import AiLoader from "@/components/AiLoader";
 import SmoothLineGraph from "@/components/SmoothLineGraph";
 import AnalyticsRechartsPair from "@/components/AnalyticsRechartsPair";
+import ChallengesDonutChart from "@/components/ChallengesDonutChart";
+import AnalyticsMasteryAndHeatmap from "@/components/AnalyticsMasteryAndHeatmap";
+import AnalyticsFunnelAndFocus from "@/components/AnalyticsFunnelAndFocus";
+import AnalyticsMetricCard from "@/components/AnalyticsMetricCard";
+import StardustCursorBackdrop from "@/components/StardustCursorBackdrop";
 
 // ── Tipos de Datos ──
 interface PillarMetric {
@@ -244,14 +241,6 @@ export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "activity">("overview");
   const [chartAnimKey, setChartAnimKey] = useState<number>(0);
 
-  // Interactive chart inspection states
-  const [hoveredDonut, setHoveredDonut] = useState<"easy" | "medium" | "hard" | null>(null);
-  const [hoveredHeatCell, setHoveredHeatCell] = useState<{
-    week: number;
-    day: string;
-    level: number;
-  } | null>(null);
-
   const fetchAnalytics = async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) setIsRefreshing(true);
     try {
@@ -300,15 +289,15 @@ export default function AnalyticsPage() {
   const radarAxes =
     data.pillars && data.pillars.length === 5
       ? data.pillars.map((p) => ({
-          label: p.name.replace(" en Entrevista", "").replace(" & Fluidez", ""),
-          score: p.score,
-          benchmark: p.benchmark,
-        }))
+        label: p.name.replace(" en Entrevista", "").replace(" & Fluidez", ""),
+        score: p.score,
+        benchmark: p.benchmark,
+      }))
       : RADAR_AXES_METRICS.map((m) => ({
-          label: m.label,
-          score: m.score,
-          benchmark: m.benchmark,
-        }));
+        label: m.label,
+        score: m.score,
+        benchmark: m.benchmark,
+      }));
 
   // ── Datos para SmoothLineGraph (Curva de Evolución Histórica) ──
   const smoothTrendData = HISTORICAL_TREND.map((pt) => ({
@@ -316,39 +305,6 @@ export default function AnalyticsPage() {
     value: pt.score,
     sublabel: `${pt.date} · ${pt.tag || pt.session}`,
   }));
-
-  // ── Donut Chart (Desglose de Desafíos por Dificultad) ──
-  const donutR = 64;
-  const donutCircumference = 2 * Math.PI * donutR; // ~402.12
-  const easyRatio = 0.375; // 9 / 24 = 37.5%
-  const medRatio = 0.417; // 10 / 24 = 41.7%
-  const hardRatio = 0.208; // 5 / 24 = 20.8%
-
-  const easyStroke = easyRatio * donutCircumference;
-  const medStroke = medRatio * donutCircumference;
-  const hardStroke = hardRatio * donutCircumference;
-
-  const easyOffset = 0;
-  const medOffset = -easyStroke;
-  const hardOffset = -(easyStroke + medStroke);
-
-  // ── Mapa de Calor GitHub (12 semanas x 7 días) ──
-  const heatmapDays = ["L", "M", "X", "J", "V", "S", "D"];
-  // Matriz determinista pero variada de 12 semanas (84 celdas)
-  const heatmapPattern = [
-    [0, 1, 2, 0, 1, 0, 0],
-    [1, 0, 1, 2, 0, 1, 0],
-    [0, 2, 1, 0, 3, 2, 0],
-    [1, 1, 0, 2, 1, 0, 0],
-    [2, 0, 3, 1, 0, 1, 1],
-    [1, 2, 1, 0, 2, 0, 0],
-    [0, 1, 2, 3, 1, 2, 0],
-    [2, 1, 0, 2, 3, 1, 0],
-    [1, 2, 2, 1, 2, 3, 0],
-    [2, 3, 1, 2, 0, 2, 1],
-    [3, 2, 3, 2, 3, 1, 2],
-    [3, 3, 2, 3, 3, 2, 3], // Última semana (Racha alta activa)
-  ];
 
   if (isInitialLoading) {
     return (
@@ -364,8 +320,10 @@ export default function AnalyticsPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto pb-16 px-4 sm:px-6">
-      {/* ── Encabezado Principal ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-b border-zinc-800 pb-5">
+      {/* ── Sección Superior con Fondo Interactivo Stardust Cursor (Header + 4 KPIs + Tabs) ── */}
+      <StardustCursorBackdrop>
+        {/* ── Encabezado Principal ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-b border-zinc-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
@@ -401,7 +359,7 @@ export default function AnalyticsPage() {
       {/* ── 4 Tarjetas de Métricas Clave ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Tarjeta 1: Puntuación de Nivel */}
-        <div className="p-5 rounded-2xl bg-[#11131c] border border-indigo-500/30 flex flex-col justify-between shadow-lg">
+        <AnalyticsMetricCard highlighted>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-zinc-400">Nivel de Preparación</span>
             <Trophy className="w-4 h-4 text-amber-400" />
@@ -427,10 +385,10 @@ export default function AnalyticsPage() {
               className="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full rounded-full"
             />
           </div>
-        </div>
+        </AnalyticsMetricCard>
 
         {/* Tarjeta 2: Entrevistas por Voz */}
-        <div className="p-5 rounded-2xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between">
+        <AnalyticsMetricCard>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-zinc-400">Entrevistas por Voz</span>
             <Mic className="w-4 h-4 text-pink-400" />
@@ -449,10 +407,10 @@ export default function AnalyticsPage() {
           <span className="text-[11px] text-pink-400 font-medium">
             Simulaciones con IA conversacional
           </span>
-        </div>
+        </AnalyticsMetricCard>
 
         {/* Tarjeta 3: Retos de Código */}
-        <div className="p-5 rounded-2xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between">
+        <AnalyticsMetricCard>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-zinc-400">Retos de Código</span>
             <Code2 className="w-4 h-4 text-cyan-400" />
@@ -471,10 +429,10 @@ export default function AnalyticsPage() {
           <span className="text-[11px] text-cyan-400 font-medium">
             Algoritmos y Patrones GoF
           </span>
-        </div>
+        </AnalyticsMetricCard>
 
         {/* Tarjeta 4: Racha de Estudio */}
-        <div className="p-5 rounded-2xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between">
+        <AnalyticsMetricCard>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-zinc-400">Racha de Práctica</span>
             <Flame className="w-4 h-4 text-amber-400" />
@@ -493,18 +451,17 @@ export default function AnalyticsPage() {
           <span className="text-[11px] text-amber-400 font-medium">
             ¡Excelente constancia activa!
           </span>
-        </div>
+        </AnalyticsMetricCard>
       </div>
 
       {/* ── Navegación entre Pestañas ── */}
       <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
         <button
           onClick={() => setActiveTab("overview")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
-            activeTab === "overview"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-              : "text-zinc-400 hover:text-white hover:bg-zinc-900"
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${activeTab === "overview"
+            ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+            : "text-zinc-400 hover:text-white hover:bg-zinc-900"
+            }`}
         >
           <BarChart3 className="w-4 h-4" />
           <span>Panel Gráfico Principal</span>
@@ -512,16 +469,16 @@ export default function AnalyticsPage() {
 
         <button
           onClick={() => setActiveTab("activity")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
-            activeTab === "activity"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-              : "text-zinc-400 hover:text-white hover:bg-zinc-900"
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${activeTab === "activity"
+            ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+            : "text-zinc-400 hover:text-white hover:bg-zinc-900"
+            }`}
         >
           <Activity className="w-4 h-4" />
           <span>Historial de Prácticas</span>
         </button>
       </div>
+      </StardustCursorBackdrop>
 
       {/* ── VISTA PRINCIPAL: MÚLTIPLES GRÁFICAS VISUALES ── */}
       {activeTab === "overview" && (
@@ -579,687 +536,31 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Gráfica 4: Desglose de Desafíos Técnicos (Donut Chart LeetCode Style SVG) */}
-            <div className="p-6 rounded-3xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <PieChart className="w-5 h-5 text-cyan-400" />
-                    Distribución de Retos por Dificultad
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Clasificación de los 24 problemas resueltos y patrones abordados.
-                  </p>
-                </div>
-                <Link
-                  href="/code-challenge"
-                  className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-                >
-                  <span>Ver catálogo</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-              {/* Donut SVG y Leyenda Interactiva */}
-              <div
-                key={`donut-${chartAnimKey}`}
-                className="py-2 flex flex-col sm:flex-row items-center justify-around gap-6"
-                onMouseLeave={() => setHoveredDonut(null)}
-              >
-                <div className="relative flex items-center justify-center">
-                  <svg
-                    width="170"
-                    height="170"
-                    viewBox="0 0 170 170"
-                    className="select-none overflow-visible"
-                  >
-                    {/* Anillo de fondo */}
-                    <circle
-                      cx="85"
-                      cy="85"
-                      r={donutR}
-                      fill="none"
-                      stroke="#1e2230"
-                      strokeWidth="16"
-                    />
-
-                    {/* Segmento Fácil (Esmeralda) */}
-                    <motion.circle
-                      cx="85"
-                      cy="85"
-                      r={donutR}
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth={hoveredDonut === "easy" ? 20 : 16}
-                      strokeDashoffset={easyOffset}
-                      strokeLinecap="round"
-                      transform="rotate(-90 85 85)"
-                      className="cursor-pointer transition-[stroke-width] duration-200"
-                      onMouseEnter={() => setHoveredDonut("easy")}
-                      initial={
-                        prefersReducedMotion
-                          ? { strokeDasharray: `${easyStroke} ${donutCircumference}` }
-                          : { strokeDasharray: `0 ${donutCircumference}` }
-                      }
-                      whileInView={{ strokeDasharray: `${easyStroke} ${donutCircumference}` }}
-                      viewport={{ once: true }}
-                      animate={{
-                        opacity: hoveredDonut && hoveredDonut !== "easy" ? 0.35 : 1,
-                      }}
-                      transition={{
-                        strokeDasharray: { duration: 0.75, delay: 0.1, ease: CHART_EASE },
-                        opacity: { duration: 0.2 },
-                      }}
-                    />
-
-                    {/* Segmento Medio (Ámbar) */}
-                    <motion.circle
-                      cx="85"
-                      cy="85"
-                      r={donutR}
-                      fill="none"
-                      stroke="#f59e0b"
-                      strokeWidth={hoveredDonut === "medium" ? 20 : 16}
-                      strokeDashoffset={medOffset}
-                      strokeLinecap="round"
-                      transform="rotate(-90 85 85)"
-                      className="cursor-pointer transition-[stroke-width] duration-200"
-                      onMouseEnter={() => setHoveredDonut("medium")}
-                      initial={
-                        prefersReducedMotion
-                          ? { strokeDasharray: `${medStroke} ${donutCircumference}` }
-                          : { strokeDasharray: `0 ${donutCircumference}` }
-                      }
-                      whileInView={{ strokeDasharray: `${medStroke} ${donutCircumference}` }}
-                      viewport={{ once: true }}
-                      animate={{
-                        opacity: hoveredDonut && hoveredDonut !== "medium" ? 0.35 : 1,
-                      }}
-                      transition={{
-                        strokeDasharray: { duration: 0.75, delay: 0.32, ease: CHART_EASE },
-                        opacity: { duration: 0.2 },
-                      }}
-                    />
-
-                    {/* Segmento Difícil & Patrones GoF (Púrpura) */}
-                    <motion.circle
-                      cx="85"
-                      cy="85"
-                      r={donutR}
-                      fill="none"
-                      stroke="#8b5cf6"
-                      strokeWidth={hoveredDonut === "hard" ? 20 : 16}
-                      strokeDashoffset={hardOffset}
-                      strokeLinecap="round"
-                      transform="rotate(-90 85 85)"
-                      className="cursor-pointer transition-[stroke-width] duration-200"
-                      onMouseEnter={() => setHoveredDonut("hard")}
-                      initial={
-                        prefersReducedMotion
-                          ? { strokeDasharray: `${hardStroke} ${donutCircumference}` }
-                          : { strokeDasharray: `0 ${donutCircumference}` }
-                      }
-                      whileInView={{ strokeDasharray: `${hardStroke} ${donutCircumference}` }}
-                      viewport={{ once: true }}
-                      animate={{
-                        opacity: hoveredDonut && hoveredDonut !== "hard" ? 0.35 : 1,
-                      }}
-                      transition={{
-                        strokeDasharray: { duration: 0.75, delay: 0.54, ease: CHART_EASE },
-                        opacity: { duration: 0.2 },
-                      }}
-                    />
-                  </svg>
-
-                  {/* Centro dinámico del Donut */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <AnimatePresence mode="wait">
-                      {hoveredDonut === "easy" ? (
-                        <motion.div
-                          key="donut-easy"
-                          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
-                          transition={{ duration: 0.16 }}
-                          className="flex flex-col items-center"
-                        >
-                          <span className="text-2xl font-black text-emerald-400 font-mono leading-none">9</span>
-                          <span className="text-[10px] text-zinc-300 font-semibold mt-0.5">Fácil</span>
-                          <span className="text-[9px] text-emerald-400 font-bold font-mono">38%</span>
-                        </motion.div>
-                      ) : hoveredDonut === "medium" ? (
-                        <motion.div
-                          key="donut-medium"
-                          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
-                          transition={{ duration: 0.16 }}
-                          className="flex flex-col items-center"
-                        >
-                          <span className="text-2xl font-black text-amber-400 font-mono leading-none">10</span>
-                          <span className="text-[10px] text-zinc-300 font-semibold mt-0.5">Medio</span>
-                          <span className="text-[9px] text-amber-400 font-bold font-mono">42%</span>
-                        </motion.div>
-                      ) : hoveredDonut === "hard" ? (
-                        <motion.div
-                          key="donut-hard"
-                          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
-                          transition={{ duration: 0.16 }}
-                          className="flex flex-col items-center"
-                        >
-                          <span className="text-2xl font-black text-purple-400 font-mono leading-none">5</span>
-                          <span className="text-[10px] text-zinc-300 font-semibold mt-0.5">Difícil</span>
-                          <span className="text-[9px] text-purple-400 font-bold font-mono">20%</span>
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="donut-all"
-                          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
-                          transition={{ duration: 0.16 }}
-                          className="flex flex-col items-center"
-                        >
-                          <span className="text-2xl font-black text-white font-mono leading-none">
-                            {data.metrics.challengesCompleted}
-                          </span>
-                          <span className="text-[10px] text-zinc-400 font-medium mt-0.5">
-                            Resueltos
-                          </span>
-                          <span className="text-[9px] text-emerald-400 font-bold font-mono">
-                            {data.metrics.challengeSuccessRate}% Éxito
-                          </span>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                {/* Leyenda Interactiva sincronizada */}
-                <div className="flex flex-col gap-2.5 w-full sm:w-auto">
-                  <div
-                    onMouseEnter={() => setHoveredDonut("easy")}
-                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-6 min-w-[200px] cursor-pointer transition-colors ${
-                      hoveredDonut === "easy"
-                        ? "bg-emerald-500/15 border-emerald-500/40"
-                        : "bg-zinc-900/70 border-zinc-800 hover:border-zinc-700"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-md bg-emerald-500 shrink-0" />
-                      <div>
-                        <span className="text-xs font-bold text-white block">Fácil</span>
-                        <span className="text-[10px] text-zinc-400">Algoritmos básicos</span>
-                      </div>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-emerald-400">9 (38%)</span>
-                  </div>
-
-                  <div
-                    onMouseEnter={() => setHoveredDonut("medium")}
-                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-6 min-w-[200px] cursor-pointer transition-colors ${
-                      hoveredDonut === "medium"
-                        ? "bg-amber-500/15 border-amber-500/40"
-                        : "bg-zinc-900/70 border-zinc-800 hover:border-zinc-700"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-md bg-amber-500 shrink-0" />
-                      <div>
-                        <span className="text-xs font-bold text-white block">Medio</span>
-                        <span className="text-[10px] text-zinc-400">Estructuras & Big-O</span>
-                      </div>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-amber-400">10 (42%)</span>
-                  </div>
-
-                  <div
-                    onMouseEnter={() => setHoveredDonut("hard")}
-                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-6 min-w-[200px] cursor-pointer transition-colors ${
-                      hoveredDonut === "hard"
-                        ? "bg-purple-500/15 border-purple-500/40"
-                        : "bg-zinc-900/70 border-zinc-800 hover:border-zinc-700"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-md bg-purple-500 shrink-0" />
-                      <div>
-                        <span className="text-xs font-bold text-white block">Difícil / GoF</span>
-                        <span className="text-[10px] text-zinc-400">Visitor, LRU, Sorter</span>
-                      </div>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-purple-400">5 (20%)</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-zinc-800 text-xs flex items-center justify-between text-zinc-400">
-                <span>Catálogo expandido con retos de patrones GoF</span>
-                <span className="text-white font-mono font-semibold">20 disponibles</span>
-              </div>
-            </div>
+            {/* Gráfica 4: Desglose de Desafíos Técnicos (Recharts Interactive Donut) */}
+            <ChallengesDonutChart
+              challengesCompleted={data.metrics.challengesCompleted}
+              challengeSuccessRate={data.metrics.challengeSuccessRate}
+              chartAnimKey={chartAnimKey}
+            />
           </div>
 
-          {/* ═════════ FILA 3: MATRIZ DE DOMINIO TÉCNICO + MAPA DE CALOR GITHUB ═════════ */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfica 5: Matriz de Dominio por Área Técnica (Barras Comparativas) */}
-            <div className="p-6 rounded-3xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Award className="w-5 h-5 text-amber-400" />
-                    Matriz de Dominio Técnico
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Nivel de maestría por ramas clave de la ingeniería de software.
-                  </p>
-                </div>
-                <span className="text-xs text-zinc-500 font-mono">Meta: 75-80%</span>
-              </div>
+          {/* ═════════ FILA 3: MATRIZ DE DOMINIO TÉCNICO + MAPA DE CALOR (INTERACTIVOS) ═════════ */}
+          <AnalyticsMasteryAndHeatmap
+            areas={TECHNICAL_MASTERY_AREAS}
+            activeStreakDays={data.metrics.activeStreakDays}
+            practiceHoursMonth={data.metrics.practiceHoursMonth}
+            chartAnimKey={chartAnimKey}
+          />
 
-              <div key={`mastery-${chartAnimKey}`} className="space-y-4 py-3">
-                {TECHNICAL_MASTERY_AREAS.map((area, idx) => (
-                  <div key={idx} className="space-y-1.5 group">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-zinc-200 group-hover:text-white transition-colors">
-                        {area.name}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${area.badgeColor}`}
-                        >
-                          {area.status}
-                        </span>
-                        <span className="font-mono font-bold text-white">{area.score}%</span>
-                      </div>
-                    </div>
-
-                    {/* Barra de progreso animada con benchmark vertical */}
-                    <div className="w-full bg-zinc-800/90 rounded-full h-2.5 relative overflow-hidden">
-                      <motion.div
-                        initial={prefersReducedMotion ? false : { scaleX: 0 }}
-                        whileInView={{ scaleX: 1 }}
-                        viewport={{ once: true }}
-                        transition={{
-                          duration: 0.85,
-                          delay: 0.08 + idx * 0.09,
-                          ease: CHART_EASE,
-                        }}
-                        style={{ width: `${area.score}%`, transformOrigin: "left" }}
-                        className={`h-full rounded-full bg-gradient-to-r ${area.barColor}`}
-                      />
-                      {/* Línea de benchmark */}
-                      <div
-                        style={{ left: `${area.benchmark}%` }}
-                        className="absolute top-0 bottom-0 w-0.5 bg-white/50 group-hover:bg-white transition-colors pointer-events-none"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-3 border-t border-zinc-800 text-xs flex items-center justify-between text-zinc-400">
-                <span>Línea clara vertical = Umbral requerido de contratación</span>
-                <span className="text-emerald-400 font-semibold font-mono">100% Superado</span>
-              </div>
-            </div>
-
-            {/* Gráfica 6: Mapa de Calor de Actividad y Constancia (GitHub Heatmap Grid) */}
-            <div className="p-6 rounded-3xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-indigo-400" />
-                    Mapa de Calor de Práctica (12 Semanas)
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Registro de frecuencia de simulaciones y ejercicios resueltos.
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-amber-400 font-mono font-bold">
-                  <Flame className="w-4 h-4 fill-amber-400/20" />
-                  <span>Racha: {data.metrics.activeStreakDays} días</span>
-                </div>
-              </div>
-
-              {/* Grid 12 semanas x 7 días con ola diagonal animada */}
-              <div
-                key={`heatmap-${chartAnimKey}`}
-                className="py-3 flex flex-col gap-2 overflow-x-auto"
-                onMouseLeave={() => setHoveredHeatCell(null)}
-              >
-                <div className="flex items-start gap-1.5 justify-center">
-                  <div className="flex flex-col gap-1 text-[9px] text-zinc-500 pr-1 select-none font-mono">
-                    <span>L</span>
-                    <span>M</span>
-                    <span>X</span>
-                    <span>J</span>
-                    <span>V</span>
-                    <span>S</span>
-                    <span>D</span>
-                  </div>
-
-                  {heatmapPattern.map((week, wIdx) => (
-                    <div key={wIdx} className="flex flex-col gap-1">
-                      {week.map((level, dIdx) => {
-                        let colorClass = "bg-zinc-800/60";
-                        if (level === 1) colorClass = "bg-emerald-900/80 border border-emerald-800/40";
-                        if (level === 2) colorClass = "bg-emerald-600/90";
-                        if (level === 3) colorClass = "bg-emerald-400 shadow-sm shadow-emerald-400/30";
-
-                        return (
-                          <motion.div
-                            key={dIdx}
-                            initial={prefersReducedMotion ? false : { scale: 0.35, opacity: 0 }}
-                            whileInView={{ scale: 1, opacity: 1 }}
-                            viewport={{ once: true }}
-                            whileHover={prefersReducedMotion ? undefined : { scale: 1.38, zIndex: 10 }}
-                            transition={{
-                              scale: { duration: 0.25, delay: wIdx * 0.028 + dIdx * 0.015 },
-                              opacity: { duration: 0.25, delay: wIdx * 0.028 + dIdx * 0.015 },
-                            }}
-                            onMouseEnter={() =>
-                              setHoveredHeatCell({
-                                week: wIdx + 1,
-                                day: heatmapDays[dIdx],
-                                level,
-                              })
-                            }
-                            title={`Semana ${wIdx + 1}, Día ${heatmapDays[dIdx]}: ${
-                              level === 0 ? "Sin práctica" : `${level} actividades completadas`
-                            }`}
-                            className={`w-3.5 h-3.5 rounded-[3px] cursor-pointer ${colorClass}`}
-                          />
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Leyenda + lectura en vivo de la celda */}
-                <div className="flex items-center justify-between pt-2 text-[11px] text-zinc-400 min-h-[24px]">
-                  <span className="font-mono text-zinc-300">
-                    {hoveredHeatCell
-                      ? `Sem ${hoveredHeatCell.week} · ${hoveredHeatCell.day}: ${
-                          hoveredHeatCell.level === 0
-                            ? "Sin práctica"
-                            : `${hoveredHeatCell.level} actividades`
-                        }`
-                      : "Total: 48 sesiones registradas"}
-                  </span>
-                  <div className="flex items-center gap-1 text-[10px]">
-                    <span className="text-zinc-500">Menos</span>
-                    <span className="w-2.5 h-2.5 rounded-[2px] bg-zinc-800/60" />
-                    <span className="w-2.5 h-2.5 rounded-[2px] bg-emerald-900/80" />
-                    <span className="w-2.5 h-2.5 rounded-[2px] bg-emerald-600/90" />
-                    <span className="w-2.5 h-2.5 rounded-[2px] bg-emerald-400" />
-                    <span className="text-zinc-300">Más</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-zinc-800 text-xs">
-                <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
-                  <span className="text-zinc-400">Horas de práctica este mes:</span>
-                  <span className="font-bold font-mono text-white">42 hrs</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
-                  <span className="text-zinc-400">Constancia semanal:</span>
-                  <span className="font-bold font-mono text-emerald-400">85% activa</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ═════════ FILA 4: EMBUDO DE POSTULACIONES + CONSEJOS COMPLETOS ═════════ */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfica 7: Embudo Visual de Postulaciones (Application Stepper Funnel) */}
-            <div className="p-6 rounded-3xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Briefcase className="w-5 h-5 text-indigo-400" />
-                    Embudo de Postulaciones
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Conversión de vacantes desde la postulación hasta la oferta final.
-                  </p>
-                </div>
-                <Link
-                  href="/jobs?tab=applications"
-                  className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                >
-                  <span>Ver todas</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-              {/* Stepper Funnel Visual con barras de conversión animadas */}
-              <div key={`funnel-${chartAnimKey}`} className="py-4 space-y-3">
-                {[
-                  {
-                    step: 1,
-                    title: "Postulaciones Enviadas",
-                    desc: "Currículum enviado a vacantes activas",
-                    count: data.metrics.totalApplications,
-                    percent: 100,
-                    percentLabel: "100% inicio",
-                    boxClass: "bg-zinc-900/80 border-zinc-800",
-                    badgeClass: "bg-zinc-800 text-zinc-300",
-                    countClass: "text-white",
-                    subClass: "text-zinc-500",
-                    barClass: "from-zinc-400 to-zinc-300",
-                  },
-                  {
-                    step: 2,
-                    title: "En Proceso de Entrevista",
-                    desc: "Evaluaciones técnicas y filtros activos",
-                    count: data.metrics.interviewingApplications,
-                    percent:
-                      data.metrics.totalApplications > 0
-                        ? Math.round(
-                            (data.metrics.interviewingApplications /
-                              data.metrics.totalApplications) *
-                              100
-                          )
-                        : 0,
-                    percentLabel: `${
-                      data.metrics.totalApplications > 0
-                        ? Math.round(
-                            (data.metrics.interviewingApplications /
-                              data.metrics.totalApplications) *
-                              100
-                          )
-                        : 0
-                    }% avance`,
-                    boxClass: "bg-indigo-500/10 border-indigo-500/30",
-                    badgeClass: "bg-indigo-500/20 text-indigo-400",
-                    countClass: "text-indigo-400",
-                    subClass: "text-indigo-300",
-                    barClass: "from-indigo-500 to-violet-400",
-                  },
-                  {
-                    step: 3,
-                    title: "Ofertas Finales Recibidas",
-                    desc: "Propuesta económica y técnica lista",
-                    count: data.metrics.offeredApplications,
-                    percent:
-                      data.metrics.totalApplications > 0
-                        ? Math.round(
-                            (data.metrics.offeredApplications / data.metrics.totalApplications) *
-                              100
-                          )
-                        : 0,
-                    percentLabel: `${
-                      data.metrics.totalApplications > 0
-                        ? Math.round(
-                            (data.metrics.offeredApplications / data.metrics.totalApplications) *
-                              100
-                          )
-                        : 0
-                    }% éxito final`,
-                    boxClass: "bg-emerald-500/10 border-emerald-500/30",
-                    badgeClass: "bg-emerald-500/20 text-emerald-400",
-                    countClass: "text-emerald-400",
-                    subClass: "text-emerald-300",
-                    barClass: "from-emerald-500 to-teal-400",
-                  },
-                ].map((stage, idx) => (
-                  <div
-                    key={stage.step}
-                    className={`p-3.5 rounded-2xl border flex flex-col gap-2.5 ${stage.boxClass}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold font-mono ${stage.badgeClass}`}
-                        >
-                          {stage.step}
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white block">{stage.title}</span>
-                          <span className="text-[10px] text-zinc-400">{stage.desc}</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className={`text-lg font-black font-mono ${stage.countClass}`}>
-                          {stage.count}
-                        </span>
-                        <span className={`text-[10px] block font-mono ${stage.subClass}`}>
-                          {stage.percentLabel}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="w-full h-1.5 rounded-full bg-zinc-950/70 overflow-hidden">
-                      <motion.div
-                        initial={prefersReducedMotion ? false : { scaleX: 0 }}
-                        whileInView={{ scaleX: 1 }}
-                        viewport={{ once: true }}
-                        transition={{
-                          duration: 0.8,
-                          delay: 0.12 + idx * 0.14,
-                          ease: CHART_EASE,
-                        }}
-                        style={{
-                          width: `${Math.max(stage.percent, stage.count > 0 ? 6 : 0)}%`,
-                          transformOrigin: "left",
-                        }}
-                        className={`h-full rounded-full bg-gradient-to-r ${stage.barClass}`}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between text-xs">
-                <span className="text-zinc-300 font-medium">Tasa de efectividad hacia entrevista:</span>
-                <span className="font-bold font-mono text-emerald-400 text-sm">
-                  {data.metrics.totalApplications > 0
-                    ? Math.round(
-                        (data.metrics.interviewingApplications / data.metrics.totalApplications) * 100
-                      )
-                    : 0}
-                  %
-                </span>
-              </div>
-            </div>
-
-            {/* Apartado: ¿En qué enfocarte para mejorar? (TEXTOS COMPLETOS Y SIN CORTES) */}
-            <div className="p-6 rounded-3xl bg-[#11131c] border border-zinc-800 flex flex-col justify-between shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-amber-400" />
-                    ¿En qué enfocarte para mejorar?
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Consejos concretos detectados a partir de tus prácticas recientes.
-                  </p>
-                </div>
-                <Link
-                  href="/code-challenge"
-                  className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-                >
-                  <span>Practicar retos</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-              {/* Lista de Consejos con Texto Completo, Títulos Semánticos y Acciones */}
-              <div className="space-y-3 py-3">
-                {data.blindspots.slice(0, 3).map((item, idx) => (
-                  <div
-                    key={item.id || idx}
-                    className="p-3.5 rounded-2xl bg-zinc-900/70 border border-zinc-800/80 hover:border-zinc-700/80 transition-colors flex flex-col gap-2"
-                  >
-                    {/* Encabezado del Consejo: Número + Título Semántico + Badge de Categoría */}
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 text-xs font-bold font-mono">
-                          {idx + 1}
-                        </div>
-                        <h4 className="text-xs font-bold text-white tracking-wide">
-                          {item.title}
-                        </h4>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {item.category && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-zinc-800 border border-zinc-700/60 text-zinc-300">
-                            {item.category}
-                          </span>
-                        )}
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                            item.severity === "high"
-                              ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                              : item.severity === "medium"
-                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                              : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                          }`}
-                        >
-                          {item.severity === "high"
-                            ? "Prioritario"
-                            : item.severity === "medium"
-                            ? "Recomendado"
-                            : "Sugerencia"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Texto del Consejo: Completo, legible, sin elipsis ni recortes */}
-                    <p className="text-xs text-zinc-300 leading-relaxed pl-8 break-words whitespace-normal">
-                      {item.detail}
-                    </p>
-
-                    {/* Acción Recomendada Directa */}
-                    {item.action && (
-                      <div className="ml-8 p-2 rounded-xl bg-zinc-950/70 border border-zinc-800/80 flex items-start gap-2 text-xs">
-                        <Target className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
-                        <span className="text-zinc-400 leading-snug">
-                          <strong className="text-zinc-200">Acción sugerida:</strong> {item.action}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Botón de Acción Principal */}
-              <div className="pt-2">
-                <Link
-                  href="/jobs"
-                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition shadow-md shadow-indigo-600/20"
-                >
-                  <span>Hacer una Simulación Completa (Voz + Código)</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
-            </div>
-          </div>
+          {/* ═════════ FILA 4: EMBUDO DE POSTULACIONES + PLAN DE MEJORA (INTERACTIVOS) ═════════ */}
+          <AnalyticsFunnelAndFocus
+            totalApplications={data.metrics.totalApplications}
+            interviewingApplications={data.metrics.interviewingApplications}
+            offeredApplications={data.metrics.offeredApplications}
+            rejectedApplications={data.metrics.rejectedApplications}
+            blindspots={data.blindspots}
+            chartAnimKey={chartAnimKey}
+          />
         </div>
       )}
 
@@ -1288,13 +589,12 @@ export default function AnalyticsPage() {
                 >
                   <div className="flex items-center gap-3.5">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        isApp
-                          ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
-                          : isInt
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isApp
+                        ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                        : isInt
                           ? "bg-pink-500/10 text-pink-400 border border-pink-500/20"
                           : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
-                      }`}
+                        }`}
                     >
                       {isApp ? (
                         <Briefcase className="w-5 h-5" />

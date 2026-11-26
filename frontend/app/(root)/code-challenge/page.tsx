@@ -6,21 +6,20 @@ import {
   Code2,
   Filter,
   Shuffle,
-  ArrowRight,
-  Clock,
   ChevronLeft,
   Layers,
-  Briefcase,
 } from "lucide-react";
 import {
   PROBLEMS,
   getAllProblems,
   DIFFICULTY_LABELS,
-  DIFFICULTY_COLORS,
   type Difficulty,
   type Problem,
 } from "@/lib/problems";
 import { useRouter } from "next/navigation";
+import CodeChallengeCard from "@/components/CodeChallengeCard";
+import GlitterWarpBackdrop from "@/components/GlitterWarpBackdrop";
+import CodeChallengeMidnightHeader from "@/components/CodeChallengeMidnightHeader";
 
 export default function CodeChallengePage() {
   const router = useRouter();
@@ -58,8 +57,16 @@ export default function CodeChallengePage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 min-h-screen pb-16">
-      {/* Header */}
+    <div className="relative min-h-screen pb-16">
+      <GlitterWarpBackdrop
+        mode={categoryFilter === "Patrones de Diseño" ? "patterns" : "all"}
+      />
+
+      <div className="relative z-10 flex flex-col gap-8">
+        <CodeChallengeMidnightHeader
+          mode={categoryFilter === "Patrones de Diseño" ? "patterns" : "all"}
+        >
+        {/* Header */}
       <div className="flex flex-col gap-4">
         <Link
           href="/dashboard"
@@ -172,82 +179,13 @@ export default function CodeChallengePage() {
           Mostrando {filtered.length} reto{filtered.length !== 1 ? "s" : ""}
         </span>
       </div>
+        </CodeChallengeMidnightHeader>
 
       {/* Grid de problemas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((problem) => {
-          const isPattern = problem.category.includes("Patrones de Diseño");
-          const isJobCustom = problem.id.startsWith("job-");
-
-          return (
-            <Link
-              key={problem.id}
-              href={`/code-challenge/${problem.id}`}
-              className={`group flex flex-col gap-4 p-5 rounded-2xl border transition-all hover:scale-[1.01] ${
-                isJobCustom
-                  ? "bg-gradient-to-b from-cyan-950/20 via-zinc-900/60 to-zinc-900/80 border-cyan-500/30 hover:border-cyan-400/60 shadow-lg shadow-cyan-950/20"
-                  : isPattern
-                  ? "bg-indigo-950/20 border-indigo-500/20 hover:border-indigo-500/40 hover:bg-indigo-950/30"
-                  : "bg-zinc-900/40 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/80"
-              }`}
-            >
-              {/* Top row */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex flex-col gap-1">
-                  {isJobCustom && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
-                      <Briefcase className="w-3 h-3" />
-                      Reto de Oferta Laboral
-                    </span>
-                  )}
-                  <span className="text-white font-semibold text-sm leading-snug group-hover:text-cyan-200 transition-colors">
-                    {problem.title}
-                  </span>
-                </div>
-                <span
-                  className={`flex-shrink-0 text-xs font-semibold border px-2.5 py-0.5 rounded-full ${
-                    DIFFICULTY_COLORS[problem.difficulty]
-                  }`}
-                >
-                  {DIFFICULTY_LABELS[problem.difficulty]}
-                </span>
-              </div>
-
-              {/* Description preview */}
-              <p className="text-zinc-400 text-xs leading-relaxed line-clamp-2">
-                {problem.description.replace(/`/g, "").split("\n")[0]}
-              </p>
-
-              {/* Tags + time */}
-              <div className="flex items-center gap-2 flex-wrap mt-auto pt-2">
-                {problem.category.map((cat) => (
-                  <span
-                    key={cat}
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                      cat === "Patrones de Diseño"
-                        ? "bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-semibold"
-                        : "bg-zinc-800/60 border border-zinc-700/50 text-zinc-400"
-                    }`}
-                  >
-                    {cat}
-                  </span>
-                ))}
-                <span className="flex items-center gap-1 ml-auto text-zinc-500 text-[10px] font-mono">
-                  <Clock className="w-3 h-3" />
-                  {problem.timeLimit}m
-                </span>
-              </div>
-
-              {/* Arrow */}
-              <div className="flex items-center justify-end border-t border-zinc-800/50 pt-3 mt-1">
-                <span className="text-xs text-zinc-400 group-hover:text-cyan-300 transition-colors mr-2">
-                  Resolver reto
-                </span>
-                <ArrowRight className="w-4 h-4 text-zinc-500 group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-all" />
-              </div>
-            </Link>
-          );
-        })}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {filtered.map((problem) => (
+          <CodeChallengeCard key={problem.id} problem={problem} />
+        ))}
       </div>
 
       {filtered.length === 0 && (
@@ -267,6 +205,7 @@ export default function CodeChallengePage() {
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }

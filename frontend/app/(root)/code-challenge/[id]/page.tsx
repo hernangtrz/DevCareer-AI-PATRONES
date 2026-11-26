@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import AiLoader from "@/components/AiLoader";
+import ErrorFaceScreen from "@/components/ErrorFaceScreen";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -27,7 +28,6 @@ import {
   Clock,
   Zap,
   ChevronLeft,
-  AlertCircle,
   TrendingUp,
   ThumbsUp,
   Wrench,
@@ -270,13 +270,15 @@ export default function ProblemPage() {
 
   if (!problem) {
     return (
-      <div className="flex flex-col items-center gap-4 py-24 text-center">
-        <AlertCircle className="w-10 h-10 text-white/20" />
-        <p className="text-white/50">Problema no encontrado.</p>
-        <Link href="/code-challenge" className="text-cyan-400 text-sm hover:underline">
-          Volver al listado
-        </Link>
-      </div>
+      <ErrorFaceScreen
+        compact
+        code="404"
+        badge="DevCareer AI · Reto No Encontrado"
+        title="No encontramos este reto de código"
+        description="El identificador del problema no existe o fue movido del catálogo de retos técnicos."
+        backHref="/code-challenge"
+        backLabel="Volver al listado de retos"
+      />
     );
   }
 

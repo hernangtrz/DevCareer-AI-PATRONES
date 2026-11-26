@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import CvTemplateCard from "@/components/CvTemplateCard";
 import CvPreview from "@/components/CvPreview";
+import AiGeneratingOverlay from "@/components/AiGeneratingOverlay";
 import { toast } from "sonner";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -239,6 +240,7 @@ const CvCreatorForm = () => {
           targetRole,
           language,
           profileText,
+          templateId: selectedTemplate,
         }),
       });
 
@@ -246,12 +248,49 @@ const CvCreatorForm = () => {
 
       const responseData = await res.json();
       if (responseData.success && responseData.data) {
-        const { personalInfo: newInfo, experiences: newExp, skills: newSkills, profileText: newProfile } = responseData.data;
-        if (newInfo?.headline) setPersonalInfo(prev => ({ ...prev, headline: newInfo.headline }));
-        if (Array.isArray(newExp)) setExperiences(newExp);
-        if (Array.isArray(newSkills)) setSkills(newSkills);
-        if (newProfile && newProfile.trim()) setProfileText(newProfile);
-        toast.success("¡CV optimizado con éxito!", { id: toastId });
+        const {
+          personalInfo: newInfo,
+          experiences: newExp,
+          education: newEducation,
+          skills: newSkills,
+          profileText: newProfile,
+        } = responseData.data;
+
+        if (newInfo?.headline) {
+          setPersonalInfo((prev) => ({ ...prev, headline: newInfo.headline }));
+        }
+        if (Array.isArray(newExp) && newExp.length > 0) {
+          setExperiences(
+            newExp.map((exp: Partial<WorkExperience>) => ({
+              company: exp.company || "",
+              role: exp.role || "",
+              startDate: exp.startDate || "",
+              endDate: exp.endDate || "",
+              bullets:
+                Array.isArray(exp.bullets) && exp.bullets.length > 0
+                  ? exp.bullets
+                  : [""],
+            }))
+          );
+        }
+        if (Array.isArray(newEducation) && newEducation.length > 0) {
+          setEducation(
+            newEducation.map((edu: Partial<Education>) => ({
+              institution: edu.institution || "",
+              degree: edu.degree || "",
+              year: edu.year || "",
+            }))
+          );
+        }
+        if (Array.isArray(newSkills) && newSkills.length > 0) {
+          setSkills(newSkills);
+        }
+        if (typeof newProfile === "string" && newProfile.trim()) {
+          setProfileText(newProfile.trim());
+        }
+
+        const templateLabel = currentTemplate?.name || selectedTemplate;
+        toast.success(`¡CV potenciado con IA para ${templateLabel}!`, { id: toastId });
       } else {
         throw new Error("No se recibieron datos válidos.");
       }
@@ -289,6 +328,7 @@ const CvCreatorForm = () => {
           targetRole: targetRole || personalInfo.headline || "Profesional",
           language: newLang,
           profileText,
+          templateId: selectedTemplate,
           translate: true,
         }),
       });
@@ -297,11 +337,46 @@ const CvCreatorForm = () => {
 
       const responseData = await res.json();
       if (responseData.success && responseData.data) {
-        const { personalInfo: newInfo, experiences: newExp, skills: newSkills, profileText: newProfile } = responseData.data;
-        if (newInfo?.headline) setPersonalInfo(prev => ({ ...prev, headline: newInfo.headline }));
-        if (Array.isArray(newExp)) setExperiences(newExp);
-        if (Array.isArray(newSkills)) setSkills(newSkills);
-        if (newProfile && newProfile.trim()) setProfileText(newProfile);
+        const {
+          personalInfo: newInfo,
+          experiences: newExp,
+          education: newEducation,
+          skills: newSkills,
+          profileText: newProfile,
+        } = responseData.data;
+
+        if (newInfo?.headline) {
+          setPersonalInfo((prev) => ({ ...prev, headline: newInfo.headline }));
+        }
+        if (Array.isArray(newExp) && newExp.length > 0) {
+          setExperiences(
+            newExp.map((exp: Partial<WorkExperience>) => ({
+              company: exp.company || "",
+              role: exp.role || "",
+              startDate: exp.startDate || "",
+              endDate: exp.endDate || "",
+              bullets:
+                Array.isArray(exp.bullets) && exp.bullets.length > 0
+                  ? exp.bullets
+                  : [""],
+            }))
+          );
+        }
+        if (Array.isArray(newEducation) && newEducation.length > 0) {
+          setEducation(
+            newEducation.map((edu: Partial<Education>) => ({
+              institution: edu.institution || "",
+              degree: edu.degree || "",
+              year: edu.year || "",
+            }))
+          );
+        }
+        if (Array.isArray(newSkills) && newSkills.length > 0) {
+          setSkills(newSkills);
+        }
+        if (typeof newProfile === "string" && newProfile.trim()) {
+          setProfileText(newProfile.trim());
+        }
         setLanguage(newLang);
         toast.success(newLang === "en" ? "¡CV traducido al inglés!" : "¡CV traducido al español!", { id: toastId });
       } else {
@@ -321,7 +396,30 @@ const CvCreatorForm = () => {
       setStep(0);
       return;
     }
-    window.print();
+
+    // Dismiss active toasts before print so notifications never overlap the PDF
+    toast.dismiss();
+
+    const prevTitle = document.title;
+    const safeName = personalInfo.name
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    document.title = safeName ? `CV_${safeName}` : "CV_DevCareer";
+
+    const restoreTitle = () => {
+      document.title = prevTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+    window.addEventListener("afterprint", restoreTitle);
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.print();
+      });
+    });
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -368,6 +466,7 @@ const CvCreatorForm = () => {
           profileText,
           targetRole: role,
           language,
+          templateId: selectedTemplate,
         }),
       });
 
@@ -760,7 +859,7 @@ const CvCreatorForm = () => {
   };
 
   return (
-    <div className="flex flex-col gap-8 w-full">
+    <div className="flex flex-col gap-8 w-full print:block print:gap-0">
       {/* ─── Template selector ─── */}
       <div className="flex flex-col gap-4 no-print">
         <h3 className="text-primary-100">Elige tu plantilla</h3>
@@ -787,6 +886,7 @@ const CvCreatorForm = () => {
                   education={education}
                   photoUrl={photoUrl}
                   profileText={profileText}
+                  language={language}
                 />
               }
             />
@@ -929,6 +1029,7 @@ const CvCreatorForm = () => {
                 education={education}
                 photoUrl={photoUrl}
                 profileText={profileText}
+                language={language}
               />
             </div>
             <p className="text-white/20 text-[11px] text-center">
@@ -949,9 +1050,27 @@ const CvCreatorForm = () => {
           education={education}
           photoUrl={photoUrl}
           profileText={profileText}
+          language={language}
           isPrint={true}
         />
       </div>
+
+      {/* ─── Pantalla de carga IA (Optimizar CV / Perfil con IA) ─── */}
+      <AiGeneratingOverlay
+        visible={isGenerating || isImprovingProfile}
+        title={
+          isImprovingProfile
+            ? "Perfeccionando tu Perfil Profesional con IA"
+            : `Potenciando tu CV para ${currentTemplate?.name || "tu plantilla"}`
+        }
+        subtitle={
+          isImprovingProfile
+            ? "Mejorando redacción, fluidez y palabras clave alineadas a tu rol objetivo..."
+            : selectedTemplate === "ats"
+            ? "Aplicando reglas estrictas ATS: keywords canónicas, verbos de acción y texto limpio..."
+            : "Optimizando titular, perfil profesional, logros, educación y habilidades con IA..."
+        }
+      />
 
       {/* ─── Modal Zoom de Vista Previa ─── */}
       {isZoomOpen && (
@@ -980,6 +1099,7 @@ const CvCreatorForm = () => {
                 education={education}
                 photoUrl={photoUrl}
                 profileText={profileText}
+                language={language}
                 isPrint={true}
               />
             </div>

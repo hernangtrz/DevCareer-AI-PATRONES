@@ -1,0 +1,185 @@
+/*
+ * From Uiverse.io by preet_7613 - https://uiverse.io/preet_7613/new-cougar-63
+ * MIT License, Copyright (c) preet_7613 (Preet)
+ *
+ * Adapted for DevCareer AI error screens with scoped CSS Modules,
+ * DevCareer obsidian/indigo/lavender/fuchsia palette, and reduced-motion support.
+ */
+
+.faceStage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 1rem 0 0.5rem;
+  background: transparent;
+  color: #cac5fe;
+}
+
+.faceGlow {
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.28) 0%,
+    rgba(168, 85, 247, 0.14) 45%,
+    rgba(217, 70, 239, 0) 75%
+  );
+  filter: blur(22px);
+  pointer-events: none;
+}
+
+.face {
+  position: relative;
+  z-index: 1;
+  width: 172px;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 0 18px rgba(129, 140, 248, 0.35));
+}
+
+.faceCompact {
+  width: 140px;
+}
+
+/* Final resting states (also shown immediately when prefers-reduced-motion: reduce) */
+.faceEyes {
+  transform: translateY(15px);
+}
+
+.faceEyeLid {
+  transform: translateY(0);
+}
+
+.facePupil {
+  stroke-dashoffset: 0;
+  transform: translate(0, 0);
+}
+
+.faceNose {
+  transform: translate(0, 22.5px);
+}
+
+.faceMouthLeft,
+.faceMouthRight {
+  stroke-dashoffset: 0;
+}
+
+/* Opt in to the exact new-cougar-63 keyframe sequence when user allows motion */
+@media (prefers-reduced-motion: no-preference) {
+  .faceEyes,
+  .faceMouthLeft,
+  .faceMouthRight,
+  .faceNose {
+    animation-duration: 1s;
+    animation-delay: 0.3s;
+    animation-fill-mode: both;
+  }
+
+  .faceEyes {
+    animation-name: devcareerFaceEyes;
+  }
+
+  .faceMouthLeft {
+    animation-name: devcareerFaceMouthLeft;
+  }
+
+  .faceMouthRight {
+    animation-name: devcareerFaceMouthRight;
+  }
+
+  .faceNose {
+    animation-name: devcareerFaceNose;
+  }
+
+  .faceEyeLid,
+  .facePupil {
+    animation-duration: 4s;
+    animation-delay: 1.3s;
+    animation-iteration-count: infinite;
+    animation-fill-mode: forwards;
+  }
+
+  .faceEyeLid {
+    animation-name: devcareerFaceEyeLid;
+  }
+
+  .facePupil {
+    animation-name: devcareerFacePupil;
+  }
+}
+
+@keyframes devcareerFaceEyeLid {
+  0%,
+  40%,
+  45%,
+  100% {
+    transform: translateY(0);
+  }
+  42.5% {
+    transform: translateY(17.5px);
+  }
+}
+
+@keyframes devcareerFaceEyes {
+  from {
+    transform: translateY(112.5px);
+  }
+  to {
+    transform: translateY(15px);
+  }
+}
+
+@keyframes devcareerFacePupil {
+  0%,
+  37.5%,
+  40%,
+  45%,
+  87.5%,
+  100% {
+    stroke-dashoffset: 0;
+    transform: translate(0, 0);
+  }
+  12.5%,
+  25%,
+  62.5%,
+  75% {
+    transform: translate(-35px, 0);
+  }
+  42.5% {
+    stroke-dashoffset: 35;
+    transform: translate(0, 17.5px);
+  }
+}
+
+@keyframes devcareerFaceMouthLeft {
+  from,
+  50% {
+    stroke-dashoffset: -102;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes devcareerFaceMouthRight {
+  from,
+  50% {
+    stroke-dashoffset: 102;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes devcareerFaceNose {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(0, 22.5px);
+  }
+}

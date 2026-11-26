@@ -1,0 +1,287 @@
+/*
+ * From Uiverse.io by victoryamaykin - https://uiverse.io/victoryamaykin/funny-rabbit-33
+ * MIT License, Copyright (c) victoryamaykin (Victor Yamaykin)
+ *
+ * Adapted for DevCareer AI CV & ATS Hub tab switcher with scoped CSS Modules,
+ * preserving Constructor (indigo) & Diagnóstico (fuchsia) colors and full labels,
+ * GPU-composited sliding pill & circular knob, accessible focus rings, and
+ * opt-in motion via prefers-reduced-motion: no-preference.
+ */
+
+.switchRoot {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .switchRoot {
+    width: fit-content;
+  }
+}
+
+/* Synced hidden state checkbox driving the funny-rabbit-33 :checked transitions */
+.stateInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+  pointer-events: none;
+}
+
+.sliderTrack {
+  position: relative;
+  display: block;
+  padding: 6px;
+  border-radius: 9999px;
+  background-color: rgba(24, 24, 27, 0.72);
+  border: 1px solid rgba(39, 39, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.sliderInner {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  width: 100%;
+}
+
+/* Active colored pill sliding smoothly between Indigo (Constructor) and Fuchsia (Diagnóstico) */
+.activePill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  width: 50%;
+  border-radius: 9999px;
+  background-color: #4f46e5;
+  box-shadow: 0 0 18px rgba(99, 102, 241, 0.45);
+  transform: translateX(0%);
+  pointer-events: none;
+}
+
+.stateInput:checked + .sliderTrack .activePill {
+  background-color: #c026d3;
+  box-shadow: 0 0 18px rgba(217, 70, 239, 0.45);
+  transform: translateX(100%);
+}
+
+/* Signature white circular knob from funny-rabbit-33 gliding across the full pill width */
+.knobCarrier {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  z-index: 1;
+  width: calc(100% - 38px);
+  transform: translateX(0%);
+  pointer-events: none;
+}
+
+.stateInput:checked + .sliderTrack .knobCarrier {
+  transform: translateX(100%);
+}
+
+.knob {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  transform: translateY(-50%);
+}
+
+/* Interactive tab buttons overlaid above the sliding pill & white knob */
+.tabButton {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: #a1a1aa;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.3s ease;
+}
+
+@media (min-width: 640px) {
+  .tabButton {
+    font-size: 0.875rem;
+    white-space: nowrap;
+  }
+}
+
+.tabButton:hover {
+  color: #e4e4e7;
+}
+
+.tabButton:focus-visible {
+  outline: 2px solid #c7d2fe;
+  outline-offset: 2px;
+}
+
+.tabButtonActive {
+  color: #ffffff;
+}
+
+.tabButtonActive:hover {
+  color: #ffffff;
+}
+
+.tabLeft {
+  padding: 0.55rem 1.15rem 0.55rem 2.65rem;
+}
+
+.tabRight {
+  padding: 0.55rem 2.65rem 0.55rem 1.15rem;
+}
+
+/* Icon slots centered pixel-accurately inside the 28px white knob endpoints */
+.iconSlot {
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: color 0.35s ease;
+}
+
+.iconSlotLeft {
+  left: 5px;
+  color: #a1a1aa;
+}
+
+.iconSlotRight {
+  right: 5px;
+  color: #a1a1aa;
+}
+
+.iconCreatorActive {
+  color: #4f46e5;
+}
+
+.iconAnalyzerActive {
+  color: #c026d3;
+}
+
+.icon {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+/* Opt in to the 0.4s sliding pill & knob animation only when user allows motion */
+@media (prefers-reduced-motion: no-preference) {
+  .activePill {
+    transition:
+      transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+      background-color 0.4s ease,
+      box-shadow 0.4s ease;
+  }
+
+  .knobCarrier {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* ── Compact full-width ATS CV input mode variant (Subir PDF / Pegar texto) ── */
+.atsRoot {
+  width: 100%;
+  margin-top: 0;
+}
+
+@media (min-width: 640px) {
+  .atsRoot {
+    width: 100%;
+  }
+}
+
+.atsRoot .sliderTrack {
+  padding: 5px;
+  background-color: var(--color-dark-200, #27282f);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.atsRoot .activePill {
+  background-color: rgba(192, 38, 211, 0.24);
+  border: 1px solid rgba(217, 70, 239, 0.42);
+  box-shadow: 0 0 16px rgba(217, 70, 239, 0.26);
+}
+
+.atsRoot .stateInput:checked + .sliderTrack .activePill {
+  background-color: rgba(168, 85, 247, 0.26);
+  border: 1px solid rgba(192, 132, 252, 0.45);
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.28);
+}
+
+.atsRoot .knobCarrier {
+  left: 5px;
+  width: calc(100% - 36px);
+}
+
+.atsRoot .knob {
+  width: 26px;
+  height: 26px;
+}
+
+.atsRoot .tabButton {
+  min-height: 36px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.atsRoot .tabButton:hover {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.atsRoot .tabButtonActive,
+.atsRoot .tabButtonActive:hover {
+  color: #f5d0fe;
+}
+
+.atsRoot .tabLeft {
+  padding: 0.5rem 0.9rem 0.5rem 2.4rem;
+}
+
+.atsRoot .tabRight {
+  padding: 0.5rem 2.4rem 0.5rem 0.9rem;
+}
+
+.atsRoot .iconSlot {
+  width: 26px;
+  height: 26px;
+}
+
+.atsRoot .icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.iconAtsFileActive {
+  color: #c026d3;
+}
+
+.iconAtsTextActive {
+  color: #9333ea;
+}

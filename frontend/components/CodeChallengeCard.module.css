@@ -1,0 +1,245 @@
+/*
+ * From Uiverse.io by Smit-Prajapati - https://uiverse.io/Smit-Prajapati/spicy-rat-83
+ * MIT License, Copyright (c) Smit-Prajapati (Smit Prajapati)
+ *
+ * Adapted for DevCareer AI Code Challenge & Design Pattern cards with scoped
+ * CSS Modules, preserving card readability while keeping the signature
+ * hover border-radius morph, rotating inner frame (.innerBorder), sweeping
+ * light trail (.trail), and bottom-border letter-spacing reveal (.bottomText).
+ */
+
+.card {
+  --frame-accent: #22d3ee;
+  --frame-accent-rgb: 34, 211, 238;
+  --card-surface: #12141e;
+  --card-surface-hover: #151824;
+  --card-rest-border: rgba(39, 39, 42, 0.9);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 1.35rem 1.35rem 1.75rem;
+  border-radius: 16px;
+  border: 1px solid var(--card-rest-border);
+  background: var(--card-surface);
+  overflow: hidden;
+  text-decoration: none;
+  z-index: 0;
+  transition:
+    border-radius 0.5s ease-in-out,
+    border-color 0.5s ease-in-out,
+    background-color 0.5s ease-in-out,
+    box-shadow 0.5s ease-in-out;
+}
+
+.variantPattern {
+  --frame-accent: #818cf8;
+  --frame-accent-rgb: 129, 140, 248;
+  --card-surface: #131428;
+  --card-surface-hover: #171834;
+  --card-rest-border: rgba(99, 102, 241, 0.25);
+}
+
+.variantJob {
+  --frame-accent: #38bdf8;
+  --frame-accent-rgb: 56, 189, 248;
+  --card-surface: #0f1824;
+  --card-surface-hover: #121f30;
+  --card-rest-border: rgba(6, 182, 212, 0.35);
+}
+
+.card:hover,
+.card:focus-visible {
+  border-radius: 0;
+  border-color: rgba(var(--frame-accent-rgb), 0.25);
+  background: var(--card-surface-hover);
+  box-shadow: 0 18px 40px -18px rgba(var(--frame-accent-rgb), 0.32);
+  z-index: 2;
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--frame-accent);
+  outline-offset: 3px;
+}
+
+/* Signature rotating inset border frame from spicy-rat-83 */
+.innerBorder {
+  position: absolute;
+  inset: 0px;
+  border: 2px solid var(--frame-accent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition:
+    inset 0.5s ease-in-out,
+    opacity 0.5s ease-in-out;
+}
+
+.card:hover .innerBorder,
+.card:focus-visible .innerBorder {
+  inset: 10px;
+  opacity: 0.9;
+}
+
+/* Sweeping golden/accent trail shimmer across the top strip on hover */
+.trail {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  right: 10px;
+  left: 10px;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  height: 100%;
+  padding: 0.25rem;
+  transition: transform 0.5s ease-in-out;
+}
+
+/* Bottom label cutting across the inner border line with letter-spacing contraction */
+.bottomText {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  z-index: 3;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 2px 8px 2px 11px;
+  color: var(--frame-accent);
+  background: var(--card-surface-hover);
+  opacity: 0;
+  letter-spacing: 7px;
+  pointer-events: none;
+  transition:
+    opacity 0.5s ease-in-out,
+    letter-spacing 0.5s ease-in-out;
+}
+
+.card:hover .bottomText,
+.card:focus-visible .bottomText {
+  opacity: 1;
+  letter-spacing: 3px;
+}
+
+/* Expandable accent underline bar inspired by spicy-rat-83 logo reveal */
+.revealRule {
+  position: relative;
+  height: 2px;
+  width: 28px;
+  background: linear-gradient(
+    90deg,
+    var(--frame-accent) 0%,
+    rgba(var(--frame-accent-rgb), 0.35) 100%
+  );
+  overflow: hidden;
+  transition: width 0.8s ease-in-out;
+}
+
+.card:hover .revealRule,
+.card:focus-visible .revealRule {
+  width: 100%;
+}
+
+/* Opt in to spatial rotation/scale/sweep motion when user allows motion */
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    transition:
+      transform 0.5s ease-in-out,
+      border-radius 0.5s ease-in-out,
+      border-color 0.5s ease-in-out,
+      background-color 0.5s ease-in-out,
+      box-shadow 0.5s ease-in-out;
+  }
+
+  .card:hover,
+  .card:focus-visible {
+    transform: scale(1.03);
+  }
+
+  .innerBorder {
+    transform: rotate(10deg);
+    transition:
+      inset 0.5s ease-in-out,
+      opacity 0.5s ease-in-out,
+      transform 0.5s ease-in-out;
+  }
+
+  .card:hover .innerBorder,
+  .card:focus-visible .innerBorder {
+    transform: rotate(0deg);
+  }
+
+  .card:hover .revealRule,
+  .card:focus-visible .revealRule {
+    animation: spicyRatRuleEdge 1s ease-in-out;
+  }
+
+  .card:hover .trail,
+  .card:focus-visible .trail {
+    animation: spicyRatTrail 1s ease-in-out;
+  }
+}
+
+@keyframes spicyRatRuleEdge {
+  0% {
+    border-right: 1px solid transparent;
+  }
+  10% {
+    border-right: 1px solid var(--frame-accent);
+  }
+  80% {
+    border-right: 1px solid var(--frame-accent);
+  }
+  100% {
+    border-right: 1px solid transparent;
+  }
+}
+
+@keyframes spicyRatTrail {
+  0% {
+    background: linear-gradient(
+      90deg,
+      rgba(var(--frame-accent-rgb), 0) 90%,
+      rgba(var(--frame-accent-rgb), 0.35) 100%
+    );
+    opacity: 0;
+  }
+  30% {
+    background: linear-gradient(
+      90deg,
+      rgba(var(--frame-accent-rgb), 0) 68%,
+      rgba(var(--frame-accent-rgb), 0.32) 100%
+    );
+    opacity: 1;
+  }
+  70% {
+    background: linear-gradient(
+      90deg,
+      rgba(var(--frame-accent-rgb), 0) 68%,
+      rgba(var(--frame-accent-rgb), 0.28) 100%
+    );
+    opacity: 1;
+  }
+  95% {
+    background: linear-gradient(
+      90deg,
+      rgba(var(--frame-accent-rgb), 0) 90%,
+      rgba(var(--frame-accent-rgb), 0) 100%
+    );
+    opacity: 0;
+  }
+}

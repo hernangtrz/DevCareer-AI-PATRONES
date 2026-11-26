@@ -1,0 +1,108 @@
+.footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(3, 3, 6, 0.92);
+  padding: 2rem 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .footer {
+    padding: 2.25rem 3rem;
+  }
+}
+
+.inner {
+  max-width: 80rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .inner {
+    flex-direction: row;
+    gap: 2rem;
+  }
+}
+
+.navList {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navItem {
+  position: relative;
+  list-style: none;
+}
+
+.navLink {
+  display: inline-block;
+  padding-block: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.62);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.navLink:hover,
+.navLink:focus-visible,
+.navItemActive .navLink {
+  color: #ffffff;
+}
+
+.navLink:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 4px;
+  border-radius: 0.25rem;
+}
+
+/* Anchor the active/hovered item for CSS Anchor Positioning */
+.navItemActive {
+  anchor-name: --devcareer-footer-anchor;
+}
+
+/* Gliding underline drawn via ::before and border-block-end (Forced Colors safe) */
+.navList::before {
+  content: "";
+  position: absolute;
+  position-anchor: --devcareer-footer-anchor;
+  inset-block-start: calc(anchor(self-end) + 0.15rem);
+  inset-inline-start: anchor(self-start);
+  inset-inline-end: anchor(self-end);
+  border-block-end: 2px solid #818cf8;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.navListVisible::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .navList::before {
+    transition:
+      inset 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.2s ease;
+  }
+}
+
+/* Fallback for browsers without CSS Anchor Positioning */
+@supports not (position-anchor: --devcareer-footer-anchor) {
+  .navList::before {
+    content: none;
+  }
+
+  .navListVisible .navItemActive .navLink {
+    border-block-end: 2px solid #818cf8;
+  }
+}

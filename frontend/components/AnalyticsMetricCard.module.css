@@ -1,0 +1,135 @@
+/*
+ * From Uiverse.io by ElSombrero2 - https://uiverse.io/ElSombrero2/fresh-wombat-97
+ * MIT License, Copyright (c) ElSombrero2 (Rakotondrasoa Nirilala)
+ *
+ * Adapted for DevCareer AI Analytics KPI cards with scoped CSS Modules,
+ * responsive fluid sizing, compositor-only transform/opacity animations,
+ * and opt-in rotation via prefers-reduced-motion: no-preference.
+ */
+
+.wombatCard {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 2px;
+  border-radius: 1rem;
+  background: #171923;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow:
+    0 0 0 1px rgba(39, 39, 42, 0.9),
+    0 0 3px 1px #00000088;
+  cursor: pointer;
+  transition: box-shadow 300ms ease;
+}
+
+.highlighted {
+  box-shadow:
+    0 0 0 1px rgba(99, 102, 241, 0.35),
+    0 10px 15px -3px rgba(0, 0, 0, 0.35),
+    0 0 3px 1px #00000088;
+}
+
+.wombatCard:hover,
+.wombatCard:focus-within {
+  box-shadow:
+    0 0 0 1px rgba(255, 34, 136, 0.22),
+    0 10px 26px -6px rgba(56, 126, 240, 0.24),
+    0 0 3px 1px #00000088;
+}
+
+/* Rotating neon beam (exact #ff2288 -> #387ef0 palette from fresh-wombat-97) */
+.wombatCard::before {
+  content: " ";
+  position: absolute;
+  z-index: 0;
+  display: block;
+  width: 110px;
+  height: 560px;
+  background: linear-gradient(#ff2288, #387ef0);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+}
+
+.wombatCard:hover::before,
+.wombatCard:focus-within::before {
+  opacity: 1;
+}
+
+/* Frosted diffuser between rotating beam and card content */
+.wombatCard::after {
+  content: " ";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  background: #17171733;
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
+  pointer-events: none;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(1rem - 2px);
+  background: #11131c;
+  padding: 1.25rem;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+/* Subtle inner ambient white sheen on hover */
+.content::before {
+  content: " ";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: block;
+  width: 8px;
+  height: 56px;
+  background: #ffffff;
+  filter: blur(50px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+}
+
+.wombatCard:hover .content::before,
+.wombatCard:focus-within .content::before {
+  opacity: 1;
+}
+
+/* Opt in to continuous rotation only when user has no reduced-motion preference */
+@media (prefers-reduced-motion: no-preference) {
+  .wombatCard::before {
+    will-change: transform, opacity;
+    animation: wombatRotation 8000ms infinite linear;
+    animation-play-state: paused;
+  }
+
+  .wombatCard:hover::before,
+  .wombatCard:focus-within::before {
+    animation-play-state: running;
+  }
+}
+
+@keyframes wombatRotation {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}

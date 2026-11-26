@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Sparkles,
   FileCheck2,
-  AlignLeft,
   Info,
   CheckCircle2,
   Mic,
@@ -20,6 +19,7 @@ import {
 import AtsScoreCard from "./AtsScoreCard";
 import KeywordsPanel from "./KeywordsPanel";
 import SuggestionCard from "./SuggestionCard";
+import { AtsInputModeSwitch } from "./CvTabSwitch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface AnalysisResult {
@@ -306,32 +306,7 @@ const CvAnalyzerUpload = () => {
                 </div>
 
                 {/* Mode toggle */}
-                <div className="flex bg-dark-200 rounded-xl p-1 gap-1">
-                  <button
-                    onClick={() => setCvInputMode("file")}
-                    className={cn(
-                      "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer",
-                      cvInputMode === "file"
-                        ? "bg-fuchsia-600/20 border border-fuchsia-500/30 text-fuchsia-300"
-                        : "text-white/40 hover:text-white/70"
-                    )}
-                  >
-                    <Upload className="h-3.5 w-3.5" />
-                    Subir PDF
-                  </button>
-                  <button
-                    onClick={() => setCvInputMode("text")}
-                    className={cn(
-                      "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer",
-                      cvInputMode === "text"
-                        ? "bg-fuchsia-600/20 border border-fuchsia-500/30 text-fuchsia-300"
-                        : "text-white/40 hover:text-white/70"
-                    )}
-                  >
-                    <AlignLeft className="h-3.5 w-3.5" />
-                    Pegar texto
-                  </button>
-                </div>
+                <AtsInputModeSwitch mode={cvInputMode} onChange={setCvInputMode} />
 
                 {/* File upload zone */}
                 {cvInputMode === "file" ? (

@@ -2,7 +2,9 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import AiLoader from "@/components/AiLoader";
+import AiGeneratingOverlay from "@/components/AiGeneratingOverlay";
 import {
   User,
   FileText,
@@ -21,6 +23,7 @@ import {
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<"personal" | "summary" | "skills" | "experience" | "education" | "resume">("personal");
   const [uploadingResume, setUploadingResume] = useState(false);
+  const [optimizingProfile, setOptimizingProfile] = useState(false);
 
   // Profile data
   const [profileData, setProfileData] = useState({
@@ -77,8 +80,52 @@ export default function ProfilePage() {
     }, 1500);
   };
 
+  const handleOptimizeSummaryWithAi = async () => {
+    if (!profileData.summary.trim()) {
+      toast.error("Escribe primero un borrador en tu resumen profesional antes de optimizarlo con IA.");
+      return;
+    }
+
+    setOptimizingProfile(true);
+    try {
+      const res = await fetch("/api/proxy/api/cv/improve-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileText: profileData.summary,
+          targetRole: profileData.headline || "Senior Software Engineer",
+          language: "es",
+          templateId: "ats",
+        }),
+      });
+
+      if (!res.ok) throw new Error("Error en el servidor al optimizar el perfil.");
+
+      const responseData = await res.json();
+      if (responseData.success && responseData.data?.refinedProfile) {
+        setProfileData((prev) => ({
+          ...prev,
+          summary: responseData.data.refinedProfile,
+        }));
+        toast.success("¡Resumen profesional optimizado con IA!");
+      } else {
+        throw new Error("No se recibió una respuesta válida de la IA.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo optimizar el perfil con IA. Inténtalo de nuevo.");
+    } finally {
+      setOptimizingProfile(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 min-h-screen pb-16">
+      <AiGeneratingOverlay
+        visible={optimizingProfile}
+        title="Optimizando tu perfil con IA"
+        subtitle="Mejorando redacción, verbos de acción y compatibilidad ATS de tu resumen profesional..."
+      />
       {uploadingResume && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-6">
           <div className="p-8 rounded-3xl bg-[#0c0d14]/95 border border-white/10 shadow-2xl">
@@ -353,11 +400,13 @@ export default function ProfilePage() {
                   Resumen Profesional
                 </h3>
                 <button
-                  onClick={() => alert("¡Resumen profesional optimizado con verbos de acción por IA!")}
-                  className="px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  type="button"
+                  onClick={handleOptimizeSummaryWithAi}
+                  disabled={optimizingProfile}
+                  className="px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Optimizar con IA</span>
+                  <span>{optimizingProfile ? "Optimizando..." : "Optimizar con IA"}</span>
                 </button>
               </div>
 
